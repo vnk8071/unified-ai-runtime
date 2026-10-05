@@ -168,6 +168,53 @@ UAIRT_API uairt_status uairt_model_run(
     uairt_tensor* outputs,
     size_t num_outputs);
 
+/*
+ * Language models: the vocabulary calls and sessions work on models whose backend supports them (llamacpp) and return
+ * UAIRT_ERR_UNSUPPORTED otherwise. Where a call fills a buffer, a `capacity` that is too small returns
+ * UAIRT_ERR_INVALID_ARGUMENT and still sets the out count to the size needed, so capacity 0 sizes a buffer.
+ * One token can be part of a multi-byte character: detokenize returns bytes, and the caller joins them.
+ * Backends may parse special-token text such as `<|eot_id|>` into control tokens when tokenizing (llamacpp does); do
+ * not tokenize untrusted text if that matters.
+ */
+UAIRT_API uairt_status uairt_model_vocab_size(const uairt_model* model, size_t* out_size);
+UAIRT_API uairt_status uairt_model_tokenize(
+    const uairt_model* model,
+    const char* text,
+    size_t text_len,
+    int add_special,
+    int32_t* tokens,
+    size_t capacity,
+    size_t* out_count);
+/* Writes no terminating NUL. */
+UAIRT_API uairt_status uairt_model_detokenize(
+    const uairt_model* model,
+    const int32_t* tokens,
+    size_t count,
+    char* out,
+    size_t capacity,
+    size_t* out_nbytes);
+
+/*
+ * A session keeps the model's state (the KV cache) between calls. A model can have several sessions, each independent.
+ * Do not use one session from two threads at once; different sessions are independent and may be used from different
+ * threads. Destroy sessions before their model. Option: `n_ctx`, the tokens of context.
+ */
+typedef struct uairt_session uairt_session;
+
+UAIRT_API uairt_status uairt_session_create(
+    uairt_model* model,
+    const uairt_option* options,
+    size_t num_options,
+    uairt_session** out_session);
+UAIRT_API void uairt_session_destroy(uairt_session* session);
+/* Feeds tokens at the current position. A call that would pass the context size fails and changes nothing. */
+UAIRT_API uairt_status uairt_session_append(uairt_session* session, const int32_t* tokens, size_t count);
+/* Logits of the last appended token (one per vocabulary entry). Fails before the first append and after a reset. */
+UAIRT_API uairt_status
+uairt_session_logits(const uairt_session* session, float* out, size_t capacity, size_t* out_count);
+UAIRT_API uairt_status uairt_session_position(const uairt_session* session, size_t* out_position);
+UAIRT_API uairt_status uairt_session_reset(uairt_session* session);
+
 #ifdef __cplusplus
 }
 #endif

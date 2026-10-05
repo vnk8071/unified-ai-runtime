@@ -125,3 +125,31 @@ buffer_data = _declare("uairt_buffer_data", ctypes.c_void_p, ctypes.c_void_p)
 buffer_fd = _declare("uairt_buffer_fd", ctypes.c_int32, ctypes.c_void_p)
 buffer_size = _declare("uairt_buffer_size", ctypes.c_size_t, ctypes.c_void_p)
 tensor_use_buffer = _declare("uairt_tensor_use_buffer", None, ctypes.POINTER(Tensor), ctypes.c_void_p)
+
+
+def _declare_optional(name, restype, *argtypes):
+    """A function an older libuairt may lack: None when the symbol is missing."""
+    try:
+        return _declare(name, restype, *argtypes)
+    except AttributeError:
+        return None
+
+
+c_int32_p = ctypes.POINTER(ctypes.c_int32)
+c_float_p = ctypes.POINTER(ctypes.c_float)
+c_size_p = ctypes.POINTER(ctypes.c_size_t)
+
+model_vocab_size = _declare_optional("uairt_model_vocab_size", ctypes.c_int32, ctypes.c_void_p, c_size_p)
+model_tokenize = _declare_optional("uairt_model_tokenize", ctypes.c_int32, ctypes.c_void_p, ctypes.c_char_p,
+                                   ctypes.c_size_t, ctypes.c_int, c_int32_p, ctypes.c_size_t, c_size_p)
+model_detokenize = _declare_optional("uairt_model_detokenize", ctypes.c_int32, ctypes.c_void_p, c_int32_p,
+                                     ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t, c_size_p)
+session_create = _declare_optional("uairt_session_create", ctypes.c_int32, ctypes.c_void_p, ctypes.POINTER(Option),
+                                   ctypes.c_size_t, c_void_pp)
+session_destroy = _declare_optional("uairt_session_destroy", None, ctypes.c_void_p)
+session_append = _declare_optional("uairt_session_append", ctypes.c_int32, ctypes.c_void_p, c_int32_p,
+                                   ctypes.c_size_t)
+session_logits = _declare_optional("uairt_session_logits", ctypes.c_int32, ctypes.c_void_p, c_float_p,
+                                   ctypes.c_size_t, c_size_p)
+session_position = _declare_optional("uairt_session_position", ctypes.c_int32, ctypes.c_void_p, c_size_p)
+session_reset = _declare_optional("uairt_session_reset", ctypes.c_int32, ctypes.c_void_p)

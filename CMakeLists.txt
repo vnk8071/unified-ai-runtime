@@ -244,6 +244,59 @@ if(UAIRT_BUILD_TENSORRT)
   install(TARGETS uairt_backend_tensorrt LIBRARY DESTINATION lib/uairt)
 endif()
 
+option(UAIRT_BUILD_LLAMACPP "Build the llama.cpp backend plugin (GGUF language models)" OFF)
+if(UAIRT_BUILD_LLAMACPP)
+  enable_language(CXX)
+  set(UAIRT_LLAMACPP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp" CACHE PATH
+      "llama.cpp source tree; the default is the pinned submodule")
+  if(NOT EXISTS "${UAIRT_LLAMACPP_ROOT}/CMakeLists.txt")
+    message(FATAL_ERROR
+      "llama.cpp not found at ${UAIRT_LLAMACPP_ROOT}. Run: git submodule update --init third_party/llama.cpp "
+      "(or set UAIRT_LLAMACPP_ROOT to a llama.cpp checkout).")
+  endif()
+
+  # The comparison test runs llama.cpp's own llama-completion, so tools are built only when that test is enabled.
+  if(DEFINED ENV{UAIRT_LLAMACPP_TEST_MODEL})
+    set(UAIRT_LLAMACPP_TOOLS ON)
+  else()
+    set(UAIRT_LLAMACPP_TOOLS OFF)
+  endif()
+  set(UAIRT_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+  set(BUILD_SHARED_LIBS OFF)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set(LLAMA_BUILD_COMMON ${UAIRT_LLAMACPP_TOOLS} CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_TOOLS ${UAIRT_LLAMACPP_TOOLS} CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+  set(LLAMA_BUILD_APP OFF CACHE BOOL "" FORCE)
+  set(LLAMA_OPENSSL OFF CACHE BOOL "" FORCE)
+  if(APPLE)
+    set(GGML_METAL ON CACHE BOOL "" FORCE)
+    set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)
+  endif()
+  add_subdirectory(${UAIRT_LLAMACPP_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/llama.cpp EXCLUDE_FROM_ALL)
+  set(BUILD_SHARED_LIBS ${UAIRT_SAVED_BUILD_SHARED_LIBS})
+
+  add_library(uairt_backend_llamacpp MODULE src/backends/llamacpp.c)
+  target_include_directories(uairt_backend_llamacpp PRIVATE include)
+  target_compile_definitions(uairt_backend_llamacpp PRIVATE UAIRT_BUILDING_SHARED)
+  target_link_libraries(uairt_backend_llamacpp PRIVATE llama Threads::Threads)
+  set_target_properties(uairt_backend_llamacpp PROPERTIES
+    PREFIX "lib" C_VISIBILITY_PRESET hidden LINKER_LANGUAGE CXX)
+  # Only uairt_backend_get_api may be visible: llama.cpp and ggml must not clash with another ggml in the process.
+  if(APPLE)
+    target_link_options(uairt_backend_llamacpp PRIVATE -Wl,-exported_symbol,_uairt_backend_get_api)
+  elseif(NOT WIN32)
+    target_link_options(uairt_backend_llamacpp PRIVATE -Wl,--exclude-libs,ALL)
+  endif()
+  install(TARGETS uairt_backend_llamacpp LIBRARY DESTINATION lib/uairt)
+  if(UAIRT_BUILD_EXAMPLES)
+    add_executable(llm_generate examples/llm_generate.c)
+    target_link_libraries(llm_generate PRIVATE uairt)
+  endif()
+endif()
+
 if(UAIRT_BUILD_TESTS)
   enable_testing()
 
@@ -256,6 +309,18 @@ if(UAIRT_BUILD_TESTS)
   add_executable(test_core tests/test_core.c)
   target_link_libraries(test_core PRIVATE uairt)
   add_test(NAME core COMMAND test_core $<TARGET_FILE:uairt_reference_plugin>)
+
+  foreach(variant 1 2 3)
+    add_library(uairt_session_test_${variant} MODULE tests/session_test_plugin.c)
+    target_compile_definitions(uairt_session_test_${variant} PRIVATE
+      UAIRT_BUILDING_SHARED SESSION_TEST_VARIANT=${variant})
+    target_include_directories(uairt_session_test_${variant} PRIVATE include)
+    set_target_properties(uairt_session_test_${variant} PROPERTIES PREFIX "" C_VISIBILITY_PRESET hidden)
+  endforeach()
+  add_executable(test_session tests/test_session.c)
+  target_link_libraries(test_session PRIVATE uairt)
+  add_test(NAME session COMMAND test_session
+    $<TARGET_FILE:uairt_session_test_1> $<TARGET_FILE:uairt_session_test_2> $<TARGET_FILE:uairt_session_test_3>)
 
   if(UAIRT_BUILD_ONNXRUNTIME)
     add_executable(test_onnxruntime tests/test_onnxruntime.c)
@@ -338,6 +403,44 @@ if(UAIRT_BUILD_TESTS)
         $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_coreml>)
     endif()
   endif()
+  if(UAIRT_BUILD_LLAMACPP)
+    add_executable(test_llamacpp tests/test_llamacpp.c)
+    target_link_libraries(test_llamacpp PRIVATE uairt)
+    add_test(NAME llamacpp_errors COMMAND test_llamacpp $<TARGET_FILE:uairt_backend_llamacpp>
+      ${CMAKE_CURRENT_BINARY_DIR})
+    if(DEFINED ENV{UAIRT_LLAMACPP_TEST_MODEL})
+      add_test(NAME llamacpp_model COMMAND test_llamacpp $<TARGET_FILE:uairt_backend_llamacpp>
+        ${CMAKE_CURRENT_BINARY_DIR} $ENV{UAIRT_LLAMACPP_TEST_MODEL})
+      if(UAIRT_BUILD_EXAMPLES)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        add_dependencies(llm_generate llama-completion)
+        add_test(NAME llamacpp_vs_llama_completion COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_llamacpp.py
+          $<TARGET_FILE:llm_generate> $<TARGET_FILE:uairt_backend_llamacpp>
+          $<TARGET_FILE:llama-completion> $ENV{UAIRT_LLAMACPP_TEST_MODEL})
+      endif()
+    endif()
+  endif()
+
+  if(BUILD_SHARED_LIBS)
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+      execute_process(COMMAND ${Python3_EXECUTABLE} -c "import pytest, numpy"
+        RESULT_VARIABLE UAIRT_PYTEST_RESULT OUTPUT_QUIET ERROR_QUIET)
+      if(UAIRT_PYTEST_RESULT EQUAL 0)
+        add_test(NAME python_sessions COMMAND ${Python3_EXECUTABLE} -m pytest
+          ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/tests -q)
+        set(UAIRT_PYTHON_TEST_ENV
+          "UAIRT_LIBRARY=$<TARGET_FILE:uairt>"
+          "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/python"
+          "UAIRT_TEST_SESSION_PLUGIN=$<TARGET_FILE:uairt_session_test_1>")
+        if(UAIRT_BUILD_LLAMACPP)
+          list(APPEND UAIRT_PYTHON_TEST_ENV "UAIRT_TEST_LLAMACPP_PLUGIN=$<TARGET_FILE:uairt_backend_llamacpp>")
+        endif()
+        set_tests_properties(python_sessions PROPERTIES ENVIRONMENT "${UAIRT_PYTHON_TEST_ENV}")
+      endif()
+    endif()
+  endif()
 
   if(UAIRT_BUILD_EXAMPLES AND UAIRT_BUILD_REFERENCE_BACKEND)
     add_test(NAME quickstart COMMAND quickstart)
@@ -385,6 +488,10 @@ if(UAIRT_BUILD_TESTS)
   if(UAIRT_BASH)
     add_test(NAME no_vendor_files
       COMMAND ${UAIRT_BASH} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_no_vendor_files.sh)
+    if(UAIRT_BUILD_LLAMACPP AND NOT WIN32)
+      add_test(NAME llamacpp_symbols COMMAND ${UAIRT_BASH}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_plugin_symbols.sh $<TARGET_FILE:uairt_backend_llamacpp>)
+    endif()
   endif()
 endif()
 

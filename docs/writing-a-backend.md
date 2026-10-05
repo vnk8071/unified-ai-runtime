@@ -26,6 +26,7 @@ The host passes a small function table (`set_error`). The plugin returns a stati
 | `num_inputs`, `num_outputs`, `input_info`, `output_info` | describe I/O: dtype, shape, quantization, name |
 | `run` | execute; blocking |
 | `alloc_buffer`, `free_buffer` | optional, both or neither: zero-copy buffers |
+| `session` | optional, appended at the end: a `uairt_session_api` table (vocabulary, tokenizing, sessions) for language models; see `include/uairt/uairt_backend.h` |
 
 Return `uairt_status` codes (see `docs/api.md`) and call `host->set_error(message)` before
 returning an error so users get a useful `uairt_last_error()`.

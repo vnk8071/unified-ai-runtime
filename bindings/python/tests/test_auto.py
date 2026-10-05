@@ -23,7 +23,7 @@ def plan(path, available=ALL, **kwargs):
 @pytest.mark.parametrize("path, backend", [
     ("m.dlc", "qnn"), ("m.bin", "qnn"), ("m.onnx", "onnxruntime"), ("M.ONNX", "onnxruntime"), ("m.xml", "openvino"),
     ("m.param", "ncnn"), ("m.engine", "tensorrt"), ("m.plan", "tensorrt"), ("m.tflite", "tflite"),
-    ("m.mlmodelc", "coreml"), ("m.mlpackage", "coreml"), ("m.mlmodel", "coreml"),
+    ("m.mlmodelc", "coreml"), ("m.mlpackage", "coreml"), ("m.mlmodel", "coreml"), ("m.gguf", "llamacpp"),
 ])
 def test_backend_comes_from_the_file_suffix(path, backend):
     assert plan(path).backend == backend
@@ -232,3 +232,13 @@ def test_an_engine_loads_its_plugin_from_the_search_path(tmp_path, monkeypatch):
         assert y.shape == (1, 4)
     with uairt.AutoModel.from_file("unused", backend="reference-plugin") as model:
         assert model.backend == "reference-plugin"
+
+
+def test_gguf_device_mapping():
+    assert plan("m.gguf").options == {}
+    assert plan("m.gguf", device="cpu").options == {"n_gpu_layers": "0"}
+    assert plan("m.gguf", device="gpu").options == {"n_gpu_layers": "99"}
+    with pytest.raises(uairt.Unsupported):
+        plan("m.gguf", device="npu")
+    with pytest.raises(uairt.Unsupported):
+        plan("m.gguf", device="gpu:1")

@@ -174,6 +174,13 @@ else
   report skip "tensorrt: set TENSORRT_ROOT (TensorRT with headers, installed by you)"
 fi
 
+llama_root="${UAIRT_LLAMACPP_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/third_party/llama.cpp}"
+if [[ -f "$llama_root/include/llama.h" ]]; then
+  report ok "llamacpp: $llama_root"
+else
+  report skip "llamacpp: run git submodule update --init third_party/llama.cpp (or set UAIRT_LLAMACPP_ROOT)"
+fi
+
 if [[ "$(uname -s)" == "Darwin" ]]; then
   if have xcrun; then
     sdk="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"
