@@ -134,6 +134,7 @@ rows for the reference backend list by platform.
 | core, reference, C++, Python and Rust bindings | Windows 11 ARM64 (Snapdragon X Elite) | Visual Studio 2022, ARM64 Python 3.11, Rust 1.96 |
 | QNN CPU, HTP (NPU) | Windows 11 ARM64, Snapdragon X Elite (Hexagon v73) | QAIRT 2.45.0.260326; outputs bit-identical to `qnn-net-run` |
 | ONNX Runtime CUDA provider | Ubuntu 24.04 x86_64, NVIDIA GTX 1650 (compute 7.5), driver 580.178 | ONNX Runtime 1.30.0 GPU (CUDA 12), CUDA 12.8, cuDNN 9; a yolov8n model, 10.0 ms against 59.9 ms on the CPU, same detections. The `tensorrt` provider also ran it (8.1 ms, TensorRT 10.9.0.34 with its ONNX parser) |
+| OpenVINO CPU (x64 under emulation) | Windows 11 ARM64, Snapdragon X Elite, an x64 build | OpenVINO 2026.4.1 x64 wheel; the same yolov8n model, bit-identical to OpenVINO's Python API, about 212 ms sustained (emulated) |
 | OpenVINO CPU | Ubuntu 24.04 x86_64, Intel Core i9-9900K | OpenVINO 2026.4.1; a yolov8n IR model, bit-identical to OpenVINO's Python API |
 | NCNN CPU, Vulkan | Windows 11 ARM64, Snapdragon X Elite CPU and Adreno X1-85 GPU (Vulkan 1.3) | NCNN master built natively with Visual Studio, Release; the same yolov8n model, 28 ms on the CPU and 22 to 26 ms on the GPU, same detections |
 | NCNN CPU, Vulkan | Ubuntu 24.04 x86_64, i9-9900K and NVIDIA GTX 1650 (Vulkan 1.4) | NCNN master built with `NCNN_VULKAN=ON`; a yolov8n model, 79 ms on the CPU and 21.9 ms on the GPU |

@@ -67,6 +67,8 @@ static void print_io(const char* kind, size_t index, const uairt_tensor* tensor)
     printf("%s%lld", i ? "x" : "", (long long)tensor->dims[i]);
   }
   printf("\n");
+  /* Some runtimes (OpenVINO on Windows) end the process without flushing C stdio, which loses redirected output. */
+  fflush(stdout);
 }
 
 int main(int argc, char** argv) {

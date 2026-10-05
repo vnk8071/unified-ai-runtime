@@ -33,6 +33,9 @@ First public version. Pre-1.0: the API and ABI may change.
   (`device=vulkan` fails instead of falling back to the CPU). Built with `-DUAIRT_BUILD_NCNN=ON`. Verified on a CPU and a
   GTX 1650: a yolov8n model runs in 21.9 ms on the GPU against 79 ms on the CPU.
 - `doctor.sh` reports OpenVINO, NCNN and the Vulkan device.
+- OpenVINO runs on a Windows ARM64 laptop as an x64 build under emulation (CPU device): bit-identical to OpenVINO's Python
+  API. `run_model` now flushes stdout after printing tensor info, because the OpenVINO runtime ends the process without
+  flushing C stdio on Windows.
 - NCNN builds and runs natively on Windows ARM64 (Release, Visual Studio): a yolov8n model takes 28 ms on the Snapdragon X
   Elite CPU and 22 to 26 ms on its Adreno GPU through Vulkan, with the same detections.
 

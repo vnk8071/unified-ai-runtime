@@ -61,5 +61,6 @@ int main(int argc, char** argv) {
     return 1;
   }
   puts("all openvino error-path checks passed");
+  fflush(stdout);
   return 0;
 }
