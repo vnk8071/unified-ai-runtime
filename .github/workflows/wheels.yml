@@ -84,9 +84,10 @@ jobs:
 
   publish-testpypi:
     needs: [sdist, wheels, wheels-windows-arm64]
+    # always(): without a status function a skipped ARM64 job skips this job too.
     # A skipped ARM64 job is fine; a failed or cancelled build is not.
     if: >-
-      ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
+      ${{ always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
           (startsWith(github.ref, 'refs/tags/v') || inputs.publish == 'testpypi' || inputs.publish == 'pypi') }}
     runs-on: ubuntu-24.04
     environment:
