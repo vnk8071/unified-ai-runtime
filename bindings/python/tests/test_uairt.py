@@ -96,7 +96,8 @@ def test_options_are_passed_as_strings():
 
 @pytest.mark.skipif(not ORT_PLUGIN or not ADD_MUL.exists(), reason="set UAIRT_TEST_ORT_PLUGIN to run")
 def test_onnxruntime_two_inputs_two_outputs():
-    uairt.load_backend_library(ORT_PLUGIN)
+    if "onnxruntime" not in uairt.backends():  # test_auto may have registered it already
+        uairt.load_backend_library(ORT_PLUGIN)
     with uairt.Engine("onnxruntime", intra_op_threads=1) as engine, engine.load_model(str(ADD_MUL)) as model:
         assert [i.name for i in model.inputs] == ["x", "y"]
         assert [o.name for o in model.outputs] == ["sum", "product"]

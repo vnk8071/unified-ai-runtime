@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: Apache-2.0
+# Builds the `uairt` Python wheel: the Python binding plus the native core library and the backend plugins that can be built
+# without a vendor SDK. The binding uses ctypes, so one wheel per operating system and architecture serves every Python 3.x
+# (the wheel tag is py3-none-<platform>). See docs/releasing.md. For a development install of the Python code alone, use
+# bindings/python/pyproject.toml.
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "uairt"
+version = "0.1.0"
+description = "One API to run compiled AI models on NPUs, GPUs and CPUs: QNN, ONNX Runtime, TensorRT, OpenVINO, NCNN, CoreML, TFLite"
+readme = "bindings/python/README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.21"]
+keywords = ["inference", "npu", "gpu", "onnx", "qnn", "tensorrt", "openvino", "ncnn"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+onnxruntime = ["onnxruntime>=1.22"]
+test = ["pytest"]
+
+[project.urls]
+Source = "https://github.com/vnk8071/unified-ai-runtime"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.version = ">=3.16"
+wheel.packages = ["bindings/python/uairt"]
+wheel.py-api = "py3"
+wheel.license-files = ["LICENSE"]
+install.components = ["python"]
+sdist.exclude = ["bindings/rust", ".github", ".claude", "docs", "build*", ".ort"]
+
+[tool.scikit-build.cmake.define]
+BUILD_SHARED_LIBS = "ON"
+UAIRT_BUILD_TESTS = "OFF"
+UAIRT_BUILD_EXAMPLES = "OFF"
+UAIRT_ORT_BAKE_LIBRARY_DIR = "OFF"
+# The ONNX Runtime plugin needs ONNX Runtime's headers (not its library) at build time: the wheel build in CI sets
+# UAIRT_WHEEL_ONNXRUNTIME=ON and ONNXRUNTIME_ROOT. Without them the wheel holds the core and the reference backend.
+UAIRT_BUILD_ONNXRUNTIME = { env = "UAIRT_WHEEL_ONNXRUNTIME", default = "OFF" }
+
+# cibuildwheel (used by .github/workflows/wheels.yml). The wheel is py3-none, so one build per platform serves every Python 3.x.
+[tool.cibuildwheel]
+build = "cp311-*"
+skip = "*-musllinux_* *-win32 *_i686"
+build-frontend = "build"
+environment = { UAIRT_WHEEL_ONNXRUNTIME = "ON" }
+test-requires = ["pytest", "onnxruntime"]
+test-command = "pytest {project}/bindings/python/tests -q"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+
+[tool.cibuildwheel.macos]
+environment = { UAIRT_WHEEL_ONNXRUNTIME = "ON", MACOSX_DEPLOYMENT_TARGET = "11.0" }

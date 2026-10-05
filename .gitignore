@@ -16,3 +16,4 @@ target/
 Cargo.lock
 build-ort129/
 build-windows-*/
+.ort/

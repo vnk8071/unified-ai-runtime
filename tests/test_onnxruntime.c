@@ -142,8 +142,8 @@ int main(int argc, char** argv) {
   const char* ep_library = getenv("UAIRT_TEST_ORT_EP_LIBRARY");
   const char* ep_name = getenv("UAIRT_TEST_ORT_EP_NAME");
   if (ep_library && ep_name) {
-    uairt_option plugin[] = {{"ep_library", ep_library}, {"ep_name", ep_name}};
-    CHECK(uairt_engine_create("onnxruntime", plugin, 2, &engine) == UAIRT_OK);
+    uairt_option provider_options[] = {{"ep_library", ep_library}, {"ep_name", ep_name}};
+    CHECK(uairt_engine_create("onnxruntime", provider_options, 2, &engine) == UAIRT_OK);
     if (engine) {
       uairt_model* plugin_model = NULL;
       CHECK(uairt_model_load(engine, &from_path, &plugin_model) == UAIRT_OK);

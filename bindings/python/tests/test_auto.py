@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+import os
 import shutil
 from pathlib import Path
 
@@ -7,6 +8,9 @@ import pytest
 
 import uairt
 from uairt import _lib
+
+ORT_PLUGIN = os.environ.get("UAIRT_TEST_ORT_PLUGIN")
+ADD_MUL = Path(__file__).resolve().parents[3] / "tests" / "data" / "add_mul.onnx"
 
 ALL = lambda name: True  # noqa: E731
 NONE = lambda name: False  # noqa: E731
@@ -151,8 +155,8 @@ def test_auto_model_runs_and_reports_its_choice():
 def test_auto_model_resolve_plans_without_loading_anything():
     chosen = uairt.AutoModel.resolve("unused", backend="reference", threads=2, options={"a": 1})
     assert chosen.backend == "reference" and chosen.options == {"a": "1", "threads": "2"}
-    with pytest.raises(uairt.NotFound):  # a plan fails the way from_file would: there is no onnxruntime plugin here
-        uairt.AutoModel.resolve("m.onnx", device="cpu", backend="onnxruntime")
+    with pytest.raises(uairt.NotFound):  # a plan fails the way from_file would when the backend has no plugin
+        uairt.AutoModel.resolve("m.onnx", backend="no_such_backend")
 
 
 def test_a_missing_plugin_is_a_clear_error():
@@ -160,7 +164,7 @@ def test_a_missing_plugin_is_a_clear_error():
         uairt.Engine("no_such_backend")
     assert "no plugin was found" in str(caught.value)
     with pytest.raises(uairt.NotFound, match="no plugin found"):
-        uairt.AutoModel.from_file("model.onnx")
+        uairt.AutoModel.from_file("model.onnx", backend="no_such_backend")
 
 
 def test_available_backends_lists_the_registered_one():
@@ -191,6 +195,26 @@ def _reference_plugin():
         if entry.suffix in (".so", ".dylib", ".dll"):
             return entry
     return None
+
+
+def test_auto_model_runs_an_onnx_model_with_a_pip_installed_onnxruntime(monkeypatch):
+    """Uses the plugin from UAIRT_TEST_ORT_PLUGIN, or the one shipped in an installed wheel."""
+    pytest.importorskip("onnxruntime")
+    if ORT_PLUGIN:
+        monkeypatch.setenv("UAIRT_PLUGIN_PATH", str(Path(ORT_PLUGIN).resolve().parent))
+    if not ADD_MUL.exists() or (uairt.find_plugin("onnxruntime") is None and "onnxruntime" not in uairt.backends()):
+        pytest.skip("no onnxruntime plugin (set UAIRT_TEST_ORT_PLUGIN, or install a wheel that has one)")
+    monkeypatch.delenv("UAIRT_ONNXRUNTIME_LIBRARY", raising=False)  # the pip package's library is located on its own
+    x = np.array([[1, 2, 3, 4]], np.float32)
+    y = np.array([[10, 20, 30, 40]], np.float32)
+    with uairt.AutoModel.from_file(str(ADD_MUL)) as model:
+        assert model.backend == "onnxruntime" and model.options == {}
+        total, product = model.run(x, y)
+        np.testing.assert_array_equal(total, x + y)
+        np.testing.assert_array_equal(product, x * y)
+    with uairt.AutoModel.from_file(str(ADD_MUL), device="cpu") as model:
+        assert model.options == {"execution_provider": "cpu"}
+        assert [i.name for i in model.inputs] == ["x", "y"]
 
 
 def test_an_engine_loads_its_plugin_from_the_search_path(tmp_path, monkeypatch):

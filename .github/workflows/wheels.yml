@@ -1,0 +1,125 @@
+# SPDX-License-Identifier: Apache-2.0
+# Builds the `uairt` Python wheels and source distribution, tests each wheel after installing it, and (for a version tag, or by
+# hand) publishes to TestPyPI and then PyPI with trusted publishing: no token is stored. See docs/releasing.md for the one-time
+# setup on PyPI and the release steps.
+name: wheels
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - pyproject.toml
+      - CMakeLists.txt
+      - src/**
+      - include/**
+      - bindings/python/**
+      - scripts/ci/**
+      - .github/workflows/wheels.yml
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the built files to"
+        type: choice
+        options: [none, testpypi, pypi]
+        default: none
+
+permissions:
+  contents: read
+
+jobs:
+  sdist:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag, pyproject.toml and the C header name the same version
+        run: python scripts/ci/check_release_version.py ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+      - name: Build the sdist
+        run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  wheels:
+    name: wheel (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64, os: ubuntu-24.04 }
+          - { name: linux-aarch64, os: ubuntu-24.04-arm }
+          - { name: macos-arm64, os: macos-14 }
+          - { name: windows-x64, os: windows-2022 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the ONNX Runtime headers (the plugin loads the library at run time)
+        shell: bash
+        run: scripts/ci/fetch_onnxruntime_headers.sh
+      - name: Build and test the wheel
+        run: pipx run cibuildwheel==4.3.0 --output-dir wheelhouse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.name }}
+          path: wheelhouse/*.whl
+
+  # Windows ARM64 needs an ARM64 runner, which is not available to every repository. Set the repository variable
+  # ENABLE_WINDOWS_ARM64_CI to true once one is; until then this job is skipped instead of queueing forever.
+  wheels-windows-arm64:
+    if: ${{ vars.ENABLE_WINDOWS_ARM64_CI == 'true' }}
+    name: wheel (windows-arm64)
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the ONNX Runtime headers (the plugin loads the library at run time)
+        shell: bash
+        run: scripts/ci/fetch_onnxruntime_headers.sh
+      - name: Build and test the wheel
+        run: pipx run cibuildwheel==4.3.0 --output-dir wheelhouse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-arm64
+          path: wheelhouse/*.whl
+
+  publish-testpypi:
+    needs: [sdist, wheels, wheels-windows-arm64]
+    # A skipped ARM64 job is fine; a failed or cancelled build is not.
+    if: >-
+      ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
+          (startsWith(github.ref, 'refs/tags/v') || inputs.publish == 'testpypi' || inputs.publish == 'pypi') }}
+    runs-on: ubuntu-24.04
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/uairt
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: List what will be uploaded
+        run: ls -l dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  # Real PyPI. The `pypi` environment should require a reviewer's approval in the repository settings, so nothing reaches PyPI
+  # without a person saying so after TestPyPI has been looked at.
+  publish-pypi:
+    needs: [publish-testpypi]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.publish == 'pypi' }}
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/uairt
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1

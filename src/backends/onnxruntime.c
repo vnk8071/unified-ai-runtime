@@ -15,6 +15,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #define strdup _strdup
+#else
+#include <dlfcn.h>
 #endif
 #include <onnxruntime_c_api.h>
 #include <uairt/uairt_backend.h>
@@ -631,14 +633,102 @@ static const uairt_backend_api kApi = {
     .run = run,
 };
 
+/*
+ * ONNX Runtime is loaded when the plugin loads, not linked, so one plugin works with whichever release is installed (a pip
+ * install of onnxruntime, a release directory, a system copy) as long as it is at least as new as the headers this was built
+ * with. Search order: the UAIRT_ONNXRUNTIME_LIBRARY environment variable, a directory baked in at build time
+ * (UAIRT_ORT_LIBRARY_DIR, for source builds), then the loader's default search.
+ */
+#if defined(_WIN32)
+static const char* const kLibraryNames[] = {"onnxruntime.dll"};
+#elif defined(__APPLE__)
+static const char* const kLibraryNames[] = {"libonnxruntime.dylib"};
+#else
+static const char* const kLibraryNames[] = {"libonnxruntime.so", "libonnxruntime.so.1"};
+#endif
+
+typedef const OrtApiBase*(ORT_API_CALL* get_api_base_fn)(void);
+
+static get_api_base_fn open_ort(const char* path) {
+  get_api_base_fn function = NULL;
+#if defined(_WIN32)
+  HMODULE library = LoadLibraryExA(path, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+  FARPROC symbol = library ? GetProcAddress(library, "OrtGetApiBase") : NULL;
+#else
+  void* library = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+  void* symbol = library ? dlsym(library, "OrtGetApiBase") : NULL;
+#endif
+  if (symbol) {
+    memcpy(&function, &symbol, sizeof(function));
+  }
+  return function;
+}
+
+/* On Windows the Win32 environment is read, not the C runtime's copy: a host built with a different C runtime (Python, or a
+ * debug build) sets variables the plugin's own copy never sees. */
+static bool read_variable(const char* name, char* out, size_t capacity) {
+#if defined(_WIN32)
+  DWORD length = GetEnvironmentVariableA(name, out, (DWORD)capacity);
+  return length > 0 && length < capacity;
+#else
+  const char* value = getenv(name);
+  if (!value || !value[0]) {
+    return false;
+  }
+  snprintf(out, capacity, "%s", value);
+  return true;
+#endif
+}
+
+/* Returns the first ONNX Runtime found, and the paths tried when none loads. The library stays loaded. */
+static const OrtApiBase* load_ort(char* tried, size_t capacity) {
+  char candidates[8][1024];
+  size_t count = 0;
+  if (read_variable("UAIRT_ONNXRUNTIME_LIBRARY", candidates[count], sizeof(candidates[0]))) {
+    ++count;
+  }
+  for (size_t i = 0; i < sizeof(kLibraryNames) / sizeof(kLibraryNames[0]); ++i) {
+#if defined(UAIRT_ORT_LIBRARY_DIR)
+    snprintf(candidates[count], sizeof(candidates[0]), "%s/%s", UAIRT_ORT_LIBRARY_DIR, kLibraryNames[i]);
+#if defined(_WIN32)
+    for (char* c = candidates[count]; *c; ++c) {
+      *c = *c == '/' ? '\\' : *c;  /* the altered search path needs backslashes */
+    }
+#endif
+    ++count;
+#endif
+    snprintf(candidates[count++], sizeof(candidates[0]), "%s", kLibraryNames[i]);
+  }
+  size_t used = 0;
+  tried[0] = '\0';
+  for (size_t i = 0; i < count; ++i) {
+    get_api_base_fn get_api_base = open_ort(candidates[i]);
+    if (get_api_base) {
+      return get_api_base();
+    }
+    if (used < capacity) {
+      used += (size_t)snprintf(tried + used, capacity - used, "%s%s", used ? ", " : "", candidates[i]);
+    }
+  }
+  return NULL;
+}
+
 UAIRT_API const uairt_backend_api* uairt_backend_get_api(
     const uairt_host_api* host) {
   g_host = host;
-  g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+  char tried[2048];
+  const OrtApiBase* base = load_ort(tried, sizeof(tried));
+  if (!base) {
+    fail("cannot load the ONNX Runtime library (tried: %s); install onnxruntime (pip install onnxruntime) or set "
+         "UAIRT_ONNXRUNTIME_LIBRARY to its path",
+         tried);
+    return NULL;
+  }
+  g_ort = base->GetApi(ORT_API_VERSION);
   if (!g_ort) {
     fail("the installed ONNX Runtime (%s) is older than the headers this "
          "backend was built with (API %d)",
-         OrtGetApiBase()->GetVersionString(), ORT_API_VERSION);
+         base->GetVersionString(), ORT_API_VERSION);
     return NULL;
   }
   return &kApi;

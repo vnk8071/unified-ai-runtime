@@ -199,7 +199,9 @@ Per-backend setup pages are in [docs/backends/](docs/backends/README.md).
 Python (`bindings/python`), Rust (`bindings/rust`) and a header-only C++17 wrapper
 (`include/uairt/uairt.hpp`) are done, and run on Windows ARM64 too. Each has a `run_qnn` example, and Python also has
 `detect_tensorrt.py`. The Python binding has `AutoModel`, which picks the backend from the model file and device and finds
-backend plugins on its own (`uairt.AutoModel.from_file("model.dlc", device="npu")`). See
+backend plugins on its own (`uairt.AutoModel.from_file("model.dlc", device="npu")`). A wheel with the native library and the
+ONNX Runtime plugin builds from this repository (`pip install "uairt[onnxruntime]"` once published; see
+[docs/releasing.md](docs/releasing.md)). See
 [bindings/README.md](bindings/README.md) and [bindings/python/README.md](bindings/python/README.md).
 
 ## Documentation

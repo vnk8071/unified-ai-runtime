@@ -56,27 +56,35 @@ option(UAIRT_BUILD_ONNXRUNTIME "Build the ONNX Runtime backend plugin" OFF)
 if(UAIRT_BUILD_ONNXRUNTIME)
   set(ONNXRUNTIME_ROOT "$ENV{ONNXRUNTIME_ROOT}" CACHE PATH
       "Directory of an ONNX Runtime release (contains include/ and lib/)")
+  if(NOT ONNXRUNTIME_ROOT AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.ort/include/onnxruntime_c_api.h")
+    # the headers fetched by scripts/ci/fetch_onnxruntime_headers.sh for the wheel build
+    set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.ort")
+  endif()
   find_path(UAIRT_ORT_INCLUDE onnxruntime_c_api.h
     HINTS ${ONNXRUNTIME_ROOT}/include ${ONNXRUNTIME_ROOT}/include/onnxruntime
     NO_DEFAULT_PATH)
   find_library(UAIRT_ORT_LIBRARY onnxruntime
     HINTS ${ONNXRUNTIME_ROOT}/lib NO_DEFAULT_PATH)
-  if(NOT UAIRT_ORT_INCLUDE OR NOT UAIRT_ORT_LIBRARY)
+  if(NOT UAIRT_ORT_INCLUDE)
     message(FATAL_ERROR
-      "ONNX Runtime not found. Set ONNXRUNTIME_ROOT to a release directory "
-      "containing include/onnxruntime_c_api.h and lib/libonnxruntime.")
+      "ONNX Runtime headers not found. Set ONNXRUNTIME_ROOT to a release directory "
+      "containing include/onnxruntime_c_api.h. The plugin loads the library at run time, so lib/ is optional.")
   endif()
-  get_filename_component(UAIRT_ORT_LIBRARY_DIR ${UAIRT_ORT_LIBRARY} DIRECTORY)
+  # The plugin loads ONNX Runtime when it loads. For a source build, remember where the library was so it is found without
+  # setting UAIRT_ONNXRUNTIME_LIBRARY; a wheel build turns this off, since the build machine's path means nothing elsewhere.
+  option(UAIRT_ORT_BAKE_LIBRARY_DIR "Remember the build-time ONNX Runtime directory as a search location" ON)
 
   add_library(uairt_backend_onnxruntime MODULE src/backends/onnxruntime.c)
   target_include_directories(uairt_backend_onnxruntime
     PRIVATE include ${UAIRT_ORT_INCLUDE})
-  target_link_libraries(uairt_backend_onnxruntime PRIVATE ${UAIRT_ORT_LIBRARY})
   target_compile_definitions(uairt_backend_onnxruntime PRIVATE UAIRT_BUILDING_SHARED)
+  if(UAIRT_ORT_LIBRARY AND UAIRT_ORT_BAKE_LIBRARY_DIR)
+    get_filename_component(UAIRT_ORT_LIBRARY_DIR ${UAIRT_ORT_LIBRARY} DIRECTORY)
+    target_compile_definitions(uairt_backend_onnxruntime PRIVATE UAIRT_ORT_LIBRARY_DIR="${UAIRT_ORT_LIBRARY_DIR}")
+  endif()
   set_target_properties(uairt_backend_onnxruntime PROPERTIES
     PREFIX "lib"
-    C_VISIBILITY_PRESET hidden
-    BUILD_RPATH ${UAIRT_ORT_LIBRARY_DIR})
+    C_VISIBILITY_PRESET hidden)
   install(TARGETS uairt_backend_onnxruntime LIBRARY DESTINATION lib/uairt)
 endif()
 
@@ -376,5 +384,14 @@ if(UAIRT_BUILD_TESTS)
   if(UAIRT_BASH)
     add_test(NAME no_vendor_files
       COMMAND ${UAIRT_BASH} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_no_vendor_files.sh)
+  endif()
+endif()
+
+# Python wheel (scikit-build-core): the core library goes into the package, and so do the plugins that can be built without a
+# vendor SDK, in the package's plugins/ directory where plugin discovery looks first.
+if(SKBUILD)
+  install(TARGETS uairt LIBRARY DESTINATION uairt RUNTIME DESTINATION uairt COMPONENT python)
+  if(TARGET uairt_backend_onnxruntime)
+    install(TARGETS uairt_backend_onnxruntime LIBRARY DESTINATION uairt/plugins COMPONENT python)
   endif()
 endif()
