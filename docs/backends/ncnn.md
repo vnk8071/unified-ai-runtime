@@ -17,11 +17,26 @@ cmake -S . -B build -DNCNN_VULKAN=ON -DNCNN_SHARED_LIB=ON -DNCNN_BUILD_TOOLS=OFF
 cmake --build build -j && cmake --install build
 ```
 
+On Windows, build NCNN with Visual Studio (`-G "Visual Studio 17 2022" -A ARM64` or `-A x64`), install it, and build this
+plugin in the **same configuration** (Release): a Debug plugin loading a Release NCNN mixes two C++ runtimes. The Vulkan
+loader is bundled (`NCNN_SIMPLEVK`), so no Vulkan SDK is needed, only the GPU's driver.
+
 ## Build
 
 ```bash
 export NCNN_ROOT=$HOME/ncnn-install        # contains include/ncnn/net.h and lib/libncnn
 cmake -S . -B build -DUAIRT_BUILD_NCNN=ON && cmake --build build
+```
+
+Windows (PowerShell), with `ncnn.dll` on `PATH` when running:
+
+```powershell
+$env:NCNN_ROOT = "C:\path\to\ncnn-install"
+cmake --preset windows-arm64-debug -DUAIRT_BUILD_NCNN=ON
+cmake --build build-windows-arm64-debug --config Release
+$env:PATH = "$env:NCNN_ROOT\bin;$env:PATH"
+build-windows-arm64-debug\Release\run_model.exe --option input_shapes=3x640x640 --option device=vulkan `
+  build-windows-arm64-debug\Release\libuairt_backend_ncnn.dll ncnn yolov8n_ncnn_model out in0.bin
 ```
 
 ## Run
@@ -64,6 +79,18 @@ i9-9900K, NCNN built from source (master):
 | Vulkan, `fp16=false` | 21.9 ms | at most 1.9e-3 (mean 2.5e-6) |
 | Vulkan, default fp16 | 21.6 ms | at most 7.6 on values up to about 600 (mean 0.008) |
 
-The first Vulkan load takes about 12 s while NCNN builds its pipelines. All three find the same detections on a test image
+On a Snapdragon X Elite laptop (Windows 11 ARM64, NCNN master built natively with Visual Studio, the same model; the
+GPU is the Adreno X1-85 through its Vulkan 1.3 driver):
+
+| Device | Median per run | Difference from the CPU output |
+|---|---|---|
+| CPU (ARM64, native) | 28 ms | reference; the same detections as the Intel CPU |
+| Adreno Vulkan, `fp16=false` | 25.7 ms | on the 47 confident anchors, boxes within 0.65 px and class scores within 0.03 |
+| Adreno Vulkan, default fp16 | 22.1 ms | boxes within 0.5 px, class scores within 0.02 |
+
+The Adreno's fp32 is looser than NVIDIA's (a few background anchors differ by up to 31 on values near 400), but all runs find
+the same detections. Its first load takes 3 to 10 s.
+
+The first Vulkan load on the GTX 1650 takes about 12 s while NCNN builds its pipelines. All three find the same detections on a test image
 (the fp16 run scores the bus 0.83 instead of 0.84), and fp16 was no faster than fp32 on this GPU, so the tests use
 `fp16=false`.

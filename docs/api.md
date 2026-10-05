@@ -118,7 +118,9 @@ such order, so its inputs and outputs are sorted by name.
 
 ## Tested configurations
 
-These are what the author ran, not a support matrix.
+These are what the author ran, not a support matrix. Every row is a real model on the named hardware ("backend verified");
+the core, loader and bindings are separately covered by `ctest` with the reference backend ("core verified"), which the table
+rows for the reference backend list by platform.
 
 | Backend | Where | SDK / runtime |
 |---|---|---|
@@ -133,10 +135,11 @@ These are what the author ran, not a support matrix.
 | QNN CPU, HTP (NPU) | Windows 11 ARM64, Snapdragon X Elite (Hexagon v73) | QAIRT 2.45.0.260326; outputs bit-identical to `qnn-net-run` |
 | ONNX Runtime CUDA provider | Ubuntu 24.04 x86_64, NVIDIA GTX 1650 (compute 7.5), driver 580.178 | ONNX Runtime 1.30.0 GPU (CUDA 12), CUDA 12.8, cuDNN 9; a yolov8n model, 10.0 ms against 59.9 ms on the CPU, same detections. The `tensorrt` provider also ran it (8.1 ms, TensorRT 10.9.0.34 with its ONNX parser) |
 | OpenVINO CPU | Ubuntu 24.04 x86_64, Intel Core i9-9900K | OpenVINO 2026.4.1; a yolov8n IR model, bit-identical to OpenVINO's Python API |
+| NCNN CPU, Vulkan | Windows 11 ARM64, Snapdragon X Elite CPU and Adreno X1-85 GPU (Vulkan 1.3) | NCNN master built natively with Visual Studio, Release; the same yolov8n model, 28 ms on the CPU and 22 to 26 ms on the GPU, same detections |
 | NCNN CPU, Vulkan | Ubuntu 24.04 x86_64, i9-9900K and NVIDIA GTX 1650 (Vulkan 1.4) | NCNN master built with `NCNN_VULKAN=ON`; a yolov8n model, 79 ms on the CPU and 21.9 ms on the GPU |
 | TensorRT | Ubuntu 24.04 x86_64, NVIDIA GTX 1650 (compute 7.5), driver 580.178; built and error-path tested also on an RTX 2060 | TensorRT 10.9.0.34, CUDA 12.8; a yolov8n engine, outputs bit-identical to TensorRT's Python API |
 
-Not tested: OpenVINO's GPU and NPU devices (no Intel GPU or NPU was available), NCNN on Windows, macOS or ARM, Android, iOS, other Snapdragon parts, the TFLite backend's QNN delegate path (see
+Not tested: OpenVINO's GPU and NPU devices (no Intel GPU or NPU was available), NCNN on macOS or Android, iOS, other Snapdragon parts, the TFLite backend's QNN delegate path (see
 `docs/design.md`), the ONNX Runtime backend on Windows (it compiles; no matching runtime was available), the TFLite
 backend on Windows (ported, not compiled), and TensorRT with dynamic shapes or on GPUs other than the two above.
 

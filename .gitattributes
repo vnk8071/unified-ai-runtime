@@ -1,0 +1,11 @@
+# Text files are LF in the repository and in every checkout. Shell scripts fail with CRLF line endings,
+# which is what a default Windows checkout (core.autocrlf=true) would otherwise give them.
+* text=auto eol=lf
+*.sh text eol=lf
+*.ps1 text eol=lf
+*.py text eol=lf
+
+*.onnx binary
+*.bin binary
+*.png binary
+*.jpg binary

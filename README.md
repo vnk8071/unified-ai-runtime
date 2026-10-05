@@ -47,8 +47,12 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 | TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench` |
 | CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O | Apple M5; identical to CoreML itself |
 | OpenVINO | IR (`.xml` + `.bin`) and `.onnx`, static shapes; any OpenVINO device | an Intel Core CPU, bit-identical to OpenVINO's Python API. GPU and NPU devices untested |
-| NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan; matches NCNN's Python API |
+| NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan (matches NCNN's Python API); a Snapdragon X Elite laptop, CPU and Adreno GPU through Vulkan, same detections |
 | TensorRT | serialized `.engine` / `.plan` (ultralytics exports load as is), static shapes; host and pinned buffers | NVIDIA GTX 1650, TensorRT 10.9; bit-identical to TensorRT's Python API |
+
+"Verified" in this table and in the docs means a real model ran through that backend on the listed hardware and matched the
+vendor's own tool. A passing `ctest` with only the reference backend proves the core, loader and bindings, not a vendor runtime;
+the two are reported separately (see [docs/agents/run-model.md](docs/agents/run-model.md)).
 
 Known issues and the exact configurations tested are in [docs/api.md](docs/api.md) and
 [docs/design.md](docs/design.md). Read them before relying on a backend.
@@ -63,6 +67,15 @@ cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 build/quickstart
+```
+
+On Windows use the presets (Visual Studio 2022 with the C++ tools, and Git Bash for one test). Check the machine with
+`scripts/doctor.ps1` in PowerShell, or `scripts/doctor.sh --target windows` in Git Bash; WSL is Linux and is rejected.
+
+```powershell
+cmake --preset windows-arm64-debug      # or windows-x64-debug; add -DUAIRT_BUILD_QNN=ON and so on
+cmake --build --preset windows-arm64-debug
+ctest --preset windows-arm64-debug
 ```
 
 ### ONNX Runtime

@@ -5,6 +5,8 @@ the platform column says where each applies.
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| `doctor.sh` reports Linux on a Windows machine | the shell is WSL | WSL is Linux. Use Git Bash or PowerShell; `scripts/doctor.sh --target windows` fails in WSL on purpose, and `scripts/doctor.ps1` is the PowerShell version |
+| the `no_vendor_files` test fails with `/bin/bash: ... No such file` or `\r: command not found` | ctest found WSL's `bash.exe`, or a script has CRLF line endings | use Git Bash (CMake looks in `Program Files\Git`); `.gitattributes` keeps scripts LF in new checkouts, so re-checkout old ones |
 | `doctor.sh`: `cc: no C compiler` on Windows | Git Bash has no compiler on PATH | `doctor.sh` now finds Visual Studio; configure with `cmake -G "Visual Studio 17 2022"` |
 | CMake fails to link a test program with clang | the Qualcomm clang cannot link here | use the Visual Studio generator |
 | `ctest` registers 4 tests, not 5 | `UAIRT_QNN_TEST_*` variables were not set at configure time | set them, then rerun `cmake -S . -B build` |
@@ -19,6 +21,7 @@ the platform column says where each applies.
 | `.bin` will not load | built for another chip or QAIRT version | rebuild it for this chip and SDK, or use the `.dlc` |
 | `.dlc` load takes seconds on every run | the graph is compiled at load | pass `cache_dir=<dir>`; on Windows also `cache_write=true` (writes are off by default there) |
 | NCNN `device=vulkan` fails, or `vulkaninfo` says "Found no drivers" (container) | the NVIDIA graphics libraries and Vulkan ICD are missing | install the driver package that matches the running driver exactly (for example `libnvidia-gl-580` for 580.x); the failed companion packages that conflict with the container's injected files can be ignored |
+| NCNN plugin crashes or misbehaves on Windows | the plugin and `ncnn.dll` were built in different configurations (Debug against Release mixes C++ runtimes), or `ncnn.dll` is not on `PATH` | build NCNN and the plugin both in Release (`cmake --build <dir> --config Release`) and put `<NCNN_ROOT>\bin` on `PATH` |
 | OpenVINO `device 'GPU' is not available` | no Intel GPU or driver here | use `CPU`, or install the Intel GPU runtime on a machine that has the hardware |
 | the NPU run is as slow as the CPU | the CPU backend ran | check the backend library is `QnnHtp`, not `QnnCpu` |
 

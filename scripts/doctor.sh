@@ -3,9 +3,28 @@
 # Reports the target device, build prerequisites and which backends can be built here.
 # Output lines are "<status> <item>: <detail>" with status ok | missing | skip | info.
 # Exits non-zero only when core prerequisites are missing.
+#
+#   scripts/doctor.sh [--target native|windows]
+#
+# --target windows says the build is for Windows: the check fails when this shell is not a Windows shell (WSL, Linux
+# and macOS all report their own platform, which would mislead setup decisions). Use Git Bash, or scripts/doctor.ps1
+# from PowerShell. WSL is always reported, because it is Linux even though it runs on a Windows machine.
 set -uo pipefail
 
 core_missing=0
+target=native
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --target) target="${2:-}"; shift 2 ;;
+    --target=*) target="${1#*=}"; shift ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    *) echo "unknown argument: $1 (see --help)" >&2; exit 2 ;;
+  esac
+done
+if [[ "$target" != native && "$target" != windows ]]; then
+  echo "--target must be native or windows" >&2
+  exit 2
+fi
 
 report() { printf '%-8s %s\n' "$1" "$2"; }
 
@@ -13,6 +32,9 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 windows=0
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) windows=1 ;; esac
+
+wsl=0
+if [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qi microsoft /proc/version 2>/dev/null; then wsl=1; fi
 
 ps() { powershell.exe -NoProfile -Command "$1" 2>/dev/null | tr -d '\r'; }
 
@@ -29,6 +51,16 @@ hexagon_hint() {
 
 echo "== device"
 report info "os: $(uname -s) $(uname -m)"
+if [[ $wsl == 1 ]]; then
+  report info "wsl: this shell is WSL (${WSL_DISTRO_NAME:-unknown distro}); it is Linux, not Windows, and cannot use the Windows NPU, GPU or Visual Studio"
+fi
+if [[ "$target" == windows && $windows == 0 ]]; then
+  report missing "target: Windows requested but this shell is $(uname -s)$([[ $wsl == 1 ]] && echo " (WSL)"); run from Git Bash or use scripts/doctor.ps1 in PowerShell"
+  core_missing=1
+fi
+if [[ $windows == 1 || "$target" == windows ]]; then
+  report info "presets: cmake --preset windows-arm64-debug | windows-x64-debug (then cmake --build --preset ... and ctest --preset ...)"
+fi
 chip=""
 npu=""
 if [[ $windows == 1 ]]; then

@@ -15,3 +15,4 @@ __pycache__/
 target/
 Cargo.lock
 build-ort129/
+build-windows-*/

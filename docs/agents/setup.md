@@ -28,7 +28,8 @@ Goal: get a requested backend building and passing tests. Logic lives in
   and set `UAIRT_TEST_ORT_PROVIDER` for `ctest`. Confirm placement with `log_level=verbose`. The user installs these;
   see `docs/backends/onnxruntime.md`.
 
-- Windows: configure with `-G "Visual Studio 17 2022"` and run `ctest -C Debug`. The unpacked release needs
+- Windows: use `cmake --preset windows-arm64-debug` (or `windows-x64-debug`), then `cmake --build --preset ...` and
+  `ctest --preset ...`; check the machine with `scripts/doctor.ps1` first. The unpacked release needs
   `lib/onnxruntime.lib` (import library) next to `onnxruntime.dll`. Model and plugin paths are converted to UTF-16.
 
 ## ONNX Runtime plugin execution providers

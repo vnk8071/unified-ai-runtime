@@ -48,11 +48,13 @@ cmake -S . -B build -DUAIRT_BUILD_QNN=ON      # add the backend options you need
 cmake --build build && ctest --test-dir build --output-on-failure
 ```
 
-Windows (Git Bash or PowerShell; the Visual Studio generator is needed, other compilers did not link):
+Windows: use the presets, which carry the Visual Studio generator and the platform. Run `scripts/doctor.ps1` (PowerShell) or
+`scripts/doctor.sh --target windows` (Git Bash) first; WSL is Linux and does not count. Both reject the wrong shell.
 
 ```bash
-cmake -S . -B build -G "Visual Studio 17 2022" -DUAIRT_BUILD_QNN=ON
-cmake --build build --config Debug && ctest --test-dir build -C Debug --output-on-failure
+cmake --preset windows-arm64-debug -DUAIRT_BUILD_QNN=ON      # or windows-x64-debug
+cmake --build --preset windows-arm64-debug
+ctest --preset windows-arm64-debug
 ```
 
 Set the backend's environment variables (`QNN_SDK_ROOT`, `ONNXRUNTIME_ROOT`, and the `UAIRT_*_TEST_*` variables from
@@ -96,9 +98,22 @@ Windows need `ADSP_LIBRARY_PATH` set before the process starts for the NPU (see 
   `QnnCpu` is not an NPU run.
 - Run with a second, different input and check the outputs are not constant.
 
+## Two levels of "verified"
+
+Say which one you mean, for each backend, in every report.
+
+- **Core verified (level 1):** the build and `ctest` pass with the reference backend and the tests that need no vendor SDK.
+  The library, plugin loader, bindings and error paths work on this OS and architecture. It says nothing about a vendor runtime.
+- **Backend verified (level 2):** a real model ran through the real backend on the real device, with the vendor runtime
+  installed, the output was compared with the vendor's own tool (or an identical-input reference), and the device that
+  executed it was confirmed (NPU: the `QnnHtp` library; GPU: the provider and a placement log; Vulkan: the device name).
+
+A passing `ctest` on a laptop is level 1. "Runs on the NPU" needs level 2. List what is not verified, for example a device a
+backend supports but the machine does not have (OpenVINO's GPU and NPU), or a backend that only compiled.
+
 ## 7. Report
 
-Give the actual command and its output: `init_ms`, the median latency, the device, the backend library used, and
+Give the level reached (see above) and the actual command and its output: `init_ms`, the median latency, the device, the backend library used, and
 the `ctest` result. Say plainly what you did not verify (for example a backend that only compiled, or a model you
 did not compare against the vendor tool). The work is done only when `ctest` passes, `doctor.sh` reports the
 backend as `ok`, and a run on the requested device is shown.

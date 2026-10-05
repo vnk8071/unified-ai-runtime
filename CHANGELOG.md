@@ -15,6 +15,16 @@ First public version. Pre-1.0: the API and ABI may change.
 - Tests that compare each backend with the vendor's own tool: Python ONNX Runtime,
   `qnn-net-run`, CoreML through `coremltools`.
 
+### Added (Windows as a build target)
+- `CMakePresets.json` with `windows-arm64-debug` and `windows-x64-debug` (configure, build and test presets), so the Visual
+  Studio generator and platform flags need not be remembered.
+- `scripts/doctor.ps1`, a PowerShell version of the device and toolchain check, and `--target windows` for `doctor.sh`, which
+  reports WSL and fails when the shell is not a Windows shell.
+- CI jobs for Windows x64 (hosted runner) and Windows ARM64 (enabled with the `ENABLE_WINDOWS_ARM64_CI` repository variable,
+  since it needs an ARM64 runner); both build with warnings as errors and run `ctest` and the vendor-file check.
+- `.gitattributes` keeps text files, and shell scripts in particular, LF in every checkout.
+- The docs and `AGENTS.md` separate "core verified" from "backend verified".
+
 ### Added (OpenVINO and NCNN)
 - OpenVINO backend (`openvino`, C): IR, ONNX or a directory holding one `.xml`; any OpenVINO device; `device`,
   `performance_hint`, `num_threads`, `cache_dir`. Built with `-DUAIRT_BUILD_OPENVINO=ON`. Verified on an Intel CPU
@@ -23,6 +33,8 @@ First public version. Pre-1.0: the API and ABI may change.
   (`device=vulkan` fails instead of falling back to the CPU). Built with `-DUAIRT_BUILD_NCNN=ON`. Verified on a CPU and a
   GTX 1650: a yolov8n model runs in 21.9 ms on the GPU against 79 ms on the CPU.
 - `doctor.sh` reports OpenVINO, NCNN and the Vulkan device.
+- NCNN builds and runs natively on Windows ARM64 (Release, Visual Studio): a yolov8n model takes 28 ms on the Snapdragon X
+  Elite CPU and 22 to 26 ms on its Adreno GPU through Vulkan, with the same detections.
 
 ### Added (ONNX Runtime GPU)
 - `execution_provider=cuda` and `tensorrt` for the ONNX Runtime backend, `ep_option.<key>` for them, and a `log_level`
