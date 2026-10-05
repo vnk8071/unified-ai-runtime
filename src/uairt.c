@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -144,6 +145,48 @@ int64_t uairt_tensor_num_elements(const uairt_tensor* tensor) {
   return count;
 }
 
+/* A plugin built before the `session` field has a shorter struct, so the field may only be read when it fits. */
+static const uairt_session_api* session_of(const uairt_backend_api* api) {
+  return api->struct_size >= offsetof(uairt_backend_api, session) + sizeof(api->session) ? api->session : NULL;
+}
+
+static const char* missing_session_entry(const uairt_session_api* sessions) {
+  if (sessions->struct_size < sizeof(*sessions)) {
+    return "struct_size";
+  }
+  if (sessions->abi_version != UAIRT_SESSION_ABI_VERSION) {
+    return "abi_version";
+  }
+  if (!sessions->vocab_size) {
+    return "vocab_size";
+  }
+  if (!sessions->tokenize) {
+    return "tokenize";
+  }
+  if (!sessions->detokenize) {
+    return "detokenize";
+  }
+  if (!sessions->create_session) {
+    return "create_session";
+  }
+  if (!sessions->destroy_session) {
+    return "destroy_session";
+  }
+  if (!sessions->append) {
+    return "append";
+  }
+  if (!sessions->logits) {
+    return "logits";
+  }
+  if (!sessions->position) {
+    return "position";
+  }
+  if (!sessions->reset) {
+    return "reset";
+  }
+  return NULL;
+}
+
 static void ensure_builtin_backends(void);
 
 static uairt_status register_locked(uairt_backend_get_api_fn get_api) {
@@ -162,13 +205,21 @@ static uairt_status register_locked(uairt_backend_get_api_fn get_api) {
         UAIRT_BACKEND_ABI_VERSION);
     return UAIRT_ERR_VERSION_MISMATCH;
   }
-  if (api->struct_size < sizeof(uairt_backend_api) || !api->name ||
+  if (api->struct_size < offsetof(uairt_backend_api, session) || !api->name ||
       !api->name[0] || !api->supported_domains || !api->create_engine ||
       !api->destroy_engine || !api->load_model || !api->destroy_model ||
       !api->num_inputs || !api->num_outputs || !api->input_info ||
       !api->output_info || !api->run || !api->alloc_buffer != !api->free_buffer) {
     uairt_set_error("backend API is incomplete");
     return UAIRT_ERR_INCOMPATIBLE_MODEL;
+  }
+  const uairt_session_api* sessions = session_of(api);
+  if (sessions) {
+    const char* missing = missing_session_entry(sessions);
+    if (missing) {
+      uairt_set_error("backend '%s': session API is incomplete (%s)", api->name, missing);
+      return UAIRT_ERR_INCOMPATIBLE_MODEL;
+    }
   }
   for (size_t i = 0; i < g_backend_count; ++i) {
     if (strcmp(g_backends[i]->name, api->name) == 0) {
@@ -545,4 +596,133 @@ void uairt_tensor_use_buffer(uairt_tensor* tensor, const uairt_buffer* buffer) {
   tensor->data = buffer->data;
   tensor->dmabuf_fd = buffer->fd;
   tensor->nbytes = buffer->nbytes;
+}
+
+struct uairt_session {
+  const uairt_session_api* sessions;
+  void* handle;
+};
+
+static const uairt_session_api* require_sessions(const uairt_model* model, const char* call) {
+  const uairt_session_api* sessions = session_of(model->api);
+  if (!sessions) {
+    uairt_set_error("backend '%s' has no session support (%s)", model->api->name, call);
+  }
+  return sessions;
+}
+
+uairt_status uairt_model_vocab_size(const uairt_model* model, size_t* out_size) {
+  if (!model || !out_size) {
+    uairt_set_error("invalid argument to uairt_model_vocab_size");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  const uairt_session_api* sessions = require_sessions(model, "vocab_size");
+  return sessions ? sessions->vocab_size(model->handle, out_size) : UAIRT_ERR_UNSUPPORTED;
+}
+
+uairt_status uairt_model_tokenize(
+    const uairt_model* model,
+    const char* text,
+    size_t text_len,
+    int add_special,
+    int32_t* tokens,
+    size_t capacity,
+    size_t* out_count) {
+  if (!model || (text_len && !text) || (capacity && !tokens) || !out_count) {
+    uairt_set_error("invalid argument to uairt_model_tokenize");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  const uairt_session_api* sessions = require_sessions(model, "tokenize");
+  return sessions ? sessions->tokenize(model->handle, text ? text : "", text_len, add_special, tokens, capacity,
+                                       out_count)
+                  : UAIRT_ERR_UNSUPPORTED;
+}
+
+uairt_status uairt_model_detokenize(
+    const uairt_model* model,
+    const int32_t* tokens,
+    size_t count,
+    char* out,
+    size_t capacity,
+    size_t* out_nbytes) {
+  if (!model || (count && !tokens) || (capacity && !out) || !out_nbytes) {
+    uairt_set_error("invalid argument to uairt_model_detokenize");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  const uairt_session_api* sessions = require_sessions(model, "detokenize");
+  return sessions ? sessions->detokenize(model->handle, tokens, count, out, capacity, out_nbytes)
+                  : UAIRT_ERR_UNSUPPORTED;
+}
+
+uairt_status uairt_session_create(
+    uairt_model* model,
+    const uairt_option* options,
+    size_t num_options,
+    uairt_session** out_session) {
+  if (!model || !out_session || (num_options && !options)) {
+    uairt_set_error("invalid argument to uairt_session_create");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  *out_session = NULL;
+  const uairt_session_api* sessions = require_sessions(model, "create_session");
+  if (!sessions) {
+    return UAIRT_ERR_UNSUPPORTED;
+  }
+  uairt_session* session = calloc(1, sizeof(*session));
+  if (!session) {
+    uairt_set_error("out of memory");
+    return UAIRT_ERR_OUT_OF_MEMORY;
+  }
+  uairt_status status = sessions->create_session(model->handle, options, num_options, &session->handle);
+  if (status != UAIRT_OK) {
+    free(session);
+    return status;
+  }
+  session->sessions = sessions;
+  *out_session = session;
+  return UAIRT_OK;
+}
+
+void uairt_session_destroy(uairt_session* session) {
+  if (!session) {
+    return;
+  }
+  session->sessions->destroy_session(session->handle);
+  free(session);
+}
+
+uairt_status uairt_session_append(uairt_session* session, const int32_t* tokens, size_t count) {
+  if (!session || (count && !tokens)) {
+    uairt_set_error("invalid argument to uairt_session_append");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  return session->sessions->append(session->handle, tokens, count);
+}
+
+uairt_status uairt_session_logits(
+    const uairt_session* session,
+    float* out,
+    size_t capacity,
+    size_t* out_count) {
+  if (!session || (capacity && !out) || !out_count) {
+    uairt_set_error("invalid argument to uairt_session_logits");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  return session->sessions->logits(session->handle, out, capacity, out_count);
+}
+
+uairt_status uairt_session_position(const uairt_session* session, size_t* out_position) {
+  if (!session || !out_position) {
+    uairt_set_error("invalid argument to uairt_session_position");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  return session->sessions->position(session->handle, out_position);
+}
+
+uairt_status uairt_session_reset(uairt_session* session) {
+  if (!session) {
+    uairt_set_error("invalid argument to uairt_session_reset");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  return session->sessions->reset(session->handle);
 }

@@ -26,6 +26,7 @@ domains before a backend runs, so backends do not repeat it.
   (thread-local) and backends report them through `uairt_host_api.set_error`.
 - Plugins export one symbol, `uairt_backend_get_api`, and do not link the core
   library. The host passes a function table in.
+- Optional capabilities are appended fields that the host reads only when `struct_size` covers them (for example `uairt_backend_api.session`); the host validates plugins against the v1 base size, so older plugins keep loading.
 - Loaded plugin libraries are never unloaded.
 - Destroy models before the engine that created them.
 

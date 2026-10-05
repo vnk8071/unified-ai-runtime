@@ -39,7 +39,7 @@ wheel.packages = ["bindings/python/uairt"]
 wheel.py-api = "py3"
 wheel.license-files = ["LICENSE"]
 install.components = ["python"]
-sdist.exclude = ["bindings/rust", ".github", ".claude", "docs", "build*", ".ort"]
+sdist.exclude = ["bindings/rust", ".github", ".claude", "docs", "build*", ".ort", "third_party"]
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "ON"

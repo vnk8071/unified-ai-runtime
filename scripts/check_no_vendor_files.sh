@@ -7,7 +7,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-exclude=(--exclude-dir=.git --exclude-dir=build --exclude-dir=docs
+exclude=(--exclude-dir=.git --exclude-dir=build --exclude-dir=docs --exclude-dir=llama.cpp
          --exclude=check_no_vendor_files.sh --exclude=AGENTS.md)
 
 status=0
@@ -20,7 +20,7 @@ if grep -rIl "${exclude[@]}" \
   status=1
 fi
 
-if find . -path ./.git -prune -o -path ./build -prune -o \
+if find . -path ./.git -prune -o -path ./build -prune -o -path ./third_party/llama.cpp -prune -o \
     \( -name 'libQnn*' -o -name 'libSNPE*' -o -name 'libnvinfer*' \
        -o -name '*.mlmodelc' -o -name 'QnnInterface.h' -o -name 'NvInfer*.h' \) \
     -print | grep .; then

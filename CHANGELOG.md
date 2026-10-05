@@ -89,6 +89,15 @@ First public version. Pre-1.0: the API and ABI may change.
   provider. Verified with the MLX provider on an Apple M5: ResNet50 at batch 8 ran 3.1 to 3.2 times faster than
   the CPU EP with the same outputs; MobileNetV2 at batch 1 showed no gain.
 
+### Added (llama.cpp and sessions)
+- `llamacpp` backend: GGUF language models through llama.cpp, a pinned submodule (`third_party/llama.cpp`, MIT), built with
+  `-DUAIRT_BUILD_LLAMACPP=ON`; Metal on Apple.
+- Public session API: `uairt_model_vocab_size/tokenize/detokenize` and `uairt_session_*`, backed by an optional `session`
+  field appended to `uairt_backend_api`. The host now validates plugins against the v1 struct size, so existing plugins
+  load unchanged.
+- Python: `Model.tokenize/detokenize`, `Session`, `generate()` (sampling in NumPy), `.gguf` in `AutoModel`.
+- `examples/llm_generate.c` and a test that compares greedy output with llama.cpp's own.
+
 ### Changed
 - QNN: `htp_performance_mode` option (`default`, `burst`, `high_performance`, `balanced`,
   `power_saver`). Without it HTP runs a small graph about 3.8 times slower than with
@@ -112,6 +121,8 @@ First public version. Pre-1.0: the API and ABI may change.
   run time, sanitizers clean.
 - CoreML on an Apple M5: three models, identical to `MLModel.predict` on CPU-only and
   all compute units.
+- llamacpp on an Apple M5 (Metal and CPU): Llama 3.2 1B Q4, greedy output identical to llama.cpp's own
+  `llama-completion`. Not run on Linux, Windows, CUDA or Vulkan.
 
 ### Known issues
 - A DLC on the QNN HTP backend crashes in Qualcomm's `libQnnHtpPrepare.so` on the

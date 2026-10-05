@@ -112,6 +112,7 @@ such order, so its inputs and outputs are sorted by name.
 | NCNN | `ncnn` | `.param` + `.bin` or a directory with one (path only), float32, static shapes | `input_shapes` (required), `device` (`cpu`, `vulkan`), `vulkan_device`, `fp16`, `num_threads` | host |
 | TensorRT | `tensorrt` | serialized engine `.engine` / `.plan` (ultralytics exports load as is), static shapes | `device` (CUDA device index) | host, pinned |
 | CoreML | `coreml` | `.mlmodelc`, `.mlpackage`, `.mlmodel` (path only), multi-array I/O and fixed-size image inputs (uint8 `[1,H,W,C]`), static shapes | `compute_units`: `all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne` | host |
+| llama.cpp | `llamacpp` | `.gguf` (path only), session API instead of `run` | `n_gpu_layers` | host |
 
 \* required. Backends other than `reference` are separate plugins: load
 `libuairt_backend_<name>` with `uairt_load_backend_library` first.
@@ -139,13 +140,23 @@ rows for the reference backend list by platform.
 | NCNN CPU, Vulkan | Windows 11 ARM64, Snapdragon X Elite CPU and Adreno X1-85 GPU (Vulkan 1.3) | NCNN master built natively with Visual Studio, Release; the same yolov8n model, 28 ms on the CPU and 22 to 26 ms on the GPU, same detections |
 | NCNN CPU, Vulkan | Ubuntu 24.04 x86_64, i9-9900K and NVIDIA GTX 1650 (Vulkan 1.4) | NCNN master built with `NCNN_VULKAN=ON`; a yolov8n model, 79 ms on the CPU and 21.9 ms on the GPU |
 | TensorRT | Ubuntu 24.04 x86_64, NVIDIA GTX 1650 (compute 7.5), driver 580.178; built and error-path tested also on an RTX 2060 | TensorRT 10.9.0.34, CUDA 12.8; a yolov8n engine, outputs bit-identical to TensorRT's Python API |
+| llamacpp, Metal and CPU | macOS on an Apple M5 | llama.cpp at the pinned submodule commit; Llama 3.2 1B Q4, greedy output identical to llama.cpp's `llama-completion` |
 
 Not tested: OpenVINO's GPU and NPU devices (no Intel GPU or NPU was available), NCNN on macOS or Android, iOS, other Snapdragon parts, the TFLite backend's QNN delegate path (see
 `docs/design.md`), the ONNX Runtime backend on Windows (it compiles; no matching runtime was available), the TFLite
-backend on Windows (ported, not compiled), and TensorRT with dynamic shapes or on GPUs other than the two above.
+backend on Windows (ported, not compiled), and TensorRT with dynamic shapes or on GPUs other than the two above. The llamacpp backend was not run on Linux or
+Windows, nor with CUDA or Vulkan.
 
 ## ABI stability
 
 Version 0.x makes no ABI promise. From 1.0, public structs only grow at the end and
 carry `struct_size`, functions are not removed or changed, and the backend plugin ABI
 (`UAIRT_BACKEND_ABI_VERSION`) changes only with a major version.
+
+## Sessions (language models)
+
+`uairt_model_vocab_size`, `uairt_model_tokenize`, `uairt_model_detokenize` and `uairt_session_*` (create, append,
+logits, position, reset, destroy) are in `uairt/uairt.h`. They work on models whose backend has a session table
+(`llamacpp`) and return `UAIRT_ERR_UNSUPPORTED` for the others. A too-small buffer returns
+`UAIRT_ERR_INVALID_ARGUMENT` with the size needed in the out count. Backends provide the table through the optional
+`session` field at the end of `uairt_backend_api` (see `uairt/uairt_backend.h`).

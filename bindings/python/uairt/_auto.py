@@ -14,7 +14,8 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from . import _plugins
-from ._core import (Buffer, Engine, InvalidArgument, Model, NotFound, TensorInfo, Unsupported, backends)
+from ._core import (Buffer, Engine, InvalidArgument, Model, NotFound, Session, TensorInfo, Unsupported, backends)
+from ._generate import generate as _generate
 
 # File suffix -> backends that can load it, most preferred first.
 FORMATS: Dict[str, List[str]] = {
@@ -29,6 +30,7 @@ FORMATS: Dict[str, List[str]] = {
     ".mlmodelc": ["coreml"],
     ".mlpackage": ["coreml"],
     ".mlmodel": ["coreml"],
+    ".gguf": ["llamacpp"],
 }
 
 _KINDS = ("cpu", "gpu", "npu", "cuda", "tensorrt", "vulkan")
@@ -127,9 +129,17 @@ def _coreml(kind, index):
     return {} if units[kind] is None else {"compute_units": units[kind]}
 
 
+def _llamacpp(kind, index):
+    _no_index("llamacpp", index)
+    layers = {None: None, "cpu": "0", "gpu": "99"}
+    if kind not in layers:
+        raise _Skip(f"llamacpp runs on the cpu or gpu, not {kind}")
+    return {} if layers[kind] is None else {"n_gpu_layers": layers[kind]}
+
+
 _MAPPERS: Dict[str, Callable] = {
     "qnn": _qnn, "onnxruntime": _onnxruntime, "openvino": _openvino, "ncnn": _ncnn, "tensorrt": _tensorrt,
-    "tflite": _tflite, "coreml": _coreml,
+    "tflite": _tflite, "coreml": _coreml, "llamacpp": _llamacpp,
 }
 
 
@@ -264,6 +274,26 @@ class AutoModel:
 
     def alloc_buffer(self, nbytes: int, domain: str = "host") -> Buffer:
         return self.engine.alloc_buffer(nbytes, domain)
+
+    @property
+    def vocab_size(self) -> int:
+        return self.model.vocab_size
+
+    def tokenize(self, text: str, add_special: bool = True) -> np.ndarray:
+        return self.model.tokenize(text, add_special)
+
+    def detokenize(self, tokens) -> str:
+        return self.model.detokenize(tokens)
+
+    def detokenize_bytes(self, tokens) -> bytes:
+        return self.model.detokenize_bytes(tokens)
+
+    def session(self, options: Optional[Dict[str, object]] = None, **kwargs) -> Session:
+        return self.model.session(options, **kwargs)
+
+    def generate(self, prompt: str, **kwargs):
+        """Yields text pieces; see uairt.generate."""
+        return _generate(self, prompt, **kwargs)
 
     def close(self) -> None:
         self.model.close()

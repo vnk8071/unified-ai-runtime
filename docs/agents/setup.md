@@ -52,6 +52,13 @@ Goal: get a requested backend building and passing tests. Logic lives in
   user's own environments without asking; a throwaway virtualenv is fine. Set
   `UAIRT_COREML_PYTHON` to that interpreter before running cmake.
 
+## llama.cpp
+
+- Run `git submodule update --init third_party/llama.cpp` once (about 100 MB; no SDK or licence step, llama.cpp is MIT).
+- Configure with `-DUAIRT_BUILD_LLAMACPP=ON`. Engines take `n_gpu_layers` (default 99, 0 for CPU only); sessions take `n_ctx`.
+- To run the comparison test against llama.cpp's own output, set `UAIRT_LLAMACPP_TEST_MODEL` to a GGUF file before
+  `cmake`. Do not commit a model.
+
 ## TFLite
 
 - You build TFLite's C library for the target (the repository does not). Set `TFLITE_INCLUDE_DIR`

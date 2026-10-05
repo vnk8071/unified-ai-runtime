@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import ctypes
+import weakref
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -95,6 +96,95 @@ def _new_tensor() -> _lib.Tensor:
     return tensor
 
 
+def _need_sessions():
+    if _lib.session_create is None:
+        raise Unsupported(3, "this libuairt has no session API; upgrade the uairt package")
+
+
+def _token_array(tokens) -> np.ndarray:
+    array = np.asarray(tokens)
+    if array.size == 0:
+        return np.zeros(0, np.int32)
+    if array.dtype.kind not in "iu":
+        raise InvalidArgument(1, f"tokens must be integers, got {array.dtype}")
+    if int(array.min()) < -(2 ** 31) or int(array.max()) > 2 ** 31 - 1:
+        raise InvalidArgument(1, "token ids must fit in 32 bits")
+    return np.ascontiguousarray(array, dtype=np.int32)
+
+
+def _option_array(merged):
+    array = (_lib.Option * max(len(merged), 1))()
+    keep = []
+    for i, (key, value) in enumerate(merged.items()):
+        k, v = str(key).encode(), str(value).encode()
+        keep.extend((k, v))
+        array[i].key, array[i].value = k, v
+    return array, keep
+
+
+class Session:
+    """A model's state (its KV cache) between calls. Close sessions before their model; use one from one thread."""
+
+    def __init__(self, model: "Model", options: Optional[Dict[str, object]] = None, **kwargs):
+        _need_sessions()
+        model._ensure_open()
+        merged = dict(options or {})
+        merged.update(kwargs)
+        array, keep = _option_array(merged)
+        handle = ctypes.c_void_p()
+        _check(_lib.session_create(model._handle, array, len(merged), ctypes.byref(handle)))
+        self._model = model
+        self._handle = handle.value
+        model._sessions.add(self)  # Model.close() closes its live sessions first
+        self._vocab = model.vocab_size
+
+    def append(self, tokens) -> None:
+        """Feeds tokens at the current position."""
+        self._ensure_open()
+        array = _token_array(tokens)
+        _check(_lib.session_append(self._handle, array.ctypes.data_as(_lib.c_int32_p), array.size))
+
+    def logits(self) -> np.ndarray:
+        """Logits of the last appended token, as a float32 array with one value per vocabulary entry."""
+        self._ensure_open()
+        out = np.empty(self._vocab, np.float32)
+        count = ctypes.c_size_t()
+        _check(_lib.session_logits(self._handle, out.ctypes.data_as(_lib.c_float_p), out.size, ctypes.byref(count)))
+        return out
+
+    @property
+    def position(self) -> int:
+        self._ensure_open()
+        position = ctypes.c_size_t()
+        _check(_lib.session_position(self._handle, ctypes.byref(position)))
+        return position.value
+
+    def reset(self) -> None:
+        self._ensure_open()
+        _check(_lib.session_reset(self._handle))
+
+    def _ensure_open(self):
+        if not self._handle:
+            raise InvalidArgument(1, "the session is closed")
+
+    def close(self) -> None:
+        if self._handle:
+            _lib.session_destroy(self._handle)
+            self._handle = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
 class Buffer:
     """A zero-copy buffer allocated by a backend. Free it after the models that used it."""
 
@@ -147,6 +237,7 @@ class Model:
     def __init__(self, engine: "Engine", handle: int):
         self._engine = engine  # keeps the engine alive for the model's lifetime
         self._handle = handle
+        self._sessions = weakref.WeakSet()
         self.inputs: List[TensorInfo] = []
         self.outputs: List[TensorInfo] = []
         for count, getter, target in ((_lib.model_num_inputs, _lib.model_input_info, self.inputs),
@@ -207,11 +298,70 @@ class Model:
                 _lib.tensor_use_buffer(ctypes.byref(tensors[i]), buffers[i]._handle)
         _check(_lib.model_run(self._handle, in_tensors, len(inputs), out_tensors, len(outputs)))
 
+    @property
+    def vocab_size(self) -> int:
+        _need_sessions()
+        self._ensure_open()
+        size = ctypes.c_size_t()
+        _check(_lib.model_vocab_size(self._handle, ctypes.byref(size)))
+        return size.value
+
+    def tokenize(self, text: str, add_special: bool = True) -> np.ndarray:
+        """Token ids (int32) for `text`. `add_special` adds the beginning-of-sequence token where the model uses one.
+
+        Backends may parse special-token text such as `<|eot_id|>` into control tokens (llamacpp does); do not tokenize
+        untrusted text if that matters.
+        """
+        _need_sessions()
+        self._ensure_open()
+        try:
+            data = text.encode()
+        except UnicodeEncodeError:
+            raise InvalidArgument(1, "text is not valid Unicode (lone surrogate)") from None
+        capacity = len(data) + 2
+        while True:
+            tokens = np.empty(capacity, np.int32)
+            count = ctypes.c_size_t()
+            status = _lib.model_tokenize(self._handle, data, len(data), int(add_special),
+                                         tokens.ctypes.data_as(_lib.c_int32_p), capacity, ctypes.byref(count))
+            if status == 1 and count.value > capacity:  # too small: `count` is the size needed
+                capacity = count.value
+                continue
+            _check(status)
+            return tokens[: count.value].copy()
+
+    def detokenize_bytes(self, tokens) -> bytes:
+        """The bytes for these tokens. One token can be a fragment of a multi-byte character."""
+        _need_sessions()
+        self._ensure_open()
+        array = _token_array(tokens)
+        capacity = max(array.size * 8, 16)
+        while True:
+            buffer = ctypes.create_string_buffer(capacity)
+            nbytes = ctypes.c_size_t()
+            status = _lib.model_detokenize(self._handle, array.ctypes.data_as(_lib.c_int32_p), array.size, buffer,
+                                           capacity, ctypes.byref(nbytes))
+            if status == 1 and nbytes.value > capacity:
+                capacity = nbytes.value
+                continue
+            _check(status)
+            return buffer.raw[: nbytes.value]
+
+    def detokenize(self, tokens) -> str:
+        """The text for these tokens; bytes that are not valid UTF-8 become U+FFFD."""
+        return self.detokenize_bytes(tokens).decode("utf-8", errors="replace")
+
+    def session(self, options: Optional[Dict[str, object]] = None, **kwargs) -> Session:
+        """A new session on this model. Option: n_ctx, the tokens of context."""
+        return Session(self, options, **kwargs)
+
     def _ensure_open(self):
         if not self._handle:
             raise InvalidArgument(1, "the model is closed")
 
     def close(self) -> None:
+        for session in list(self._sessions):
+            session.close()
         if self._handle:
             _lib.model_destroy(self._handle)
             self._handle = None
@@ -238,12 +388,7 @@ class Engine:
         ensure_backend(backend)
         merged = dict(options or {})
         merged.update(kwargs)
-        array = (_lib.Option * max(len(merged), 1))()
-        keep = []
-        for i, (key, value) in enumerate(merged.items()):
-            k, v = str(key).encode(), str(value).encode()
-            keep.extend((k, v))
-            array[i].key, array[i].value = k, v
+        array, keep = _option_array(merged)
         handle = ctypes.c_void_p()
         _check(_lib.engine_create(backend.encode(), array, len(merged), ctypes.byref(handle)))
         self._handle = handle.value

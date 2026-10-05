@@ -77,9 +77,26 @@ still needs its vendor runtime installed; loading it reports that.
 - Threading follows the C API: do not run one model from several threads at once.
 
 Tests: `UAIRT_LIBRARY=... pytest bindings/python/tests`. Set `UAIRT_TEST_ORT_PLUGIN` to the ONNX Runtime
-plugin to also run the two-input/two-output test.
+plugin to also run the two-input/two-output test. The session tests (`test_sessions.py`) need
+`UAIRT_TEST_SESSION_PLUGIN` (the fake-session plugin built by CMake, `uairt_session_test_1`) and, for the real-model
+tests, `UAIRT_TEST_LLAMACPP_PLUGIN` (the llamacpp plugin) and `UAIRT_LLAMACPP_TEST_MODEL` (a GGUF path); without them
+those tests are skipped. In a shared-library build (`-DBUILD_SHARED_LIBS=ON`) with `pytest` and NumPy importable, the
+`python_sessions` ctest sets these variables (except the model path, which it inherits from the environment) and runs
+the whole directory.
 
 Windows ARM64: use an ARM64 Python (an x64 Python cannot load the ARM64 `uairt.dll`), build libuairt as a DLL and set
 `UAIRT_LIBRARY` to `build-shared\Debug\uairt.dll`. `examples/run_qnn.py <plugin> <QAIRT root> <model.dlc> [npu|cpu|gpu]`
 runs a model through the QNN plugin (0.8 ms on the Snapdragon X Elite NPU for `face_det_lite`). Set `ADSP_LIBRARY_PATH`
 to `<QAIRT root>\lib\hexagon-v73\unsigned` before starting Python for `npu`; see the Rust README for the caveat.
+
+## Language models (GGUF)
+
+With the llamacpp plugin available, `uairt.AutoModel.from_file("model.gguf", device="gpu")` loads a GGUF model. It has
+no `run`; use `model.generate(prompt, max_tokens=64, temperature=0.0, top_k=0, top_p=1.0, seed=None, stop_tokens=())`,
+which yields text pieces and samples in NumPy, or your own loop over `model.tokenize(text)`, `model.session(n_ctx=...)`,
+`session.append(tokens)` and `session.logits()`. Close sessions before their model. `generate()` does not stop at an end-of-generation token by itself (the C API exposes no special-token ids); pass `stop_tokens`, or limit `max_tokens`. For a Llama 3 style model,
+`stop = model.tokenize("<|eot_id|>", add_special=False)` returns the one id to pass (other models use their own end token string).
+`n_ctx` is capped by the model's training context and cannot be read back; a generation that reaches the context size fails
+mid-stream with "context full" (`InvalidArgument`). Different sessions of one model may be used from different threads; one
+session must not be. `tokenize` and `generate` may parse special-token text such as `<|eot_id|>` into control tokens (llamacpp
+does), so do not pass untrusted text if that matters.

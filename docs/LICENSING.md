@@ -8,6 +8,7 @@ UAIRT is Apache-2.0. It wraps vendor runtimes that are not open source.
 | QNN (QAIRT) | Qualcomm proprietary | Qualcomm proprietary | Never |
 | CoreML | Apple proprietary | Apple system framework | Never |
 | TensorRT | Apache-2.0 (NVIDIA/TensorRT repo) | NVIDIA proprietary | Never |
+| llama.cpp | MIT | MIT | As a pinned git submodule at `third_party/llama.cpp` (only the pin is in the repo) |
 
 ## Rules
 
@@ -19,6 +20,9 @@ UAIRT is Apache-2.0. It wraps vendor runtimes that are not open source.
 4. Do not reverse engineer vendor binaries or artifact formats.
 5. Do not use TensorRT in the same binary as copyleft-licensed code.
 6. Document in each backend that the vendor SDK and its license are required.
+7. Exception to rule 1: llama.cpp (MIT, not a vendor SDK) is a pinned submodule under `third_party/`, built only when
+   `UAIRT_BUILD_LLAMACPP=ON`. The repository holds the submodule pin, not llama.cpp's files, and releases that include
+   the plugin must ship `THIRD_PARTY_NOTICES.md`.
 
 ## Notes from the license texts reviewed (not legal advice)
 
