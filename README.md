@@ -42,7 +42,7 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 
 | Backend | Models | Verified on |
 |---|---|---|
-| ONNX Runtime | `.onnx`, static shapes, CPU | macOS arm64; matches Python ONNX Runtime. Compiles on Windows ARM64, not run there |
+| ONNX Runtime | `.onnx`, static shapes; CPU, and the CUDA and TensorRT providers on NVIDIA GPUs | macOS arm64 (CPU) and a GTX 1650 (CUDA provider); matches Python ONNX Runtime. Compiles on Windows ARM64, not run there |
 | QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy; compiled-context cache | Qualcomm QCS6490 and QCS8550, and Windows 11 ARM64 on a Snapdragon X Elite NPU; byte-identical to `qnn-net-run` |
 | TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench` |
 | CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O | Apple M5; identical to CoreML itself |
@@ -72,7 +72,7 @@ export ONNXRUNTIME_ROOT=/path/to/onnxruntime-<platform>-<version>
 cmake -S . -B build -DUAIRT_BUILD_ONNXRUNTIME=ON && cmake --build build
 ```
 
-Engine options: `intra_op_threads`, `execution_provider` (`cpu`), and for a plugin execution provider
+Engine options: `intra_op_threads`, `execution_provider` (`cpu`, `cuda` or `tensorrt` with a GPU release), `log_level`, and for a plugin execution provider
 `ep_library`, `ep_name` and `ep_option.<key>` (for example Apple's MLX with ONNX Runtime 1.29;
 see [docs/design.md](docs/design.md)).
 

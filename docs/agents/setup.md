@@ -23,6 +23,10 @@ Goal: get a requested backend building and passing tests. Logic lives in
   header version; it fails to load with a clear error if the installed library is older.
 - `tests/data/make_models.py` regenerates the test models and checks them against
   Python ONNX Runtime (needs `onnx`, `onnxruntime`, `numpy`).
+- GPU: use a GPU release whose CUDA major version matches the installed toolkit (for CUDA 12, the `gpu_cuda12` tarball)
+  and cuDNN 9. Run with `execution_provider=cuda` or `tensorrt` (the latter also needs TensorRT and `libnvonnxparser`),
+  and set `UAIRT_TEST_ORT_PROVIDER` for `ctest`. Confirm placement with `log_level=verbose`. The user installs these;
+  see `docs/backends/onnxruntime.md`.
 
 - Windows: configure with `-G "Visual Studio 17 2022"` and run `ctest -C Debug`. The unpacked release needs
   `lib/onnxruntime.lib` (import library) next to `onnxruntime.dll`. Model and plugin paths are converted to UTF-16.

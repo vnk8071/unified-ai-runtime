@@ -84,8 +84,8 @@ int main(int argc, char** argv) {
   uairt_engine* engine = NULL;
   CHECK(uairt_engine_create("onnxruntime", &bad_option, 1, &engine) ==
         UAIRT_ERR_INVALID_ARGUMENT);
-  uairt_option gpu = {"execution_provider", "cuda"};
-  CHECK(uairt_engine_create("onnxruntime", &gpu, 1, &engine) ==
+  uairt_option unknown_provider = {"execution_provider", "no_such_provider"};
+  CHECK(uairt_engine_create("onnxruntime", &unknown_provider, 1, &engine) ==
         UAIRT_ERR_UNSUPPORTED);
 
   uairt_option threads = {"intra_op_threads", "1"};
@@ -153,6 +153,24 @@ int main(int argc, char** argv) {
       }
       uairt_engine_destroy(engine);
     }
+  }
+
+  /* Optional: a built-in GPU provider ("cuda" or "tensorrt") from UAIRT_TEST_ORT_PROVIDER; needs a GPU build. */
+  const char* provider = getenv("UAIRT_TEST_ORT_PROVIDER");
+  if (provider && provider[0]) {
+    uairt_option gpu[] = {{"execution_provider", provider}};
+    CHECK(uairt_engine_create("onnxruntime", gpu, 1, &engine) == UAIRT_OK);
+    if (engine) {
+      uairt_model* gpu_model = NULL;
+      CHECK(uairt_model_load(engine, &from_path, &gpu_model) == UAIRT_OK);
+      if (gpu_model) {
+        run_add_mul(gpu_model);
+        uairt_model_destroy(gpu_model);
+      }
+      uairt_engine_destroy(engine);
+    }
+    uairt_option bad_combo[] = {{"execution_provider", provider}, {"ep_name", "x"}};
+    CHECK(uairt_engine_create("onnxruntime", bad_combo, 2, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
   }
 
   if (g_failures) {

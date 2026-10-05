@@ -24,6 +24,7 @@
 #define OPTION_EP_LIBRARY "ep_library"
 #define OPTION_EP_NAME "ep_name"
 #define OPTION_EP_PREFIX "ep_option."
+#define OPTION_LOG_LEVEL "log_level"
 #define MAX_EP_OPTIONS 32
 
 typedef struct {
@@ -69,7 +70,7 @@ static wchar_t* utf8_to_wide(const char* text) {
 #endif
 
 static void fail(const char* fmt, ...) {
-  char message[256];
+  char message[1024];
   va_list args;
   va_start(args, fmt);
   vsnprintf(message, sizeof(message), fmt, args);
@@ -219,6 +220,53 @@ cleanup:
   return status;
 }
 
+/*
+ * Appends a built-in GPU execution provider ("cuda" or "tensorrt") with the ep_option.<key> settings. The provider
+ * libraries ship with an ONNX Runtime GPU build; a CPU-only build fails here. Nodes the provider cannot take run on
+ * the CPU provider, which ONNX Runtime adds last.
+ */
+static uairt_status append_gpu_ep(
+    engine_t* engine,
+    const char* provider,
+    const char* const* keys,
+    const char* const* values,
+    size_t num_ep_options) {
+  uairt_status status = UAIRT_OK;
+  OrtCUDAProviderOptionsV2* cuda = NULL;
+  OrtTensorRTProviderOptionsV2* tensorrt = NULL;
+  if (strcmp(provider, "cuda") == 0) {
+    TRY(g_ort->CreateCUDAProviderOptions(&cuda));
+    TRY(g_ort->UpdateCUDAProviderOptions(cuda, keys, values, num_ep_options));
+    status = check(g_ort->SessionOptionsAppendExecutionProvider_CUDA_V2(engine->options, cuda));
+  } else {
+    TRY(g_ort->CreateTensorRTProviderOptions(&tensorrt));
+    TRY(g_ort->UpdateTensorRTProviderOptions(tensorrt, keys, values, num_ep_options));
+    status = check(g_ort->SessionOptionsAppendExecutionProvider_TensorRT_V2(engine->options, tensorrt));
+  }
+cleanup:
+  if (cuda) {
+    g_ort->ReleaseCUDAProviderOptions(cuda);
+  }
+  if (tensorrt) {
+    g_ort->ReleaseTensorRTProviderOptions(tensorrt);
+  }
+  if (status == UAIRT_ERR_RUNTIME) {
+    status = UAIRT_ERR_BACKEND_UNAVAILABLE;  // a CPU-only build, or the provider's libraries cannot be loaded
+  }
+  return status;
+}
+
+static bool parse_log_level(const char* value, int* level) {
+  static const char* const names[] = {"verbose", "info", "warning", "error", "fatal"};
+  for (int i = 0; i < 5; ++i) {
+    if (strcmp(value, names[i]) == 0) {
+      *level = i;
+      return true;
+    }
+  }
+  return false;
+}
+
 static uairt_status create_engine(
     const uairt_option* options,
     size_t num_options,
@@ -234,6 +282,7 @@ static uairt_status create_engine(
   const char* ep_values[MAX_EP_OPTIONS];
   size_t num_ep_options = 0;
   bool cpu_requested = false;
+  const char* gpu_ep = NULL;
   TRY(g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "uairt", &engine->env));
   TRY(g_ort->CreateSessionOptions(&engine->options));
   for (size_t i = 0; i < num_options; ++i) {
@@ -241,13 +290,25 @@ static uairt_status create_engine(
     const char* value = options[i].value ? options[i].value : "";
     if (strcmp(key, OPTION_THREADS) == 0) {
       TRY(g_ort->SetIntraOpNumThreads(engine->options, atoi(value)));
+    } else if (strcmp(key, OPTION_LOG_LEVEL) == 0) {
+      int level = 0;
+      if (!parse_log_level(value, &level)) {
+        fail("%s must be verbose, info, warning, error or fatal", OPTION_LOG_LEVEL);
+        status = UAIRT_ERR_INVALID_ARGUMENT;
+        goto cleanup;
+      }
+      TRY(g_ort->SetSessionLogSeverityLevel(engine->options, level));
     } else if (strcmp(key, OPTION_EP) == 0) {
-      if (strcmp(value, "cpu") != 0) {
-        fail("execution provider '%s' is not supported; use ep_library and ep_name for a plugin", value);
+      if (strcmp(value, "cuda") == 0 || strcmp(value, "tensorrt") == 0) {
+        gpu_ep = value;
+      } else if (strcmp(value, "cpu") == 0) {
+        cpu_requested = true;
+      } else {
+        fail("execution provider '%s' is not supported (cpu, cuda, tensorrt); use ep_library and ep_name for a "
+             "plugin", value);
         status = UAIRT_ERR_UNSUPPORTED;
         goto cleanup;
       }
-      cpu_requested = true;
     } else if (strcmp(key, OPTION_EP_LIBRARY) == 0) {
       ep_library = value;
     } else if (strcmp(key, OPTION_EP_NAME) == 0) {
@@ -266,7 +327,17 @@ static uairt_status create_engine(
       goto cleanup;
     }
   }
-  if (ep_library) {
+  if (gpu_ep) {
+    if (ep_library || ep_name) {
+      fail("execution_provider=%s cannot be combined with '%s' or '%s'", gpu_ep, OPTION_EP_LIBRARY, OPTION_EP_NAME);
+      status = UAIRT_ERR_INVALID_ARGUMENT;
+      goto cleanup;
+    }
+    status = append_gpu_ep(engine, gpu_ep, ep_keys, ep_values, num_ep_options);
+    if (status != UAIRT_OK) {
+      goto cleanup;
+    }
+  } else if (ep_library) {
     if (!ep_name || cpu_requested) {
       fail("'%s' needs '%s' and cannot be combined with execution_provider=cpu", OPTION_EP_LIBRARY, OPTION_EP_NAME);
       status = UAIRT_ERR_INVALID_ARGUMENT;
@@ -277,7 +348,8 @@ static uairt_status create_engine(
       goto cleanup;
     }
   } else if (ep_name || num_ep_options) {
-    fail("'%s' and '%s*' need '%s'", OPTION_EP_NAME, OPTION_EP_PREFIX, OPTION_EP_LIBRARY);
+    fail("'%s' and '%s*' need '%s' or execution_provider=cuda|tensorrt", OPTION_EP_NAME, OPTION_EP_PREFIX,
+         OPTION_EP_LIBRARY);
     status = UAIRT_ERR_INVALID_ARGUMENT;
     goto cleanup;
   }

@@ -15,6 +15,12 @@ First public version. Pre-1.0: the API and ABI may change.
 - Tests that compare each backend with the vendor's own tool: Python ONNX Runtime,
   `qnn-net-run`, CoreML through `coremltools`.
 
+### Added (ONNX Runtime GPU)
+- `execution_provider=cuda` and `tensorrt` for the ONNX Runtime backend, `ep_option.<key>` for them, and a `log_level`
+  option. A provider that cannot load reports `UAIRT_ERR_BACKEND_UNAVAILABLE`. Verified with the CUDA provider on a
+  GTX 1650: a yolov8n model runs in 10.0 ms against 59.9 ms on the CPU, with the same detections. The `tensorrt`
+  provider runs it in 8.1 ms (engine compile 116 s on the first run, cached afterwards).
+
 ### Added (TensorRT)
 - TensorRT backend (`tensorrt`, a C++ plugin): serialized engines (ultralytics exports load as is), static shapes, on
   an NVIDIA GPU. Built with `-DUAIRT_BUILD_TENSORRT=ON`. Verified on a GTX 1650 with TensorRT 10.9.0.34: outputs
