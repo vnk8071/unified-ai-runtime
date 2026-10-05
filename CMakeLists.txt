@@ -390,8 +390,10 @@ endif()
 # Python wheel (scikit-build-core): the core library goes into the package, and so do the plugins that can be built without a
 # vendor SDK, in the package's plugins/ directory where plugin discovery looks first.
 if(SKBUILD)
-  install(TARGETS uairt LIBRARY DESTINATION uairt RUNTIME DESTINATION uairt COMPONENT python)
+  # COMPONENT comes first: after an artifact kind it would apply to that kind only, and the library is a RUNTIME artifact on
+  # Windows but a LIBRARY artifact on Linux and macOS.
+  install(TARGETS uairt COMPONENT python LIBRARY DESTINATION uairt RUNTIME DESTINATION uairt)
   if(TARGET uairt_backend_onnxruntime)
-    install(TARGETS uairt_backend_onnxruntime LIBRARY DESTINATION uairt/plugins COMPONENT python)
+    install(TARGETS uairt_backend_onnxruntime COMPONENT python LIBRARY DESTINATION uairt/plugins)
   endif()
 endif()
