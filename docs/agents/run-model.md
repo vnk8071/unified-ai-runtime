@@ -20,6 +20,7 @@ a Hexagon architecture hint (it is a hint: check it against the chip before rely
 | `.dlc`, `.bin` (QNN context binary) | `qnn` | NPU (HTP), CPU, GPU | QAIRT SDK, new enough for `.dlc` |
 | `.onnx` | `onnxruntime` | CPU; NPU through a plugin execution provider | an ONNX Runtime release matching the headers (1.22+) |
 | `.tflite` | `tflite` | CPU; NPU through the QNN delegate (`libQnnTFLiteDelegate.so`, so Linux or Android) | a TFLite C library built for the target |
+| `.engine`, `.plan` (TensorRT) | `tensorrt` | NVIDIA GPU (CUDA) | TensorRT 8.5+ with headers, CUDA toolkit; build the engine on the GPU that runs it |
 | `.mlmodel`, `.mlpackage` | `coreml` | Apple CPU, GPU, Neural Engine | Xcode (macOS) |
 | PyTorch (`.pt`, `.pth`) | none | | export to ONNX first, then use `onnxruntime` |
 

@@ -149,6 +149,34 @@ if(UAIRT_BUILD_TFLITE)
   install(TARGETS uairt_backend_tflite LIBRARY DESTINATION lib/uairt)
 endif()
 
+option(UAIRT_BUILD_TENSORRT "Build the NVIDIA TensorRT backend plugin" OFF)
+if(UAIRT_BUILD_TENSORRT)
+  enable_language(CXX)
+  set(TENSORRT_ROOT "$ENV{TENSORRT_ROOT}" CACHE PATH
+      "Directory of your TensorRT installation (include/NvInfer.h and lib/libnvinfer)")
+  find_package(CUDAToolkit REQUIRED)
+  find_path(UAIRT_TRT_INCLUDE NvInfer.h
+    HINTS ${TENSORRT_ROOT}/include /usr/include/x86_64-linux-gnu /usr/include/aarch64-linux-gnu)
+  find_library(UAIRT_TRT_LIBRARY nvinfer
+    HINTS ${TENSORRT_ROOT}/lib ${TENSORRT_ROOT}/lib64
+          /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu)
+  if(NOT UAIRT_TRT_INCLUDE OR NOT UAIRT_TRT_LIBRARY)
+    message(FATAL_ERROR
+      "TensorRT not found. Set TENSORRT_ROOT to your TensorRT directory "
+      "(it must contain include/NvInfer.h and lib/libnvinfer).")
+  endif()
+
+  add_library(uairt_backend_tensorrt MODULE src/backends/tensorrt.cpp)
+  target_include_directories(uairt_backend_tensorrt PRIVATE include)
+  target_include_directories(uairt_backend_tensorrt SYSTEM PRIVATE ${UAIRT_TRT_INCLUDE})
+  target_compile_features(uairt_backend_tensorrt PRIVATE cxx_std_17)
+  target_compile_definitions(uairt_backend_tensorrt PRIVATE UAIRT_BUILDING_SHARED)
+  target_link_libraries(uairt_backend_tensorrt PRIVATE ${UAIRT_TRT_LIBRARY} CUDA::cudart)
+  set_target_properties(uairt_backend_tensorrt PROPERTIES
+    PREFIX "lib" CXX_VISIBILITY_PRESET hidden BUILD_RPATH "${TENSORRT_ROOT}/lib")
+  install(TARGETS uairt_backend_tensorrt LIBRARY DESTINATION lib/uairt)
+endif()
+
 if(UAIRT_BUILD_TESTS)
   enable_testing()
 
@@ -194,6 +222,18 @@ if(UAIRT_BUILD_TESTS)
       ${QNN_SDK_ROOT} $ENV{UAIRT_QNN_TEST_DLC}
       $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_qnn>
       --target ${UAIRT_QNN_TARGET} --backend ${UAIRT_QNN_BACKEND} ${UAIRT_QNN_DSP_ARGS})
+  endif()
+
+  if(UAIRT_BUILD_TENSORRT)
+    add_executable(test_tensorrt tests/test_tensorrt.c)
+    target_link_libraries(test_tensorrt PRIVATE uairt)
+    add_test(NAME tensorrt_errors COMMAND test_tensorrt $<TARGET_FILE:uairt_backend_tensorrt>
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_tensorrt.c)
+    if(DEFINED ENV{UAIRT_TENSORRT_TEST_ENGINE} AND DEFINED ENV{UAIRT_TENSORRT_PYTHON})
+      add_test(NAME tensorrt_vs_tensorrt_python COMMAND $ENV{UAIRT_TENSORRT_PYTHON}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_tensorrt.py
+        $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_tensorrt> $ENV{UAIRT_TENSORRT_TEST_ENGINE})
+    endif()
   endif()
 
   if(UAIRT_BUILD_COREML)

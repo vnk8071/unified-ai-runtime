@@ -108,6 +108,7 @@ such order, so its inputs and outputs are sorted by name.
 | ONNX Runtime | `onnxruntime` | `.onnx` (path or memory), static shapes | `intra_op_threads`, `execution_provider` (`cpu` only), `ep_library` + `ep_name` (a plugin execution provider; CPU stays the fallback), `ep_option.<key>` (passed to the plugin) | host |
 | QNN | `qnn` | `.dlc`, context binary `.bin` (one graph; others via `graph_name`) | `backend_library`*, `system_library`* (or `device` instead: `cpu`, `gpu`, `npu`, with `sdk_root` or `QNN_SDK_ROOT`, `target`, `hexagon_arch`, default `v73`), `graph_name`, `adsp_library_path`, `htp_performance_mode` (`default`, `burst`, `high_performance`, `balanced`, `power_saver`; HTP only), `cache_dir` and `cache_write` (compiled-context cache for `.dlc` on HTP; writes default to on, but off on Windows) | host, DMABUF (HTP) |
 | TFLite | `tflite` | `.tflite` (path or memory), static shapes; optional QNN delegate (HTP) | `num_threads`, `delegate` (`none`, `qnn`), and with `qnn`: `delegate_library`*, `backend_library`*, `skel_dir`, `htp_performance_mode` (`default`, `burst`, `high_performance`, `sustained`, `balanced`, `power_saver`), `htp_precision` (`quantized`, `fp16`), `adsp_library_path` | host |
+| TensorRT | `tensorrt` | serialized engine `.engine` / `.plan`, static shapes | `device` (CUDA device index) | host |
 | CoreML | `coreml` | `.mlmodelc`, `.mlpackage`, `.mlmodel` (path only), multi-array I/O, static shapes | `compute_units`: `all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne` | host |
 
 \* required. Backends other than `reference` are separate plugins: load
@@ -126,9 +127,13 @@ These are what the author ran, not a support matrix.
 | QNN CPU, HTP | Qualcomm QCS8550 (kalama, soc_id 603, Hexagon v73), Qualcomm Linux LE.PRODUCT.2.1, glibc 2.35 | QAIRT 2.46.0.260424 |
 | TFLite, CPU kernels | Qualcomm QCS6490, Ubuntu 20.04 aarch64 | TFLite 2.16.1 built on the device |
 | CoreML | macOS 26.6 on an Apple M5 | Xcode with the macOS 27.0 SDK, coremltools 9.0 |
+| core, reference, C++, Python and Rust bindings | Windows 11 ARM64 (Snapdragon X Elite) | Visual Studio 2022, ARM64 Python 3.11, Rust 1.96 |
+| QNN CPU, HTP (NPU) | Windows 11 ARM64, Snapdragon X Elite (Hexagon v73) | QAIRT 2.45.0.260326; outputs bit-identical to `qnn-net-run` |
+| TensorRT | Ubuntu 24.04 x86_64, NVIDIA GTX 1650 (compute 7.5), driver 580.178; built and error-path tested also on an RTX 2060 | TensorRT 10.9.0.34, CUDA 12.8; a yolov8n engine, outputs bit-identical to TensorRT's Python API |
 
-Not tested: Windows, Android, iOS, x86_64, other Snapdragon parts, the TFLite backend's QNN
-delegate path (see `docs/design.md`), TensorRT (not implemented).
+Not tested: Android, iOS, other Snapdragon parts, the TFLite backend's QNN delegate path (see
+`docs/design.md`), the ONNX Runtime backend on Windows (it compiles; no matching runtime was available), the TFLite
+backend on Windows (ported, not compiled), and TensorRT with dynamic shapes or on GPUs other than the two above.
 
 ## ABI stability
 

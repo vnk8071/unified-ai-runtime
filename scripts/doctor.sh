@@ -37,7 +37,7 @@ if [[ $windows == 1 ]]; then
 elif [[ "$(uname -s)" == "Darwin" ]]; then
   chip="$(sysctl -n machdep.cpu.brand_string 2>/dev/null)"
 else
-  chip="$(tr -d '\0' < /sys/firmware/devicetree/base/model 2>/dev/null || true)"
+  [[ -r /sys/firmware/devicetree/base/model ]] && chip="$(tr -d '\0' < /sys/firmware/devicetree/base/model)"
   [[ -z "$chip" ]] && chip="$(grep -m1 -i 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2- | sed 's/^ *//')"
   for node in /dev/fastrpc-* /dev/adsprpc-smd* /dev/accel/accel*; do
     [[ -e "$node" ]] && npu="$node" && break
@@ -45,6 +45,11 @@ else
 fi
 [[ -n "$chip" ]] && report info "chip: $chip"
 if [[ -n "$npu" ]]; then report ok "npu: $npu"; else report skip "npu: none detected"; fi
+if have nvidia-smi; then
+  gpu="$(nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader 2>/dev/null | head -1)"
+  [[ -n "$gpu" ]] && report ok "gpu: $gpu (name, driver, memory, compute capability)"
+  have nvcc && report info "cuda toolkit: $(nvcc --version | tail -1)"
+fi
 arch="$(hexagon_hint "$chip")"
 [[ -n "$arch" ]] && report info "hexagon arch hint: $arch (QNN hexagon_arch option; verify against your chip)"
 
@@ -94,14 +99,20 @@ else
   report skip "onnxruntime: set ONNXRUNTIME_ROOT"
 fi
 
+system_trt=""
+for header in /usr/include/x86_64-linux-gnu/NvInfer.h /usr/include/aarch64-linux-gnu/NvInfer.h /usr/include/NvInfer.h; do
+  [[ -f "$header" ]] && system_trt="$header" && break
+done
 if [[ -n "${TENSORRT_ROOT:-}" ]]; then
   if [[ -f "$TENSORRT_ROOT/include/NvInfer.h" ]]; then
     report ok "tensorrt: $TENSORRT_ROOT"
   else
     report missing "tensorrt: NvInfer.h not found under TENSORRT_ROOT"
   fi
+elif [[ -n "$system_trt" ]]; then
+  report ok "tensorrt: system install ($system_trt)"
 else
-  report skip "tensorrt: set TENSORRT_ROOT"
+  report skip "tensorrt: set TENSORRT_ROOT (TensorRT with headers, installed by you)"
 fi
 
 if [[ "$(uname -s)" == "Darwin" ]]; then

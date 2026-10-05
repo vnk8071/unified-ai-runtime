@@ -57,6 +57,12 @@ Goal: get a requested backend building and passing tests. Logic lives in
 - To compare with TFLite itself, build `tests/bench/tflite_bench.c` (see `tests/bench/README.md`)
   and set `UAIRT_TFLITE_BENCH` and `UAIRT_TFLITE_TEST_MODEL` before running cmake, then `ctest`.
 
+## TensorRT
+
+- NVIDIA GPU, driver and CUDA toolkit, plus TensorRT 8.5+ with headers. The user installs TensorRT under NVIDIA's licence;
+  never run `pip install tensorrt` or an installer for them. Set `TENSORRT_ROOT` (include/NvInfer.h, lib/libnvinfer).
+- Configure with `-DUAIRT_BUILD_TENSORRT=ON`. Engines must be built on the GPU that runs them; see `docs/backends/tensorrt.md`.
+
 ## QNN (Qualcomm AI Runtime)
 
 - The user installs QAIRT from Qualcomm and accepts its license; set `QNN_SDK_ROOT`
