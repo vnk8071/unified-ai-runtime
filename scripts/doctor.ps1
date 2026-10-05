@@ -58,11 +58,15 @@ foreach ($tool in 'cmake', 'git') {
 }
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $studio = $null
+$otherStudio = $null
 if (Test-Path $vswhere) {
-    $studio = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName
+    # The presets name the Visual Studio 2022 generator (version 17), so only 2022 counts.
+    $studio = & $vswhere -latest -version '[17.0,18.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName
+    if (-not $studio) { $otherStudio = & $vswhere -latest -products '*' -property displayName }
 }
 if ($studio) { Report 'ok' ('cc: {0} (use a preset, or -G "Visual Studio 17 2022")' -f $studio) }
-else { Report 'missing' 'cc: Visual Studio with the C++ tools not found'; $script:coreMissing = $true }
+elseif ($otherStudio) { Report 'missing' ('cc: found {0}, but the presets and docs use Visual Studio 2022 (generator ''Visual Studio 17 2022'') with the C++ tools; install it or pass your own generator' -f $otherStudio); $script:coreMissing = $true }
+else { Report 'missing' 'cc: Visual Studio 2022 with the C++ tools not found'; $script:coreMissing = $true }
 # The vendor-file test needs Git's bash. A bash.exe in System32 is the WSL launcher, which sees Linux paths.
 $gitBash = $null
 $gitCommand = Get-Command git

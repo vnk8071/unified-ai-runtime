@@ -97,8 +97,10 @@ done
 vswhere="${PROGRAMFILES_X86:-/c/Program Files (x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
 if have cc; then report ok "cc: $(cc --version | head -1)"
 elif [[ -x "$vswhere" ]] \
-     && vs="$("$vswhere" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName 2>/dev/null)" && [[ -n "$vs" ]]; then
-  report ok "cc: $vs (use: cmake -G \"Visual Studio 17 2022\")"
+     && vs="$("$vswhere" -latest -version '[17.0,18.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName 2>/dev/null)" && [[ -n "$vs" ]]; then
+  report ok "cc: $vs (use: cmake -G \"Visual Studio 17 2022\", or a preset)"
+elif [[ -x "$vswhere" ]] && other="$("$vswhere" -latest -products '*' -property displayName 2>/dev/null)" && [[ -n "$other" ]]; then
+  report missing "cc: found $other, but the presets and docs use Visual Studio 2022 (generator 'Visual Studio 17 2022') with the C++ tools; install it or pass your own generator"; core_missing=1
 else report missing "cc: no C compiler"; core_missing=1; fi
 
 echo "== backends (SDKs are installed by you under their own licenses)"
