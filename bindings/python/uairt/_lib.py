@@ -65,15 +65,21 @@ def _candidates():
         yield Path(found)
 
 
+library_path = None  # where libuairt was loaded from, when that is a file; plugin discovery starts there
+
+
 def load():
+    global library_path
     tried = []
     for path in _candidates():
         tried.append(str(path))
         if path.exists() or not path.is_absolute():
             try:
-                return ctypes.CDLL(str(path))
+                handle = ctypes.CDLL(str(path))
             except OSError:
                 continue
+            library_path = path.resolve() if path.exists() else None
+            return handle
     raise OSError(
         "cannot find libuairt; build it with -DBUILD_SHARED_LIBS=ON and set UAIRT_LIBRARY to its path "
         f"(tried: {', '.join(tried) or 'nothing'})")

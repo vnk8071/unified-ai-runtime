@@ -233,6 +233,9 @@ class Engine:
     """One backend configuration. Options are passed to the backend as strings."""
 
     def __init__(self, backend: str, options: Optional[Dict[str, object]] = None, **kwargs):
+        from ._plugins import ensure_backend  # a plugin that is not registered yet is loaded from the search path
+
+        ensure_backend(backend)
         merged = dict(options or {})
         merged.update(kwargs)
         array = (_lib.Option * max(len(merged), 1))()

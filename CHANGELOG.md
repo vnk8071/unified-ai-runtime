@@ -15,6 +15,16 @@ First public version. Pre-1.0: the API and ABI may change.
 - Tests that compare each backend with the vendor's own tool: Python ONNX Runtime,
   `qnn-net-run`, CoreML through `coremltools`.
 
+### Added (Python AutoModel)
+- `uairt.AutoModel.from_file(path, device=...)` (and `uairt.load`) chooses the backend from the model file and the device,
+  maps the device to that backend's options, and reports its choice in `model.backend`, `model.options` and `model.plan`.
+  It is strict: no fallback to another runtime or the CPU, and clear errors saying why candidates were passed over.
+- Plugin discovery: `Engine("onnxruntime")` loads `libuairt_backend_onnxruntime` from `UAIRT_PLUGIN_PATH`, the package's
+  `plugins/` directory or the directory of libuairt, so plugin paths are no longer needed. `uairt.available_backends()`,
+  `discover_plugins()` and `ensure_backend()` expose it.
+- Verified end to end on a Snapdragon X Elite laptop: a `.dlc` on the NPU and an NCNN model on the Adreno GPU, each from one
+  `AutoModel.from_file` call with no plugin paths in the code.
+
 ### Added (Windows as a build target)
 - `CMakePresets.json` with `windows-arm64-debug` and `windows-x64-debug` (configure, build and test presets), so the Visual
   Studio generator and platform flags need not be remembered.

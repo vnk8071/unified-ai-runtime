@@ -198,7 +198,9 @@ Per-backend setup pages are in [docs/backends/](docs/backends/README.md).
 
 Python (`bindings/python`), Rust (`bindings/rust`) and a header-only C++17 wrapper
 (`include/uairt/uairt.hpp`) are done, and run on Windows ARM64 too. Each has a `run_qnn` example, and Python also has
-`detect_tensorrt.py`. See [bindings/README.md](bindings/README.md).
+`detect_tensorrt.py`. The Python binding has `AutoModel`, which picks the backend from the model file and device and finds
+backend plugins on its own (`uairt.AutoModel.from_file("model.dlc", device="npu")`). See
+[bindings/README.md](bindings/README.md) and [bindings/python/README.md](bindings/python/README.md).
 
 ## Documentation
 
