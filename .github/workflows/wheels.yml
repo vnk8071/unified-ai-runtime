@@ -111,7 +111,8 @@ jobs:
   # without a person saying so after TestPyPI has been looked at.
   publish-pypi:
     needs: [publish-testpypi]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.publish == 'pypi' }}
+    # always(): the implicit success() also sees the skipped ARM64 job two levels up.
+    if: ${{ always() && needs.publish-testpypi.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || inputs.publish == 'pypi') }}
     runs-on: ubuntu-24.04
     environment:
       name: pypi
