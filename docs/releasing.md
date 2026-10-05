@@ -2,7 +2,8 @@
 # Releasing the Python package
 
 The `uairt` package on PyPI is a set of platform wheels plus a source distribution, built and published by
-`.github/workflows/wheels.yml`. Nothing is published until you do the one-time setup below and push a version tag.
+`.github/workflows/wheels.yml`. Version 0.1.0 is on https://pypi.org/project/uairt/. A release needs the one-time setup below and either a pushed `v*` tag or a manual
+run of the workflow with `publish` set to `testpypi` or `pypi`.
 
 ## What is published
 

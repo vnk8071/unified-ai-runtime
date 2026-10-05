@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Compares UAIRT's CoreML backend with CoreML itself (through coremltools).
 
-Builds two small models (Add/Mul and a conv net with random weights), compiles them
-with coremlcompiler, and checks UAIRT's outputs against MLModel.predict. Needs macOS,
-coremltools, numpy and Xcode.
+Builds three small models (Add/Mul, a conv net with random weights, and a conv net with an
+image input), compiles them with coremlcompiler, and checks UAIRT's outputs against
+MLModel.predict. Needs macOS, coremltools, numpy, pillow and Xcode.
 
     python tests/compare_with_coremltools.py build/run_model build/libuairt_backend_coreml.so
 """
@@ -17,7 +17,7 @@ import coremltools as ct
 import numpy as np
 from coremltools.converters.mil import Builder as mb
 
-DTYPES = {1: np.float32, 2: np.float16, 7: np.int32}
+DTYPES = {1: np.float32, 2: np.float16, 5: np.uint8, 7: np.int32}
 
 
 def build_models(directory):
@@ -37,10 +37,18 @@ def build_models(directory):
         b2 = rng.standard_normal(10).astype(np.float32)
         return mb.linear(x=y, weight=w2, bias=b2, name="logits")
 
+    @mb.program(input_specs=[mb.TensorSpec(shape=(1, 3, 64, 64))])
+    def imagenet(image):
+        w = rng.standard_normal((8, 3, 3, 3)).astype(np.float32) * 0.2
+        y = mb.relu(x=mb.conv(x=image, weight=w, strides=[2, 2], pad_type="same"))
+        return mb.reduce_mean(x=y, axes=[2, 3], keep_dims=False, name="features")
+
+    image = ct.ImageType(name="image", shape=(1, 3, 64, 64), scale=1 / 255, color_layout=ct.colorlayout.BGR)
     models = {}
-    for name, program in [("add_mul", add_mul), ("convnet", convnet)]:
+    for name, program, inputs in [("add_mul", add_mul, None), ("convnet", convnet, None),
+                                  ("imagenet", imagenet, [image])]:
         package = directory / f"{name}.mlpackage"
-        ct.convert(program, convert_to="mlprogram", compute_precision=ct.precision.FLOAT32,
+        ct.convert(program, inputs=inputs, convert_to="mlprogram", compute_precision=ct.precision.FLOAT32,
                    minimum_deployment_target=ct.target.macOS13).save(str(package))
         subprocess.run(["xcrun", "coremlcompiler", "compile", str(package), str(directory)],
                        check=True, capture_output=True)
@@ -68,10 +76,16 @@ def compare(run_model, plugin, package, compiled, units, tmp):
 
     rng = np.random.default_rng(1)
     arrays, paths = {}, []
+    raw = {}
     for i, (name, dtype, shape) in enumerate(tensors["input"]):
-        arrays[name] = rng.standard_normal(shape).astype(dtype)
+        if dtype == np.uint8:  # an image input: BGRA bytes for UAIRT, the same pixels as an image for CoreML
+            from PIL import Image
+            raw[name] = rng.integers(0, 256, shape, dtype=np.uint8)
+            arrays[name] = Image.fromarray(raw[name][0][..., [2, 1, 0]], "RGB")
+        else:
+            raw[name] = arrays[name] = rng.standard_normal(shape).astype(dtype)
         path = tmp / f"in{i}.bin"
-        arrays[name].tofile(path)
+        raw[name].tofile(path)
         paths.append(str(path))
     prefix = tmp / f"out_{package.stem}_{units}_"
     subprocess.run([*base, plugin, "coreml", str(compiled), str(prefix), *paths], check=True)

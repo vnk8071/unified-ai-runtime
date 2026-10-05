@@ -84,8 +84,10 @@ buffer inside the backend did not help (8.9 ms): the single-threaded host copy c
 - Models load from a path: `.mlmodelc`, or `.mlpackage`/`.mlmodel` which are compiled
   with `MLModel compileModelAtURL` on load (the compiled copy is deleted with the
   model). Loading from memory is not supported because CoreML needs a file URL.
-- Only multi-array inputs and outputs (float32, float16, int32) with static shapes.
-  Image and other feature types, and flexible shapes, return `UAIRT_ERR_UNSUPPORTED`.
+- Multi-array inputs and outputs (float32, float16, int32) with static shapes, and image inputs of a fixed size in
+  `BGRA`, `ARGB`, `RGBA` or one-channel 8-bit format. An image input is a `UINT8` tensor `[1, height, width, channels]`
+  of tightly packed rows in the model's pixel order; the model applies its own scale and bias. Image outputs, other
+  feature types, flexible shapes and flexible image sizes return `UAIRT_ERR_UNSUPPORTED`.
   CoreML reports a fixed shape as one enumerated shape, which counts as static.
 - CoreML has no ordering of inputs and outputs, so UAIRT orders both by name.
 - Inputs wrap the caller's memory without copying. Outputs are bound with

@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /*
  * CoreML backend (Apple platforms), built as a loadable plugin.
- * v1 limits: multi-array inputs and outputs, static shapes, host memory.
+ * v1 limits: multi-array inputs and outputs and fixed-size image inputs (uint8
+ * [1, height, width, channels]), static shapes, host memory.
  * Models load from a path (.mlmodelc, or .mlpackage/.mlmodel which are compiled
  * on load). Inputs and outputs are ordered by name.
  */
 #import <CoreML/CoreML.h>
+#import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
 
 #include <stdarg.h>
@@ -26,6 +28,10 @@ typedef struct {
   size_t nbytes;
   size_t element_size;
   MLMultiArrayDataType ml_type;
+  OSType pixel_format; /* nonzero: a CoreML image input, exposed as uint8 [1, height, width, channels] */
+  size_t width;
+  size_t height;
+  size_t channels;
   void* shape;
   void* strides;
 } io_t;
@@ -163,10 +169,82 @@ static bool has_static_shape(MLMultiArrayShapeConstraint* constraint) {
   }
 }
 
+static bool has_static_image_size(MLImageConstraint* constraint) {
+  MLImageSizeConstraint* size = constraint.sizeConstraint;
+  switch (size.type) {
+    case MLImageSizeConstraintTypeUnspecified:
+      return true;
+    case MLImageSizeConstraintTypeEnumerated:
+      return size.enumeratedImageSizes.count == 1;
+    case MLImageSizeConstraintTypeRange:
+      return size.pixelsWideRange.length == 1 && size.pixelsHighRange.length == 1;
+    default:
+      return false;
+  }
+}
+
+static uairt_status describe_image(MLImageConstraint* constraint, const char* kind, io_t* io) {
+  switch (constraint.pixelFormatType) {
+    case kCVPixelFormatType_32BGRA:
+    case kCVPixelFormatType_32ARGB:
+    case kCVPixelFormatType_32RGBA:
+      io->channels = 4;
+      break;
+    case kCVPixelFormatType_OneComponent8:
+      io->channels = 1;
+      break;
+    default:
+      fail("%s '%s' has an unsupported image pixel format", kind, io->name);
+      return UAIRT_ERR_UNSUPPORTED;
+  }
+  if (!has_static_image_size(constraint)) {
+    fail("%s '%s' has a flexible image size; static sizes only for now", kind, io->name);
+    return UAIRT_ERR_UNSUPPORTED;
+  }
+  io->pixel_format = constraint.pixelFormatType;
+  io->width = (size_t)constraint.pixelsWide;
+  io->height = (size_t)constraint.pixelsHigh;
+  io->element_size = 1;
+  io->nbytes = io->width * io->height * io->channels;
+  io->desc.struct_size = sizeof(uairt_tensor);
+  io->desc.domain = UAIRT_MEM_HOST;
+  io->desc.dmabuf_fd = -1;
+  io->desc.dtype = UAIRT_DTYPE_UINT8;
+  io->desc.rank = 4;
+  io->desc.name = io->name;
+  io->desc.dims[0] = 1;
+  io->desc.dims[1] = (int64_t)io->height;
+  io->desc.dims[2] = (int64_t)io->width;
+  io->desc.dims[3] = (int64_t)io->channels;
+  return UAIRT_OK;
+}
+
+/* Copies tightly packed rows into a new pixel buffer, whose rows may be padded. */
+static CVPixelBufferRef make_pixel_buffer(const io_t* io, const uint8_t* data) {
+  CVPixelBufferRef buffer = NULL;
+  if (CVPixelBufferCreate(kCFAllocatorDefault, io->width, io->height, io->pixel_format,
+                          (__bridge CFDictionaryRef) @{(id)kCVPixelBufferIOSurfacePropertiesKey : @{}},
+                          &buffer) != kCVReturnSuccess) {
+    return NULL;
+  }
+  CVPixelBufferLockBaseAddress(buffer, 0);
+  uint8_t* base = CVPixelBufferGetBaseAddress(buffer);
+  size_t stride = CVPixelBufferGetBytesPerRow(buffer);
+  size_t row = io->width * io->channels;
+  for (size_t y = 0; y < io->height; ++y) {
+    memcpy(base + y * stride, data + y * row, row);
+  }
+  CVPixelBufferUnlockBaseAddress(buffer, 0);
+  return buffer;
+}
+
 static uairt_status describe_io(MLFeatureDescription* feature, const char* kind, io_t* io) {
   io->name = strdup(feature.name.UTF8String);
   if (!io->name) {
     return UAIRT_ERR_OUT_OF_MEMORY;
+  }
+  if (feature.type == MLFeatureTypeImage && strcmp(kind, "input") == 0) {
+    return describe_image(feature.imageConstraint, kind, io);
   }
   if (feature.type != MLFeatureTypeMultiArray) {
     fail("%s '%s' is not a multi-array (images and other feature types are not supported yet)",
@@ -378,12 +456,24 @@ static uairt_status run(
     MLModel* ml_model = (__bridge MLModel*)model->ml_model;
     NSMutableDictionary<NSString*, MLFeatureValue*>* features = [NSMutableDictionary dictionary];
     for (size_t i = 0; i < n_in && status == UAIRT_OK; ++i) {
-      MLMultiArray* array = wrap(&model->inputs[i], inputs[i].data, &error);
+      const io_t* io = &model->inputs[i];
+      if (io->pixel_format) {
+        CVPixelBufferRef pixels = make_pixel_buffer(io, inputs[i].data);
+        if (!pixels) {
+          fail("cannot create a pixel buffer for input '%s'", io->name);
+          status = UAIRT_ERR_RUNTIME;
+        } else {
+          features[@(io->name)] = [MLFeatureValue featureValueWithPixelBuffer:pixels];
+          CVPixelBufferRelease(pixels);
+        }
+        continue;
+      }
+      MLMultiArray* array = wrap(io, inputs[i].data, &error);
       if (!array) {
         fail_error("cannot wrap input", error);
         status = UAIRT_ERR_RUNTIME;
       } else {
-        features[@(model->inputs[i].name)] = [MLFeatureValue featureValueWithMultiArray:array];
+        features[@(io->name)] = [MLFeatureValue featureValueWithMultiArray:array];
       }
     }
     NSMutableDictionary<NSString*, id>* backings = [NSMutableDictionary dictionary];

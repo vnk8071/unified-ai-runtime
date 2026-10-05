@@ -26,5 +26,5 @@ Accepts `.mlmodelc`, `.mlpackage` and `.mlmodel`. The engine option `compute_uni
 ## Check
 
 `ctest --test-dir build --output-on-failure`. The comparison with CoreML itself needs Python with
-`coremltools` and `numpy`; use a throwaway virtualenv and set `UAIRT_COREML_PYTHON` to its
+`coremltools`, `numpy` and `pillow`; use a throwaway virtualenv and set `UAIRT_COREML_PYTHON` to its
 interpreter before running cmake.

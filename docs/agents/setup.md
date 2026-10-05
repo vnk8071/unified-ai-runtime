@@ -48,7 +48,7 @@ Goal: get a requested backend building and passing tests. Logic lives in
   the comparison test). The user installs Xcode and accepts its license.
 - Configure with `-DUAIRT_BUILD_COREML=ON`. Engines take the optional `compute_units`
   (`all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne`).
-- The comparison test needs `coremltools` and `numpy`. Do not install them into the
+- The comparison test needs `coremltools`, `numpy` and `pillow`. Do not install them into the
   user's own environments without asking; a throwaway virtualenv is fine. Set
   `UAIRT_COREML_PYTHON` to that interpreter before running cmake.
 

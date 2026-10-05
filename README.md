@@ -45,7 +45,7 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 | ONNX Runtime | `.onnx`, static shapes; CPU, and the CUDA and TensorRT providers on NVIDIA GPUs | macOS arm64 (CPU) and a GTX 1650 (CUDA provider); matches Python ONNX Runtime. Compiles on Windows ARM64, not run there |
 | QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy; compiled-context cache | Qualcomm QCS6490 and QCS8550, and Windows 11 ARM64 on a Snapdragon X Elite NPU; byte-identical to `qnn-net-run` |
 | TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench` |
-| CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O | Apple M5; identical to CoreML itself |
+| CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O, image inputs | Apple M5; identical to CoreML itself |
 | OpenVINO | IR (`.xml` + `.bin`) and `.onnx`, static shapes; any OpenVINO device | an Intel Core CPU, and an x64 build under emulation on a Snapdragon X Elite laptop (there is no Windows ARM64 OpenVINO); bit-identical to OpenVINO's Python API. GPU and NPU devices untested |
 | NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan (matches NCNN's Python API); a Snapdragon X Elite laptop, CPU and Adreno GPU through Vulkan, same detections |
 | TensorRT | serialized `.engine` / `.plan` (ultralytics exports load as is), static shapes; host and pinned buffers | NVIDIA GTX 1650, TensorRT 10.9; bit-identical to TensorRT's Python API |
@@ -56,6 +56,18 @@ the two are reported separately (see [docs/agents/run-model.md](docs/agents/run-
 
 Known issues and the exact configurations tested are in [docs/api.md](docs/api.md) and
 [docs/design.md](docs/design.md). Read them before relying on a backend.
+
+## Install (Python)
+
+```bash
+pip install "uairt[onnxruntime]"
+```
+
+[`uairt` on PyPI](https://pypi.org/project/uairt/) has wheels for Linux (x86_64, aarch64), macOS (arm64) and Windows (x64) for
+Python 3.9 and later. Each carries the native library and the ONNX Runtime plugin; drop the `[onnxruntime]` extra if you bring
+your own `onnxruntime`. The other backends (QNN, TensorRT, CoreML, OpenVINO, NCNN, TFLite) are not in the wheel: build
+their plugins from this repository (below) and point `UAIRT_PLUGIN_PATH` at them. See
+[bindings/python/README.md](bindings/python/README.md).
 
 ## Build
 
@@ -200,8 +212,7 @@ Python (`bindings/python`), Rust (`bindings/rust`) and a header-only C++17 wrapp
 (`include/uairt/uairt.hpp`) are done, and run on Windows ARM64 too. Each has a `run_qnn` example, and Python also has
 `detect_tensorrt.py`. The Python binding has `AutoModel`, which picks the backend from the model file and device and finds
 backend plugins on its own (`uairt.AutoModel.from_file("model.dlc", device="npu")`). A wheel with the native library and the
-ONNX Runtime plugin builds from this repository (`pip install "uairt[onnxruntime]"` once published; see
-[docs/releasing.md](docs/releasing.md)). See
+ONNX Runtime plugin is on PyPI (`pip install "uairt[onnxruntime]"`; see [docs/releasing.md](docs/releasing.md)). See
 [bindings/README.md](bindings/README.md) and [bindings/python/README.md](bindings/python/README.md).
 
 ## Documentation

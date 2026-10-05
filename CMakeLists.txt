@@ -97,7 +97,7 @@ if(UAIRT_BUILD_COREML)
   add_library(uairt_backend_coreml MODULE src/backends/coreml.m)
   target_include_directories(uairt_backend_coreml PRIVATE include)
   target_compile_options(uairt_backend_coreml PRIVATE -fobjc-arc)
-  target_link_libraries(uairt_backend_coreml PRIVATE "-framework CoreML" "-framework Foundation")
+  target_link_libraries(uairt_backend_coreml PRIVATE "-framework CoreML" "-framework CoreVideo" "-framework Foundation")
   set_target_properties(uairt_backend_coreml PROPERTIES PREFIX "lib" OBJC_VISIBILITY_PRESET hidden)
   install(TARGETS uairt_backend_coreml LIBRARY DESTINATION lib/uairt)
 endif()
@@ -167,8 +167,9 @@ if(UAIRT_BUILD_OPENVINO)
     HINTS ${OPENVINO_ROOT}/libs ${OPENVINO_ROOT}/lib ${OPENVINO_ROOT}/runtime/lib/intel64
           ${OPENVINO_ROOT}/runtime/lib/aarch64 ${OPENVINO_ROOT}/runtime/bin/intel64/Release)
   if(NOT UAIRT_OV_LIBRARY)
-    # pip installs ship only the versioned library, for example libopenvino_c.so.2641
+    # pip installs ship only the versioned library: libopenvino_c.so.2641, or libopenvino_c.2641.dylib on macOS
     file(GLOB UAIRT_OV_VERSIONED "${OPENVINO_ROOT}/libs/libopenvino_c.so.*"
+         "${OPENVINO_ROOT}/libs/libopenvino_c.*.dylib"
          "${OPENVINO_ROOT}/runtime/lib/intel64/libopenvino_c.so.*")
     if(UAIRT_OV_VERSIONED)
       list(GET UAIRT_OV_VERSIONED 0 UAIRT_OV_LIBRARY)

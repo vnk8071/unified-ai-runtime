@@ -4,7 +4,7 @@
 A `ctypes` binding for the Unified AI Runtime C API. Pure Python plus NumPy; no compiler is needed
 to install it, but it needs the shared library `libuairt`.
 
-From a wheel (once published; see [docs/releasing.md](../../docs/releasing.md)), which carries the native library and the ONNX
+From a wheel on [PyPI](https://pypi.org/project/uairt/) (see [docs/releasing.md](../../docs/releasing.md)), which carries the native library and the ONNX
 Runtime plugin, so nothing else is built:
 
 ```bash

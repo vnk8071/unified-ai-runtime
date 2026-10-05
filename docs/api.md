@@ -111,7 +111,7 @@ such order, so its inputs and outputs are sorted by name.
 | OpenVINO | `openvino` | OpenVINO IR `.xml`, `.onnx`, or a directory with one `.xml` (path only), static shapes | `device` (`CPU`, `GPU`, `NPU`, `AUTO`, ...), `performance_hint`, `num_threads`, `cache_dir` | host |
 | NCNN | `ncnn` | `.param` + `.bin` or a directory with one (path only), float32, static shapes | `input_shapes` (required), `device` (`cpu`, `vulkan`), `vulkan_device`, `fp16`, `num_threads` | host |
 | TensorRT | `tensorrt` | serialized engine `.engine` / `.plan` (ultralytics exports load as is), static shapes | `device` (CUDA device index) | host, pinned |
-| CoreML | `coreml` | `.mlmodelc`, `.mlpackage`, `.mlmodel` (path only), multi-array I/O, static shapes | `compute_units`: `all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne` | host |
+| CoreML | `coreml` | `.mlmodelc`, `.mlpackage`, `.mlmodel` (path only), multi-array I/O and fixed-size image inputs (uint8 `[1,H,W,C]`), static shapes | `compute_units`: `all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne` | host |
 
 \* required. Backends other than `reference` are separate plugins: load
 `libuairt_backend_<name>` with `uairt_load_backend_library` first.
