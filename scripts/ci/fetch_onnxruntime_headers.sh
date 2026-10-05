@@ -7,8 +7,14 @@ set -euo pipefail
 version="${1:-1.22.0}"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 dest="$root/.ort"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
 rm -rf "$dest" && mkdir -p "$dest"
-curl -fsSL --retry 3 "https://github.com/microsoft/onnxruntime/releases/download/v${version}/onnxruntime-linux-x64-${version}.tgz" \
-  | tar -xz -C "$dest" --strip-components=1 --wildcards '*/include/*'
+# Naming just the include directory works with GNU tar and with the BSD tar on macOS and Windows, and skips lib/, whose symlinks
+# Windows cannot create.
+archive="onnxruntime-linux-x64-${version}"
+curl -fsSL --retry 3 "https://github.com/microsoft/onnxruntime/releases/download/v${version}/${archive}.tgz" \
+  | tar -xz -C "$work" "${archive}/include"
+cp -R "$work/${archive}/include" "$dest/include"
 test -f "$dest/include/onnxruntime_c_api.h" || { echo "onnxruntime_c_api.h not found in the archive" >&2; exit 1; }
 echo "ONNX Runtime ${version} headers in $dest/include"
