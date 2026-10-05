@@ -1,0 +1,108 @@
+# Build and run a model on the target device
+
+Goal: the user names a model and a device ("run this on the NPU"). You build UAIRT there, run the model on that
+device, check the result, and report what actually ran. Backend installation details live in `setup.md`;
+symptoms and fixes live in `troubleshooting.md`. The rules in `AGENTS.md` apply throughout.
+
+## 1. Find the target
+
+Run `scripts/doctor.sh` and read every line. The `device` section gives the OS, chip, whether an NPU is present and
+a Hexagon architecture hint (it is a hint: check it against the chip before relying on it).
+
+- The target is the machine you are on unless the user says otherwise. For another board or phone, ask how to reach
+  it. Build and run there; never assume access.
+- If `doctor.sh` says `missing` for a core tool, tell the user what to install. Do not use `sudo`.
+
+## 2. Pick the backend from the model
+
+| Model file | Backend | Devices | The user provides |
+|---|---|---|---|
+| `.dlc`, `.bin` (QNN context binary) | `qnn` | NPU (HTP), CPU, GPU | QAIRT SDK, new enough for `.dlc` |
+| `.onnx` | `onnxruntime` | CPU; NPU through a plugin execution provider | an ONNX Runtime release matching the headers (1.22+) |
+| `.tflite` | `tflite` | CPU; NPU through the QNN delegate (`libQnnTFLiteDelegate.so`, so Linux or Android) | a TFLite C library built for the target |
+| `.mlmodel`, `.mlpackage` | `coreml` | Apple CPU, GPU, Neural Engine | Xcode (macOS) |
+| PyTorch (`.pt`, `.pth`) | none | | export to ONNX first, then use `onnxruntime` |
+
+- A PyTorch model has no backend of its own: `torch.onnx.export` it, then follow the `.onnx` row. `torch` has no
+  Windows ARM64 wheel, so on that platform export from an x64 Python.
+- A `.bin` context binary is tied to the chip and the QAIRT version it was built for. One built for another chip or
+  an older SDK will not load. A `.dlc` is portable but is compiled on the device at load (see the cache below).
+- Producing a `.dlc` needs `qairt-converter`, which runs on x86_64 Linux only. If the user has only an ONNX or
+  PyTorch model and the target is the NPU, say what that conversion needs and who does it.
+
+## 3. Get the SDK in place
+
+If `doctor.sh` reports the backend as `skip` or `missing`, follow `setup.md`: give the user the vendor download
+page and the environment variable to set, wait for them to install and set it, then rerun `doctor.sh`. Never
+download an SDK or accept its licence for them, and never put SDK files in this repository.
+
+## 4. Build and test
+
+Linux and macOS:
+
+```bash
+cmake -S . -B build -DUAIRT_BUILD_QNN=ON      # add the backend options you need
+cmake --build build && ctest --test-dir build --output-on-failure
+```
+
+Windows (Git Bash or PowerShell; the Visual Studio generator is needed, other compilers did not link):
+
+```bash
+cmake -S . -B build -G "Visual Studio 17 2022" -DUAIRT_BUILD_QNN=ON
+cmake --build build --config Debug && ctest --test-dir build -C Debug --output-on-failure
+```
+
+Set the backend's environment variables (`QNN_SDK_ROOT`, `ONNXRUNTIME_ROOT`, and the `UAIRT_*_TEST_*` variables from
+`setup.md`) before the `cmake` configure step, or the tests that need them are not registered. Check that `ctest`
+lists every test you expect.
+
+## 5. Run the model
+
+`build/run_model` takes raw input files, one per model input, and writes raw outputs. Look at the model first:
+
+```bash
+build/run_model [--option key=value]... --info <plugin> <backend> <model>
+```
+
+The plugin is `build/libuairt_backend_<name>.so` (`.dll` on Windows, under `build/Debug`). `--info` prints each
+input's name, dtype, quantization and dims. Make inputs of exactly that dtype and size, for example with numpy
+(`rng.integers(0, 256, shape).astype(np.uint8).tofile("in0.bin")`), then run:
+
+```bash
+build/run_model --repeat 50 [--option ...] <plugin> <backend> <model> <out-prefix> in0.bin
+```
+
+It prints `init_ms` and `latency_ms` (min, median, mean). Outputs go to `<out-prefix><index>.bin`.
+
+QNN on the NPU, the shortest form: `--option device=npu --option sdk_root=<QAIRT root>` (optionally
+`hexagon_arch=v73`, `htp_performance_mode=burst`, `cache_dir=<dir>`). `device` finds the backend and system
+libraries and the Hexagon skel directory for you. `cache_dir` keeps the compiled context of a `.dlc` so later loads
+skip the compile; writes are off by default on Windows (see `docs/backends/qnn.md`).
+
+From a binding: `bindings/cpp/run_qnn.cpp`, `bindings/python/examples/run_qnn.py` and
+`bindings/rust/uairt/examples/run_qnn.rs` do the same through the C++, Python and Rust APIs. Python and Rust on
+Windows need `ADSP_LIBRARY_PATH` set before the process starts for the NPU (see `troubleshooting.md`).
+
+## 6. Check the result
+
+- Correctness is agreement with the vendor tool, not agreement between devices. For QNN, run the comparison against
+  `qnn-net-run` through `ctest` (`UAIRT_QNN_TEST_DLC`, `UAIRT_QNN_TEST_BACKEND=htp`, `UAIRT_QNN_DSP_ARCH`); it must be
+  bit-identical. Quantized models differ slightly between CPU and NPU, so do not use that as a pass or fail test.
+- Confirm the device that really ran. For the NPU the backend library must be `QnnHtp`, and latency should be far
+  below the CPU run (a small vision model went from about 790 ms on the CPU to under 1 ms on the NPU). A run on
+  `QnnCpu` is not an NPU run.
+- Run with a second, different input and check the outputs are not constant.
+
+## 7. Report
+
+Give the actual command and its output: `init_ms`, the median latency, the device, the backend library used, and
+the `ctest` result. Say plainly what you did not verify (for example a backend that only compiled, or a model you
+did not compare against the vendor tool). The work is done only when `ctest` passes, `doctor.sh` reports the
+backend as `ok`, and a run on the requested device is shown.
+
+## Stop and ask when
+
+- an SDK, model conversion or licence acceptance is needed;
+- a step needs `sudo` or a system setting changed;
+- the target is another machine and you do not have access;
+- the model's format needs a backend that is not built here and cannot be built without the user's SDK.

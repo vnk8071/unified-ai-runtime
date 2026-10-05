@@ -152,3 +152,7 @@ point the build at them. See [docs/LICENSING.md](docs/LICENSING.md).
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## For agents
+
+`AGENTS.md` and `docs/agents/` direct a coding agent to build UAIRT and run a model on a target device: `run-model.md` is the playbook, `setup.md` covers each backend's SDK, `troubleshooting.md` maps symptoms to fixes, and `scripts/doctor.sh` reports the device and what is ready. A matching Claude Code skill is in `.claude/skills/run-model-on-device/`.
