@@ -25,7 +25,7 @@ with uairt.Engine("onnxruntime", intra_op_threads=1) as engine:
 - Inputs must match the model's dtype and shape exactly; the binding never converts silently.
 - Errors are `uairt.UairtError` subclasses (`NotFound`, `Unsupported`, `IncompatibleModel`, `IoFailure`, ...)
   carrying `.status` and `.message`.
-- `Engine.alloc_buffer(n, "host" | "dmabuf")` and `Model.run_buffers` give zero-copy buffers;
+- `Engine.alloc_buffer(n, "host" | "dmabuf" | "pinned")` and `Model.run_buffers` give zero-copy buffers;
   `Buffer.array(dtype, shape)` is a NumPy view.
 - Models and buffers keep their engine alive. Close models before buffers they used.
 - Threading follows the C API: do not run one model from several threads at once.

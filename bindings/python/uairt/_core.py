@@ -99,9 +99,9 @@ class Buffer:
     """A zero-copy buffer allocated by a backend. Free it after the models that used it."""
 
     def __init__(self, engine: "Engine", nbytes: int, domain: str = "host"):
-        domains = {"host": _lib.MEM_HOST, "dmabuf": _lib.MEM_DMABUF}
+        domains = {"host": _lib.MEM_HOST, "dmabuf": _lib.MEM_DMABUF, "pinned": _lib.MEM_PINNED}
         if domain not in domains:
-            raise InvalidArgument(1, f"domain must be 'host' or 'dmabuf', got {domain!r}")
+            raise InvalidArgument(1, f"domain must be 'host', 'dmabuf' or 'pinned', got {domain!r}")
         self._engine = engine
         handle = ctypes.c_void_p()
         _check(_lib.buffer_alloc(engine._handle, nbytes, domains[domain], ctypes.byref(handle)))

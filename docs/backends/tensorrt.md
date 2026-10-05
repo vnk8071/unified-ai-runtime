@@ -36,7 +36,9 @@ Engines exported by ultralytics start with a 4-byte length and a JSON metadata b
 ## Limits
 
 - Static shapes only: an engine with a dynamic dimension is rejected at load.
-- Host memory only. Inputs and outputs are copied through device buffers the model owns on every run.
+- Inputs and outputs are copied through device buffers the model owns on every run. Plain host memory works;
+  pinned buffers from `uairt_buffer_alloc(engine, n, UAIRT_MEM_PINNED)` (`--pinned` in `run_model`, `"pinned"` in
+  Python, `Domain::Pinned` in C++ and Rust) are page-locked, so the transfers are faster and need no extra copy.
 - One execution context per model; do not run one model from several threads at once.
 - Supported element types: float32, float16, bfloat16, int8, uint8, int32, int64 and bool.
 
@@ -46,9 +48,23 @@ Engines exported by ultralytics start with a 4-byte length and a JSON metadata b
 `UAIRT_TENSORRT_TEST_ENGINE=/path/model.engine` and `UAIRT_TENSORRT_PYTHON=<python with tensorrt, torch and numpy>`
 before running cmake; the outputs must be identical.
 
+## Example
+
+`bindings/python/examples/detect_tensorrt.py` runs a YOLOv8 engine on an image through the Python binding with pinned
+buffers and prints the detections (it needs numpy and Pillow only):
+
+```bash
+export UAIRT_LIBRARY=$PWD/build-shared/libuairt.so PYTHONPATH=$PWD/bindings/python
+python bindings/python/examples/detect_tensorrt.py build/libuairt_backend_tensorrt.so yolov8n.engine bus.jpg
+```
+
+On `bus.jpg` it reports four people and a bus; `--plain` uses ordinary arrays for comparison.
+
 ## Result
 
 A yolov8n engine exported by ultralytics 8.4.173 (FP32, 640x640, GTX 1650, TensorRT 10.9.0.34): the outputs are bit-identical
-to TensorRT's Python API. Median time per run over 200 runs: 5.14 ms for TensorRT with tensors already on the GPU, 6.63 ms for
-ultralytics' engine call, and 7.93 ms through this backend, which copies the 4.9 MB input and 2.8 MB output through pageable host
-memory on every run. Pinned or device-resident zero-copy buffers would close most of that gap.
+to TensorRT's Python API. Median time per run over 200 runs: 5.14 ms for TensorRT with tensors already on the GPU, 6.63 ms
+for ultralytics' engine call, 8.1 ms through this backend with plain host buffers and **6.4 ms with pinned buffers**.
+The 1.7 ms gap is the pageable transfers (about 2.5 ms of copies against 1.3 ms pinned). Copying through a pinned staging
+buffer inside the backend was tried and measured 8.9 ms, so it was dropped: the single-threaded host copy cost more than
+the faster DMA saved.

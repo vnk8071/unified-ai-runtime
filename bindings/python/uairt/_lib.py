@@ -15,6 +15,7 @@ STATUS_NAMES = {
 
 MEM_HOST = 1 << 0
 MEM_DMABUF = 1 << 1
+MEM_PINNED = 1 << 2
 
 
 class Tensor(ctypes.Structure):

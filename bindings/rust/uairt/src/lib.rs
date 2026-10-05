@@ -281,6 +281,7 @@ pub fn load_backend_library(path: &str) -> Result<()> {
 pub enum Domain {
     Host,
     DmaBuf,
+    Pinned,
 }
 
 /// One backend configuration.
@@ -358,11 +359,12 @@ impl Engine {
         Ok(model)
     }
 
-    /// Allocates a zero-copy buffer; `Domain::DmaBuf` needs backend support.
+    /// Allocates a zero-copy buffer; `Domain::DmaBuf` and `Domain::Pinned` need backend support.
     pub fn alloc_buffer(&self, nbytes: usize, domain: Domain) -> Result<Buffer<'_>> {
         let domain = match domain {
             Domain::Host => sys::UAIRT_MEM_HOST,
             Domain::DmaBuf => sys::UAIRT_MEM_DMABUF,
+            Domain::Pinned => sys::UAIRT_MEM_PINNED,
         };
         let mut raw = std::ptr::null_mut();
         check(unsafe { sys::uairt_buffer_alloc(self.raw, nbytes, domain, &mut raw) })?;

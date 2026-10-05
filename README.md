@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Unified AI Runtime (UAIRT)
 
-One C API to run compiled AI models on QNN, ONNX Runtime and CoreML (TensorRT planned).
+One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML and TensorRT (NVIDIA GPUs).
 Write the application code once; choose the backend by name when you create an engine.
 
 ```c
@@ -42,11 +42,11 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 
 | Backend | Models | Verified on |
 |---|---|---|
-| ONNX Runtime | `.onnx`, static shapes, CPU | macOS arm64; matches Python ONNX Runtime |
-| QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy | Qualcomm QCS6490 and QCS8550; byte-identical to `qnn-net-run` |
+| ONNX Runtime | `.onnx`, static shapes, CPU | macOS arm64; matches Python ONNX Runtime. Compiles on Windows ARM64, not run there |
+| QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy; compiled-context cache | Qualcomm QCS6490 and QCS8550, and Windows 11 ARM64 on a Snapdragon X Elite NPU; byte-identical to `qnn-net-run` |
 | TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench` |
 | CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O | Apple M5; identical to CoreML itself |
-| TensorRT | not implemented | needs an NVIDIA device |
+| TensorRT | serialized `.engine` / `.plan` (ultralytics exports load as is), static shapes; host and pinned buffers | NVIDIA GTX 1650, TensorRT 10.9; bit-identical to TensorRT's Python API |
 
 Known issues and the exact configurations tested are in [docs/api.md](docs/api.md) and
 [docs/design.md](docs/design.md). Read them before relying on a backend.
@@ -104,6 +104,24 @@ build/run_model --option compute_units=all --info build/libuairt_backend_coreml.
 Needs Xcode. To check against CoreML itself, point `UAIRT_COREML_PYTHON` at a Python with
 `coremltools` and `numpy` before running cmake.
 
+### TensorRT (NVIDIA GPUs)
+
+Install an NVIDIA driver, the CUDA toolkit and TensorRT 8.5+ with its headers yourself (the apt packages
+`libnvinfer-dev` or NVIDIA's tarball). An engine is built for one GPU and one TensorRT version, so build it on the GPU
+that runs it, with `trtexec` or ultralytics (`YOLO("yolov8n.pt").export(format="engine")`).
+
+```bash
+export TENSORRT_ROOT=/path/to/TensorRT            # not needed for a system install
+cmake -S . -B build -DUAIRT_BUILD_TENSORRT=ON && cmake --build build
+build/run_model --info build/libuairt_backend_tensorrt.so tensorrt yolov8n.engine
+build/run_model --repeat 100 --pinned build/libuairt_backend_tensorrt.so tensorrt yolov8n.engine out in0.bin
+```
+
+`--pinned` allocates the inputs and outputs as page-locked buffers (`UAIRT_MEM_PINNED`), which made a yolov8n run
+8.1 ms to 6.4 ms on a GTX 1650. A complete detection program, with the Python binding and pinned buffers, is
+[bindings/python/examples/detect_tensorrt.py](bindings/python/examples/detect_tensorrt.py); see
+[docs/backends/tensorrt.md](docs/backends/tensorrt.md).
+
 ### QNN (Qualcomm AI Runtime)
 
 Install QAIRT from Qualcomm yourself. The SDK has no macOS libraries, so build and run on
@@ -121,6 +139,10 @@ build/run_model \
   --info build/libuairt_backend_qnn.so qnn model.serialized.bin
 ```
 
+On Windows ARM64 or any machine where the SDK layout is standard, `--option device=npu --option sdk_root=$QNN_SDK_ROOT`
+replaces the three library options (`cpu` and `gpu` work too), and `--option cache_dir=<dir>` keeps the compiled
+context of a `.dlc` so later loads skip the compile (3.1 s to 0.4 s on a Snapdragon X Elite).
+
 Add `--option htp_performance_mode=burst` for short graphs (about 4x faster at 10 ms),
 `--option graph_name=<name>` when a model holds several graphs, `--repeat N` to time
 runs, and `--dmabuf` for zero-copy buffers on HTP. `UAIRT_QNN_TEST_DLC`,
@@ -132,7 +154,8 @@ Per-backend setup pages are in [docs/backends/](docs/backends/README.md).
 ## Language bindings
 
 Python (`bindings/python`), Rust (`bindings/rust`) and a header-only C++17 wrapper
-(`include/uairt/uairt.hpp`) are done. See [bindings/README.md](bindings/README.md).
+(`include/uairt/uairt.hpp`) are done, and run on Windows ARM64 too. Each has a `run_qnn` example, and Python also has
+`detect_tensorrt.py`. See [bindings/README.md](bindings/README.md).
 
 ## Documentation
 
@@ -141,7 +164,8 @@ Python (`bindings/python`), Rust (`bindings/rust`) and a header-only C++17 wrapp
 - [docs/design.md](docs/design.md): design decisions, per-backend notes, measurements
 - [docs/LICENSING.md](docs/LICENSING.md): how vendor licenses shape this repository
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md)
-- [AGENTS.md](AGENTS.md): instructions for coding agents working in this repository
+- [AGENTS.md](AGENTS.md) and [docs/agents/](docs/agents/run-model.md): instructions for coding agents, including a
+  playbook for building UAIRT and running a model on a target device (`scripts/doctor.sh` reports the device)
 
 ## Vendor SDKs
 
@@ -152,7 +176,3 @@ point the build at them. See [docs/LICENSING.md](docs/LICENSING.md).
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
-
-## For agents
-
-`AGENTS.md` and `docs/agents/` direct a coding agent to build UAIRT and run a model on a target device: `run-model.md` is the playbook, `setup.md` covers each backend's SDK, `troubleshooting.md` maps symptoms to fixes, and `scripts/doctor.sh` reports the device and what is ready. A matching Claude Code skill is in `.claude/skills/run-model-on-device/`.

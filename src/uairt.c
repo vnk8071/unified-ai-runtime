@@ -393,7 +393,8 @@ static uairt_status check_binding(
       return UAIRT_ERR_INVALID_ARGUMENT;
     }
   }
-  if (actual->domain != UAIRT_MEM_HOST && actual->domain != UAIRT_MEM_DMABUF) {
+  if (actual->domain != UAIRT_MEM_HOST && actual->domain != UAIRT_MEM_DMABUF &&
+      actual->domain != UAIRT_MEM_PINNED) {
     uairt_set_error("%s %zu: unknown memory domain", kind, index);
     return UAIRT_ERR_INVALID_ARGUMENT;
   }
@@ -406,7 +407,7 @@ static uairt_status check_binding(
         actual->domain);
     return UAIRT_ERR_UNSUPPORTED;
   }
-  if ((actual->domain == UAIRT_MEM_HOST && !actual->data) ||
+  if (((actual->domain == UAIRT_MEM_HOST || actual->domain == UAIRT_MEM_PINNED) && !actual->data) ||
       (actual->domain == UAIRT_MEM_DMABUF && actual->dmabuf_fd < 0)) {
     uairt_set_error("%s %zu: missing buffer", kind, index);
     return UAIRT_ERR_INVALID_ARGUMENT;
@@ -495,6 +496,14 @@ uairt_status uairt_buffer_alloc(
   } else if (domain == UAIRT_MEM_DMABUF) {
     uairt_set_error("backend '%s' cannot allocate DMABUF buffers", engine->api->name);
     status = UAIRT_ERR_UNSUPPORTED;
+  } else if (domain == UAIRT_MEM_PINNED) {
+    if ((engine->api->supported_domains & UAIRT_MEM_PINNED) && engine->api->alloc_buffer) {
+      status = engine->api->alloc_buffer(
+          engine->handle, nbytes, domain, &buffer->backend_handle, &buffer->data, &buffer->fd);
+    } else {
+      uairt_set_error("backend '%s' cannot allocate pinned buffers", engine->api->name);
+      status = UAIRT_ERR_UNSUPPORTED;
+    }
   } else {
     uairt_set_error("unknown memory domain %u", domain);
     status = UAIRT_ERR_INVALID_ARGUMENT;

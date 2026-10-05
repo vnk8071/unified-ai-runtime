@@ -55,6 +55,7 @@ int main(int argc, char** argv) {
     CHECK(std::memcmp(dst.data(), values, 16) == 0);
     CHECK(src.fd() == -1 && src.size() == 16);
     CHECK(throws_status(uairt::Status::Unsupported, [&] { engine.alloc_buffer(16, uairt::Domain::DmaBuf); }));
+    CHECK(throws_status(uairt::Status::Unsupported, [&] { engine.alloc_buffer(16, uairt::Domain::Pinned); }));
   }
 
   CHECK(throws_status(uairt::Status::NotFound, [] { uairt::Engine engine("no_such_backend"); }));

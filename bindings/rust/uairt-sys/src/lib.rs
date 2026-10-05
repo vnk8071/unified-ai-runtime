@@ -34,6 +34,7 @@ pub const UAIRT_DTYPE_UINT16: uairt_dtype = 10;
 pub type uairt_memory_domain = u32;
 pub const UAIRT_MEM_HOST: uairt_memory_domain = 1 << 0;
 pub const UAIRT_MEM_DMABUF: uairt_memory_domain = 1 << 1;
+pub const UAIRT_MEM_PINNED: uairt_memory_domain = 1 << 2;
 
 #[repr(C)]
 pub struct uairt_engine {

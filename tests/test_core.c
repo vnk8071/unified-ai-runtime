@@ -46,6 +46,8 @@ static void test_buffers(void) {
   buffer = NULL;
   CHECK(uairt_buffer_alloc(engine, 16, UAIRT_MEM_DMABUF, &buffer) == UAIRT_ERR_UNSUPPORTED);
   CHECK(buffer == NULL);
+  CHECK(uairt_buffer_alloc(engine, 16, UAIRT_MEM_PINNED, &buffer) == UAIRT_ERR_UNSUPPORTED);
+  CHECK(buffer == NULL);
   CHECK(uairt_buffer_alloc(engine, 0, UAIRT_MEM_HOST, &buffer) == UAIRT_ERR_INVALID_ARGUMENT);
   CHECK(uairt_buffer_alloc(NULL, 16, UAIRT_MEM_HOST, &buffer) == UAIRT_ERR_INVALID_ARGUMENT);
   CHECK(uairt_buffer_alloc(engine, 16, 1u << 7, &buffer) == UAIRT_ERR_INVALID_ARGUMENT);

@@ -82,6 +82,8 @@ def test_host_buffers_and_unsupported_dmabuf():
                 source.array(np.float32, (1, 5))
         with pytest.raises(uairt.Unsupported):
             engine.alloc_buffer(16, "dmabuf")
+        with pytest.raises(uairt.Unsupported):
+            engine.alloc_buffer(16, "pinned")
         with pytest.raises(uairt.InvalidArgument):
             engine.alloc_buffer(16, "gpu")
 

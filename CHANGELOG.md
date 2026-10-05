@@ -15,6 +15,15 @@ First public version. Pre-1.0: the API and ABI may change.
 - Tests that compare each backend with the vendor's own tool: Python ONNX Runtime,
   `qnn-net-run`, CoreML through `coremltools`.
 
+### Added (TensorRT)
+- TensorRT backend (`tensorrt`, a C++ plugin): serialized engines (ultralytics exports load as is), static shapes, on
+  an NVIDIA GPU. Built with `-DUAIRT_BUILD_TENSORRT=ON`. Verified on a GTX 1650 with TensorRT 10.9.0.34: outputs
+  bit-identical to TensorRT's Python API.
+- `UAIRT_MEM_PINNED` memory domain (appended, existing values unchanged): page-locked host buffers from
+  `uairt_buffer_alloc`. On the TensorRT backend they cut a yolov8n run from 8.1 ms to 6.4 ms. `run_model --pinned`,
+  and `Domain::Pinned` / `"pinned"` in the C++, Rust and Python bindings.
+- Example: `bindings/python/examples/detect_tensorrt.py` (YOLOv8 detection through the Python binding).
+
 ### Added (TFLite)
 - TFLite backend (`tflite`): `.tflite` from a path or from memory; optional QNN delegate on HTP.
   Built with `-DUAIRT_BUILD_TFLITE=ON`. The CPU path is verified on a QCS6490 and the delegate path on a QCS8550

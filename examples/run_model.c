@@ -5,7 +5,7 @@
  *   run_model [--option key=value]... --info <plugin> <backend> <model>
  * Outputs are written to <out-prefix><index>.bin. --info prints the model's I/O
  * and exits. --repeat N times N extra runs and prints min/median/mean latency.
- * --dmabuf allocates every input and output as a zero-copy DMABUF buffer. --memory loads the model
+ * --dmabuf allocates every input and output as a zero-copy DMABUF buffer, --pinned as a pinned (page-locked) one. --memory loads the model
  * file into memory and passes it as data instead of a path. The engine and
  * model creation time is printed to stderr as init_ms. Used by the compare_with_*.py scripts.
  */
@@ -75,6 +75,7 @@ int main(int argc, char** argv) {
   bool info_only = false;
   int repeat = 0;
   bool use_dmabuf = false;
+  bool use_pinned = false;
   bool from_memory = false;
   int arg = 1;
   for (; arg < argc; ++arg) {
@@ -94,6 +95,8 @@ int main(int argc, char** argv) {
       from_memory = true;
     } else if (strcmp(argv[arg], "--dmabuf") == 0) {
       use_dmabuf = true;
+    } else if (strcmp(argv[arg], "--pinned") == 0) {
+      use_pinned = true;
     } else if (strcmp(argv[arg], "--info") == 0) {
       info_only = true;
     } else {
@@ -173,6 +176,8 @@ int main(int argc, char** argv) {
     fprintf(stderr, "model needs %zu input file(s), got %d\n", n_in, num_input_files);
     return 2;
   }
+  const bool use_buffers = use_dmabuf || use_pinned;
+  const uairt_memory_domain buffer_domain = use_pinned ? UAIRT_MEM_PINNED : UAIRT_MEM_DMABUF;
   uairt_buffer** in_buffers = calloc(n_in ? n_in : 1, sizeof(*in_buffers));
   uairt_buffer** out_buffers = calloc(n_out ? n_out : 1, sizeof(*out_buffers));
   for (size_t i = 0; i < n_in; ++i) {
@@ -182,8 +187,8 @@ int main(int argc, char** argv) {
       fprintf(stderr, "cannot read %s\n", input_files[i]);
       return 1;
     }
-    if (use_dmabuf) {
-      status = uairt_buffer_alloc(engine, size, UAIRT_MEM_DMABUF, &in_buffers[i]);
+    if (use_buffers) {
+      status = uairt_buffer_alloc(engine, size, buffer_domain, &in_buffers[i]);
       if (status != UAIRT_OK) {
         return die("allocate input buffer", status);
       }
@@ -197,8 +202,8 @@ int main(int argc, char** argv) {
   }
   for (size_t i = 0; i < n_out; ++i) {
     size_t size = (size_t)uairt_tensor_num_elements(&out[i]) * uairt_dtype_size(out[i].dtype);
-    if (use_dmabuf) {
-      status = uairt_buffer_alloc(engine, size, UAIRT_MEM_DMABUF, &out_buffers[i]);
+    if (use_buffers) {
+      status = uairt_buffer_alloc(engine, size, buffer_domain, &out_buffers[i]);
       if (status != UAIRT_OK) {
         return die("allocate output buffer", status);
       }

@@ -2,8 +2,8 @@
 /*
  * NVIDIA TensorRT backend, built as a loadable plugin.
  * v1 limits: serialized engines only (.engine / .plan, built for this GPU and TensorRT version),
- * one execution context per model, static shapes, host memory (inputs and outputs are staged through device
- * buffers the model owns). TensorRT and the CUDA toolkit come from your own installation (TENSORRT_ROOT).
+ * one execution context per model, static shapes, host memory or pinned (page-locked) buffers from
+ * uairt_buffer_alloc (inputs and outputs are copied through device buffers the model owns). TensorRT and the CUDA toolkit come from your own installation (TENSORRT_ROOT).
  * Exceptions never cross the backend ABI.
  */
 #include <NvInfer.h>
@@ -305,23 +305,56 @@ uairt_status run(
   if (!cuda_ok(cudaSetDevice(model->owner->device), "cudaSetDevice")) {
     return UAIRT_ERR_RUNTIME;
   }
+  // Buffers from uairt_buffer_alloc(..., UAIRT_MEM_PINNED) are page-locked, so the driver DMAs straight from and to
+  // them; plain host memory goes through the driver's slower pageable path. Both are copied in place, no staging.
   for (size_t i = 0; i < n_in; ++i) {
     if (!cuda_ok(cudaMemcpyAsync(model->inputs[i].device, inputs[i].data, model->inputs[i].nbytes,
                                  cudaMemcpyHostToDevice, stream), "cudaMemcpyAsync (input)")) {
+      cudaStreamSynchronize(stream);
       return UAIRT_ERR_RUNTIME;
     }
   }
   if (!model->context->enqueueV3(stream)) {
+    cudaStreamSynchronize(stream);
     fail("TensorRT enqueue failed: %s", t_trt_message.c_str());
     return UAIRT_ERR_RUNTIME;
   }
   for (size_t i = 0; i < n_out; ++i) {
     if (!cuda_ok(cudaMemcpyAsync(outputs[i].data, model->outputs[i].device, model->outputs[i].nbytes,
                                  cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync (output)")) {
+      cudaStreamSynchronize(stream);
       return UAIRT_ERR_RUNTIME;
     }
   }
   return cuda_ok(cudaStreamSynchronize(stream), "cudaStreamSynchronize") ? UAIRT_OK : UAIRT_ERR_RUNTIME;
+}
+
+uairt_status alloc_buffer(
+    void* engine_handle,
+    size_t nbytes,
+    uairt_memory_domain domain,
+    void** out_handle,
+    void** out_data,
+    int32_t* out_fd) {
+  Engine* engine = static_cast<Engine*>(engine_handle);
+  if (domain != UAIRT_MEM_PINNED) {
+    fail("the tensorrt backend allocates only pinned buffers (UAIRT_MEM_PINNED)");
+    return UAIRT_ERR_UNSUPPORTED;
+  }
+  void* memory = nullptr;
+  if (!cuda_ok(cudaSetDevice(engine->device), "cudaSetDevice") ||
+      !cuda_ok(cudaHostAlloc(&memory, nbytes, cudaHostAllocDefault), "cudaHostAlloc")) {
+    return UAIRT_ERR_OUT_OF_MEMORY;
+  }
+  *out_handle = memory;
+  *out_data = memory;
+  *out_fd = -1;
+  return UAIRT_OK;
+}
+
+void free_buffer(void* engine_handle, void* handle) {
+  cudaSetDevice(static_cast<Engine*>(engine_handle)->device);
+  cudaFreeHost(handle);
 }
 
 const uairt_backend_api* api() {
@@ -331,7 +364,7 @@ const uairt_backend_api* api() {
     table.struct_size = sizeof(table);
     table.abi_version = UAIRT_BACKEND_ABI_VERSION;
     table.name = "tensorrt";
-    table.supported_domains = UAIRT_MEM_HOST;
+    table.supported_domains = UAIRT_MEM_HOST | UAIRT_MEM_PINNED;
     table.create_engine = create_engine;
     table.destroy_engine = destroy_engine;
     table.load_model = load_model;
@@ -341,6 +374,8 @@ const uairt_backend_api* api() {
     table.input_info = input_info;
     table.output_info = output_info;
     table.run = run;
+    table.alloc_buffer = alloc_buffer;
+    table.free_buffer = free_buffer;
     return table;
   }();
   return &kApi;

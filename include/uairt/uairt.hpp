@@ -79,7 +79,7 @@ enum class DType : int32_t {
   Bool = UAIRT_DTYPE_BOOL,
 };
 
-enum class Domain : uint32_t { Host = UAIRT_MEM_HOST, DmaBuf = UAIRT_MEM_DMABUF };
+enum class Domain : uint32_t { Host = UAIRT_MEM_HOST, DmaBuf = UAIRT_MEM_DMABUF, Pinned = UAIRT_MEM_PINNED };
 
 inline std::size_t dtype_size(DType dtype) { return uairt_dtype_size(static_cast<uairt_dtype>(dtype)); }
 

@@ -50,6 +50,20 @@ int main(int argc, char** argv) {
       .struct_size = sizeof(wrong_format), .path = argv[2], .format = "onnx"};
   CHECK(uairt_model_load(engine, &wrong_format, &model) == UAIRT_ERR_UNSUPPORTED);
 
+  uairt_buffer* pinned = NULL;
+  CHECK(uairt_buffer_alloc(engine, 4096, UAIRT_MEM_PINNED, &pinned) == UAIRT_OK);
+  if (pinned) {
+    CHECK(uairt_buffer_data(pinned) != NULL && uairt_buffer_size(pinned) == 4096);
+    memset(uairt_buffer_data(pinned), 0xAB, 4096);
+    uairt_tensor tensor;
+    uairt_tensor_init(&tensor);
+    uairt_tensor_use_buffer(&tensor, pinned);
+    CHECK(tensor.domain == UAIRT_MEM_PINNED && tensor.data == uairt_buffer_data(pinned));
+    uairt_buffer_free(pinned);
+  }
+  uairt_buffer* dmabuf = NULL;
+  CHECK(uairt_buffer_alloc(engine, 4096, UAIRT_MEM_DMABUF, &dmabuf) == UAIRT_ERR_UNSUPPORTED);
+
   uairt_engine_destroy(engine);
   if (g_failures) {
     fprintf(stderr, "%d check(s) failed\n", g_failures);

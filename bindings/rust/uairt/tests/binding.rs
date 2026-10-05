@@ -78,6 +78,8 @@ fn host_buffers_and_unsupported_dmabuf() {
     assert_eq!(source.fd(), -1);
     let err = engine.alloc_buffer(16, Domain::DmaBuf).err().unwrap();
     assert_eq!(err.status(), Status::Unsupported);
+    let err = engine.alloc_buffer(16, Domain::Pinned).err().unwrap();
+    assert_eq!(err.status(), Status::Unsupported);
 }
 
 #[test]

@@ -31,17 +31,20 @@ domains before a backend runs, so backends do not repeat it.
 
 ## Memory domains
 
-`UAIRT_MEM_HOST` and `UAIRT_MEM_DMABUF` are bit flags. A backend advertises the set it
+`UAIRT_MEM_HOST`, `UAIRT_MEM_DMABUF` and `UAIRT_MEM_PINNED` are bit flags. A backend advertises the set it
 accepts in `supported_domains`; the core rejects other bindings with
 `UAIRT_ERR_UNSUPPORTED`. Device pointers (CUDA) and IOSurface (CoreML) are added later
-as new bits.
+as new bits. `PINNED` is page-locked host memory: the pointer is usable like host memory, and a
+device can DMA from and to it without an extra copy.
 
 Zero-copy buffers come from the engine: `uairt_buffer_alloc(engine, n, UAIRT_MEM_DMABUF)`
 asks the backend (optional `alloc_buffer`/`free_buffer` in `uairt_backend_api`) and
 `uairt_tensor_use_buffer` binds the result to a tensor. Destroy models before freeing
 the buffers they ran with, and free buffers before the engine. Which backends accept
 DMABUF at run time is decided by the backend: QNN HTP does, QNN CPU reports
-`UAIRT_ERR_UNSUPPORTED`.
+`UAIRT_ERR_UNSUPPORTED`. Pinned buffers (`UAIRT_MEM_PINNED`) come the same way and only the TensorRT backend
+provides them; on a GTX 1650 they cut a yolov8n run from 8.1 ms to 6.4 ms. Staging the copy through a pinned
+buffer inside the backend did not help (8.9 ms): the single-threaded host copy cost more than the faster DMA.
 
 ## QNN notes
 

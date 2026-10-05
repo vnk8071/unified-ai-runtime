@@ -52,7 +52,7 @@ Describes a model input or output (`data == NULL`) and binds a buffer to it.
 | `dtype` | `UAIRT_DTYPE_FLOAT32`, `FLOAT16`, `BFLOAT16`, `INT8`, `UINT8`, `INT16`, `UINT16`, `INT32`, `INT64`, `BOOL` |
 | `rank`, `dims[UAIRT_MAX_RANK]` | shape; static shapes only in this version |
 | `quant_scale`, `quant_zero_point` | per-tensor quantization of the stored values; `0` when not quantized. Real value = `(q - zero_point) * scale` |
-| `domain` | `UAIRT_MEM_HOST` or `UAIRT_MEM_DMABUF` |
+| `domain` | `UAIRT_MEM_HOST`, `UAIRT_MEM_DMABUF` or `UAIRT_MEM_PINNED` |
 | `data`, `dmabuf_fd`, `nbytes` | the buffer; `nbytes` must cover the whole tensor |
 | `name` | set by `uairt_model_input_info` / `uairt_model_output_info`; owned by the model |
 
@@ -81,7 +81,7 @@ return `UAIRT_ERR_INVALID_ARGUMENT`.
 | `uairt_model_load(engine, &source, &model)` | |
 | `uairt_model_num_inputs/outputs(model)` | |
 | `uairt_model_input_info/output_info(model, i, &tensor)` | fills dtype, shape, quantization and name |
-| `uairt_buffer_alloc(engine, nbytes, domain, &buffer)` | `DMABUF` needs backend support, otherwise `UAIRT_ERR_UNSUPPORTED` |
+| `uairt_buffer_alloc(engine, nbytes, domain, &buffer)` | `DMABUF` and `PINNED` need backend support (`PINNED`: TensorRT), otherwise `UAIRT_ERR_UNSUPPORTED` |
 | `uairt_buffer_data/fd/size(buffer)`, `uairt_tensor_use_buffer(&t, buffer)` | bind a buffer to a tensor |
 | `uairt_model_run(model, inputs, n_in, outputs, n_out)` | blocking. Counts, dtypes, shapes, buffer sizes and memory domains are checked first |
 | `*_destroy`, `uairt_buffer_free` | accept `NULL` |
@@ -108,7 +108,7 @@ such order, so its inputs and outputs are sorted by name.
 | ONNX Runtime | `onnxruntime` | `.onnx` (path or memory), static shapes | `intra_op_threads`, `execution_provider` (`cpu` only), `ep_library` + `ep_name` (a plugin execution provider; CPU stays the fallback), `ep_option.<key>` (passed to the plugin) | host |
 | QNN | `qnn` | `.dlc`, context binary `.bin` (one graph; others via `graph_name`) | `backend_library`*, `system_library`* (or `device` instead: `cpu`, `gpu`, `npu`, with `sdk_root` or `QNN_SDK_ROOT`, `target`, `hexagon_arch`, default `v73`), `graph_name`, `adsp_library_path`, `htp_performance_mode` (`default`, `burst`, `high_performance`, `balanced`, `power_saver`; HTP only), `cache_dir` and `cache_write` (compiled-context cache for `.dlc` on HTP; writes default to on, but off on Windows) | host, DMABUF (HTP) |
 | TFLite | `tflite` | `.tflite` (path or memory), static shapes; optional QNN delegate (HTP) | `num_threads`, `delegate` (`none`, `qnn`), and with `qnn`: `delegate_library`*, `backend_library`*, `skel_dir`, `htp_performance_mode` (`default`, `burst`, `high_performance`, `sustained`, `balanced`, `power_saver`), `htp_precision` (`quantized`, `fp16`), `adsp_library_path` | host |
-| TensorRT | `tensorrt` | serialized engine `.engine` / `.plan`, static shapes | `device` (CUDA device index) | host |
+| TensorRT | `tensorrt` | serialized engine `.engine` / `.plan` (ultralytics exports load as is), static shapes | `device` (CUDA device index) | host, pinned |
 | CoreML | `coreml` | `.mlmodelc`, `.mlpackage`, `.mlmodel` (path only), multi-array I/O, static shapes | `compute_units`: `all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne` | host |
 
 \* required. Backends other than `reference` are separate plugins: load

@@ -70,6 +70,8 @@ returning an error so users get a useful `uairt_last_error()`.
 
 `supported_domains` advertises what `run` accepts. To support DMABUF, implement
 `alloc_buffer`/`free_buffer` and register the buffer with the vendor runtime on first
-use; see the registration cache in `qnn.c`. Domains the vendor needs but UAIRT does not
+use; see the registration cache in `qnn.c`. To support `UAIRT_MEM_PINNED`, advertise it, allocate page-locked
+memory in `alloc_buffer` (return the same pointer as handle and data, fd -1) and reject other domains; see
+`tensorrt.cpp`. Domains the vendor needs but UAIRT does not
 define yet (CUDA device pointers, IOSurface) are added as new bits without changing
 existing ones.

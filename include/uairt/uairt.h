@@ -70,6 +70,8 @@ typedef uint32_t uairt_memory_domain;
 enum {
   UAIRT_MEM_HOST = 1u << 0,
   UAIRT_MEM_DMABUF = 1u << 1,
+  /* Page-locked host memory from uairt_buffer_alloc; usable like host memory and DMA-able by the device. */
+  UAIRT_MEM_PINNED = 1u << 2,
 };
 
 typedef struct uairt_engine uairt_engine;
