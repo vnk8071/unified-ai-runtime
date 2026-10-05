@@ -149,6 +149,64 @@ if(UAIRT_BUILD_TFLITE)
   install(TARGETS uairt_backend_tflite LIBRARY DESTINATION lib/uairt)
 endif()
 
+option(UAIRT_BUILD_OPENVINO "Build the OpenVINO backend plugin" OFF)
+if(UAIRT_BUILD_OPENVINO)
+  set(OPENVINO_ROOT "$ENV{OPENVINO_ROOT}" CACHE PATH
+      "OpenVINO directory: a pip install's site-packages/openvino, or a release's runtime directory")
+  find_path(UAIRT_OV_INCLUDE openvino/c/openvino.h
+    HINTS ${OPENVINO_ROOT}/include ${OPENVINO_ROOT}/runtime/include)
+  find_library(UAIRT_OV_LIBRARY NAMES openvino_c
+    HINTS ${OPENVINO_ROOT}/libs ${OPENVINO_ROOT}/lib ${OPENVINO_ROOT}/runtime/lib/intel64
+          ${OPENVINO_ROOT}/runtime/lib/aarch64 ${OPENVINO_ROOT}/runtime/bin/intel64/Release)
+  if(NOT UAIRT_OV_LIBRARY)
+    # pip installs ship only the versioned library, for example libopenvino_c.so.2641
+    file(GLOB UAIRT_OV_VERSIONED "${OPENVINO_ROOT}/libs/libopenvino_c.so.*"
+         "${OPENVINO_ROOT}/runtime/lib/intel64/libopenvino_c.so.*")
+    if(UAIRT_OV_VERSIONED)
+      list(GET UAIRT_OV_VERSIONED 0 UAIRT_OV_LIBRARY)
+    endif()
+  endif()
+  if(NOT UAIRT_OV_INCLUDE OR NOT UAIRT_OV_LIBRARY)
+    message(FATAL_ERROR
+      "OpenVINO not found. Set OPENVINO_ROOT to a directory with include/openvino/c/openvino.h and "
+      "the openvino_c library (a pip install's site-packages/openvino works).")
+  endif()
+  get_filename_component(UAIRT_OV_LIBRARY_DIR ${UAIRT_OV_LIBRARY} DIRECTORY)
+
+  add_library(uairt_backend_openvino MODULE src/backends/openvino.c)
+  target_include_directories(uairt_backend_openvino PRIVATE include)
+  target_include_directories(uairt_backend_openvino SYSTEM PRIVATE ${UAIRT_OV_INCLUDE})
+  target_compile_definitions(uairt_backend_openvino PRIVATE UAIRT_BUILDING_SHARED)
+  target_link_libraries(uairt_backend_openvino PRIVATE ${UAIRT_OV_LIBRARY})
+  set_target_properties(uairt_backend_openvino PROPERTIES
+    PREFIX "lib" C_VISIBILITY_PRESET hidden BUILD_RPATH ${UAIRT_OV_LIBRARY_DIR})
+  install(TARGETS uairt_backend_openvino LIBRARY DESTINATION lib/uairt)
+endif()
+
+option(UAIRT_BUILD_NCNN "Build the NCNN backend plugin" OFF)
+if(UAIRT_BUILD_NCNN)
+  enable_language(CXX)
+  set(NCNN_ROOT "$ENV{NCNN_ROOT}" CACHE PATH
+      "NCNN install prefix (include/ncnn/net.h and lib/libncnn); build it with the same C++ toolchain as this plugin")
+  find_path(UAIRT_NCNN_INCLUDE net.h HINTS ${NCNN_ROOT}/include/ncnn ${NCNN_ROOT}/include)
+  find_library(UAIRT_NCNN_LIBRARY NAMES ncnn HINTS ${NCNN_ROOT}/lib ${NCNN_ROOT}/lib64)
+  if(NOT UAIRT_NCNN_INCLUDE OR NOT UAIRT_NCNN_LIBRARY)
+    message(FATAL_ERROR
+      "NCNN not found. Set NCNN_ROOT to an NCNN install prefix containing include/ncnn/net.h and lib/libncnn.")
+  endif()
+  get_filename_component(UAIRT_NCNN_LIBRARY_DIR ${UAIRT_NCNN_LIBRARY} DIRECTORY)
+
+  add_library(uairt_backend_ncnn MODULE src/backends/ncnn.cpp)
+  target_include_directories(uairt_backend_ncnn PRIVATE include)
+  target_include_directories(uairt_backend_ncnn SYSTEM PRIVATE ${UAIRT_NCNN_INCLUDE})
+  target_compile_features(uairt_backend_ncnn PRIVATE cxx_std_17)
+  target_compile_definitions(uairt_backend_ncnn PRIVATE UAIRT_BUILDING_SHARED)
+  target_link_libraries(uairt_backend_ncnn PRIVATE ${UAIRT_NCNN_LIBRARY})
+  set_target_properties(uairt_backend_ncnn PROPERTIES
+    PREFIX "lib" CXX_VISIBILITY_PRESET hidden BUILD_RPATH ${UAIRT_NCNN_LIBRARY_DIR})
+  install(TARGETS uairt_backend_ncnn LIBRARY DESTINATION lib/uairt)
+endif()
+
 option(UAIRT_BUILD_TENSORRT "Build the NVIDIA TensorRT backend plugin" OFF)
 if(UAIRT_BUILD_TENSORRT)
   enable_language(CXX)
@@ -222,6 +280,31 @@ if(UAIRT_BUILD_TESTS)
       ${QNN_SDK_ROOT} $ENV{UAIRT_QNN_TEST_DLC}
       $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_qnn>
       --target ${UAIRT_QNN_TARGET} --backend ${UAIRT_QNN_BACKEND} ${UAIRT_QNN_DSP_ARGS})
+  endif()
+
+  if(UAIRT_BUILD_OPENVINO)
+    add_executable(test_openvino tests/test_openvino.c)
+    target_link_libraries(test_openvino PRIVATE uairt)
+    add_test(NAME openvino_errors COMMAND test_openvino $<TARGET_FILE:uairt_backend_openvino>
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_openvino.c ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if(DEFINED ENV{UAIRT_OPENVINO_TEST_MODEL} AND DEFINED ENV{UAIRT_OPENVINO_PYTHON})
+      add_test(NAME openvino_vs_openvino_python COMMAND $ENV{UAIRT_OPENVINO_PYTHON}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_openvino.py
+        $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_openvino> $ENV{UAIRT_OPENVINO_TEST_MODEL})
+    endif()
+  endif()
+
+  if(UAIRT_BUILD_NCNN)
+    add_executable(test_ncnn tests/test_ncnn.c)
+    target_link_libraries(test_ncnn PRIVATE uairt)
+    add_test(NAME ncnn_errors COMMAND test_ncnn $<TARGET_FILE:uairt_backend_ncnn>
+      ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if(DEFINED ENV{UAIRT_NCNN_TEST_MODEL} AND DEFINED ENV{UAIRT_NCNN_TEST_SHAPES} AND DEFINED ENV{UAIRT_NCNN_PYTHON})
+      add_test(NAME ncnn_vs_ncnn_python COMMAND $ENV{UAIRT_NCNN_PYTHON}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_ncnn.py
+        $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_ncnn>
+        $ENV{UAIRT_NCNN_TEST_MODEL} $ENV{UAIRT_NCNN_TEST_SHAPES})
+    endif()
   endif()
 
   if(UAIRT_BUILD_TENSORRT)

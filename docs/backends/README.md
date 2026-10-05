@@ -11,6 +11,8 @@ and how to check the result. Vendor SDKs are never part of this repository
 | TFLite | [tflite.md](tflite.md) | Linux (verified on Qualcomm boards) |
 | CoreML | [coreml.md](coreml.md) | macOS, Apple platforms |
 | QNN | [qnn.md](qnn.md) | Linux, Windows (no macOS libraries) |
+| OpenVINO | [openvino.md](openvino.md) | Linux, Windows (verified on a Linux CPU) |
+| NCNN | [ncnn.md](ncnn.md) | Linux (CPU and Vulkan GPU, verified on a GTX 1650) |
 | TensorRT | [tensorrt.md](tensorrt.md) | Linux with an NVIDIA GPU (verified on a GTX 1650) |
 | reference | [reference.md](reference.md) | any, test only |
 

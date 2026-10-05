@@ -20,6 +20,8 @@ a Hexagon architecture hint (it is a hint: check it against the chip before rely
 | `.dlc`, `.bin` (QNN context binary) | `qnn` | NPU (HTP), CPU, GPU | QAIRT SDK, new enough for `.dlc` |
 | `.onnx` | `onnxruntime` | CPU; NVIDIA GPU with the `cuda` or `tensorrt` provider; NPU through a plugin execution provider | an ONNX Runtime release matching the headers (1.22+), a GPU release for the GPU providers |
 | `.tflite` | `tflite` | CPU; NPU through the QNN delegate (`libQnnTFLiteDelegate.so`, so Linux or Android) | a TFLite C library built for the target |
+| OpenVINO IR (`.xml` + `.bin`), also `.onnx` | `openvino` | Intel CPU, GPU, NPU | OpenVINO (pip or release), Intel GPU/NPU drivers for those devices |
+| NCNN `.param` + `.bin` | `ncnn` | CPU, any Vulkan GPU | NCNN built with Vulkan, a Vulkan driver; `input_shapes` option |
 | `.engine`, `.plan` (TensorRT) | `tensorrt` | NVIDIA GPU (CUDA) | TensorRT 8.5+ with headers, CUDA toolkit; build the engine on the GPU that runs it |
 | `.mlmodel`, `.mlpackage` | `coreml` | Apple CPU, GPU, Neural Engine | Xcode (macOS) |
 | PyTorch (`.pt`, `.pth`) | none | | export to ONNX first, then use `onnxruntime` |

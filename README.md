@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Unified AI Runtime (UAIRT)
 
-One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML and TensorRT (NVIDIA GPUs).
+One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML, TensorRT (NVIDIA GPUs), OpenVINO (Intel) and NCNN (CPU and Vulkan GPUs).
 Write the application code once; choose the backend by name when you create an engine.
 
 ```c
@@ -46,6 +46,8 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 | QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy; compiled-context cache | Qualcomm QCS6490 and QCS8550, and Windows 11 ARM64 on a Snapdragon X Elite NPU; byte-identical to `qnn-net-run` |
 | TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench` |
 | CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O | Apple M5; identical to CoreML itself |
+| OpenVINO | IR (`.xml` + `.bin`) and `.onnx`, static shapes; any OpenVINO device | an Intel Core CPU, bit-identical to OpenVINO's Python API. GPU and NPU devices untested |
+| NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan; matches NCNN's Python API |
 | TensorRT | serialized `.engine` / `.plan` (ultralytics exports load as is), static shapes; host and pinned buffers | NVIDIA GTX 1650, TensorRT 10.9; bit-identical to TensorRT's Python API |
 
 Known issues and the exact configurations tested are in [docs/api.md](docs/api.md) and
@@ -103,6 +105,34 @@ build/run_model --option compute_units=all --info build/libuairt_backend_coreml.
 
 Needs Xcode. To check against CoreML itself, point `UAIRT_COREML_PYTHON` at a Python with
 `coremltools` and `numpy` before running cmake.
+
+### OpenVINO (Intel CPUs, GPUs, NPUs)
+
+`pip install openvino` (or a release) provides the C API; point `OPENVINO_ROOT` at `site-packages/openvino`. Ultralytics
+exports (`format="openvino"`) load as a directory.
+
+```bash
+export OPENVINO_ROOT=/path/to/site-packages/openvino
+cmake -S . -B build -DUAIRT_BUILD_OPENVINO=ON && cmake --build build
+build/run_model --repeat 50 --option device=CPU build/libuairt_backend_openvino.so openvino yolov8n_openvino_model out in0.bin
+```
+
+`device=GPU` or `NPU` runs on Intel hardware when OpenVINO lists it; see [docs/backends/openvino.md](docs/backends/openvino.md).
+
+### NCNN (CPU and Vulkan GPUs)
+
+Build NCNN with `-DNCNN_VULKAN=ON` (same C++ toolchain as the plugin) and set `NCNN_ROOT` to its install prefix. NCNN's
+`.param` records no input shapes, so pass them:
+
+```bash
+export NCNN_ROOT=$HOME/ncnn-install
+cmake -S . -B build -DUAIRT_BUILD_NCNN=ON && cmake --build build
+build/run_model --repeat 100 --option input_shapes=3x640x640 --option device=vulkan --option fp16=false \
+  build/libuairt_backend_ncnn.so ncnn yolov8n_ncnn_model out in0.bin
+```
+
+On a GTX 1650 a yolov8n model runs in 21.9 ms through Vulkan against 79 ms on the CPU; `device=vulkan` fails instead of
+quietly using the CPU when no GPU is usable. See [docs/backends/ncnn.md](docs/backends/ncnn.md).
 
 ### TensorRT (NVIDIA GPUs)
 

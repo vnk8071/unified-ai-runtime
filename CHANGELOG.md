@@ -15,6 +15,15 @@ First public version. Pre-1.0: the API and ABI may change.
 - Tests that compare each backend with the vendor's own tool: Python ONNX Runtime,
   `qnn-net-run`, CoreML through `coremltools`.
 
+### Added (OpenVINO and NCNN)
+- OpenVINO backend (`openvino`, C): IR, ONNX or a directory holding one `.xml`; any OpenVINO device; `device`,
+  `performance_hint`, `num_threads`, `cache_dir`. Built with `-DUAIRT_BUILD_OPENVINO=ON`. Verified on an Intel CPU
+  (bit-identical to OpenVINO's Python API); the GPU and NPU devices are untested.
+- NCNN backend (`ncnn`, a C++ plugin): `.param` + `.bin`, float32, static shapes, `input_shapes` required; CPU and Vulkan
+  (`device=vulkan` fails instead of falling back to the CPU). Built with `-DUAIRT_BUILD_NCNN=ON`. Verified on a CPU and a
+  GTX 1650: a yolov8n model runs in 21.9 ms on the GPU against 79 ms on the CPU.
+- `doctor.sh` reports OpenVINO, NCNN and the Vulkan device.
+
 ### Added (ONNX Runtime GPU)
 - `execution_provider=cuda` and `tensorrt` for the ONNX Runtime backend, `ep_option.<key>` for them, and a `log_level`
   option. A provider that cannot load reports `UAIRT_ERR_BACKEND_UNAVAILABLE`. Verified with the CUDA provider on a

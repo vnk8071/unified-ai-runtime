@@ -61,6 +61,20 @@ Goal: get a requested backend building and passing tests. Logic lives in
 - To compare with TFLite itself, build `tests/bench/tflite_bench.c` (see `tests/bench/README.md`)
   and set `UAIRT_TFLITE_BENCH` and `UAIRT_TFLITE_TEST_MODEL` before running cmake, then `ctest`.
 
+## OpenVINO
+
+- `pip install openvino` (into a throwaway virtualenv) gives the headers and libraries under `site-packages/openvino`; or a
+  release's `runtime` directory. Set `OPENVINO_ROOT` to it and configure with `-DUAIRT_BUILD_OPENVINO=ON`.
+- `device=GPU` or `NPU` needs Intel's drivers; if OpenVINO lists only `CPU` the engine reports the available devices.
+  See `docs/backends/openvino.md`.
+
+## NCNN
+
+- Build NCNN from source with `-DNCNN_VULKAN=ON` and install it, with the same C++ toolchain as the plugin; set `NCNN_ROOT`
+  to the prefix and configure with `-DUAIRT_BUILD_NCNN=ON`. The user does this; see `docs/backends/ncnn.md`.
+- `.param` files record no input shapes: pass `input_shapes`. Vulkan needs a working driver: in a container, `vulkaninfo
+  --summary` showing "Found no drivers" means the graphics libraries are missing.
+
 ## TensorRT
 
 - NVIDIA GPU, driver and CUDA toolkit, plus TensorRT 8.5+ with headers. The user installs TensorRT under NVIDIA's licence;

@@ -50,6 +50,10 @@ if have nvidia-smi; then
   [[ -n "$gpu" ]] && report ok "gpu: $gpu (name, driver, memory, compute capability)"
   have nvcc && report info "cuda toolkit: $(nvcc --version | tail -1)"
 fi
+if have vulkaninfo; then
+  vulkan="$(vulkaninfo --summary 2>/dev/null | grep -m1 "deviceName" | sed 's/.*= *//')"
+  if [[ -n "$vulkan" ]]; then report ok "vulkan: $vulkan"; else report skip "vulkan: vulkaninfo finds no device (the Vulkan driver may be missing)"; fi
+fi
 arch="$(hexagon_hint "$chip")"
 [[ -n "$arch" ]] && report info "hexagon arch hint: $arch (QNN hexagon_arch option; verify against your chip)"
 
@@ -97,6 +101,27 @@ if [[ -n "${ONNXRUNTIME_ROOT:-}" ]]; then
   fi
 else
   report skip "onnxruntime: set ONNXRUNTIME_ROOT"
+fi
+
+if [[ -n "${OPENVINO_ROOT:-}" ]]; then
+  if [[ -f "$OPENVINO_ROOT/include/openvino/c/openvino.h" ]] ||
+     [[ -f "$OPENVINO_ROOT/runtime/include/openvino/c/openvino.h" ]]; then
+    report ok "openvino: $OPENVINO_ROOT"
+  else
+    report missing "openvino: openvino/c/openvino.h not found under OPENVINO_ROOT"
+  fi
+else
+  report skip "openvino: set OPENVINO_ROOT (pip install openvino, then its site-packages/openvino)"
+fi
+
+if [[ -n "${NCNN_ROOT:-}" ]]; then
+  if [[ -f "$NCNN_ROOT/include/ncnn/net.h" ]]; then
+    report ok "ncnn: $NCNN_ROOT"
+  else
+    report missing "ncnn: include/ncnn/net.h not found under NCNN_ROOT"
+  fi
+else
+  report skip "ncnn: set NCNN_ROOT (an NCNN install built with NCNN_VULKAN=ON)"
 fi
 
 system_trt=""
