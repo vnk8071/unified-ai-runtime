@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: Apache-2.0
+# Builds the core and the reference backend and runs the tests that need no vendor SDK.
+# Backends that need an SDK or hardware (QNN, ONNX Runtime, CoreML comparison) are tested
+# by hand; see docs/agents/setup.md.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Install and use the installed library
+        run: |
+          cmake --install build --prefix "$PWD/prefix"
+          cc -std=c11 -I prefix/include examples/quickstart.c -L prefix/lib -luairt -o quickstart_installed
+          ./quickstart_installed
+
+  coreml:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure with CoreML
+        run: cmake -S . -B build -DUAIRT_BUILD_COREML=ON -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror"
+      - name: Build and run the error-path tests
+        run: |
+          cmake --build build
+          ctest --test-dir build --output-on-failure

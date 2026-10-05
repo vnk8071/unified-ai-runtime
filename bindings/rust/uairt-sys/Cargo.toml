@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "uairt-sys"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Raw FFI declarations for the Unified AI Runtime C API"
+build = "build.rs"
+links = "uairt"

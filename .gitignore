@@ -1,0 +1,17 @@
+build/
+cmake-build-*/
+.cache/
+compile_commands.json
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+.DS_Store
+build-shared/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+target/
+Cargo.lock
+build-ort129/
