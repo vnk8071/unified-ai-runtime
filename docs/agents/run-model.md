@@ -33,11 +33,15 @@ a Hexagon architecture hint (it is a hint: check it against the chip before rely
   an older SDK will not load. A `.dlc` is portable but is compiled on the device at load (see the cache below).
 - Producing a `.dlc` needs `qairt-converter`, which runs on x86_64 Linux only. If the user has only an ONNX or
   PyTorch model and the target is the NPU, say what that conversion needs and who does it.
+- Choosing a format for a device, and converting and checking a model, is in [export-model.md](export-model.md).
+  Writing the program that feeds the model is in [write-app.md](write-app.md).
 
 ## 3. Get the SDK in place
 
 If `doctor.sh` reports the backend as `skip` or `missing`, follow `setup.md`: give the user the vendor download
-page and the environment variable to set, wait for them to install and set it, then rerun `doctor.sh`. Never
+page and the environment variable to set, wait for them to install and set it, then rerun `doctor.sh`. `doctor` also
+prints the installed version against the tested and minimum versions in [../vendors.md](../vendors.md), and says when a
+newer copy of an SDK is installed but not selected. Never
 download an SDK or accept its licence for them, and never put SDK files in this repository.
 
 ## 4. Build and test

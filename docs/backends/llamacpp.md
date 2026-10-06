@@ -19,6 +19,19 @@ cmake -S . -B build -DUAIRT_BUILD_LLAMACPP=ON && cmake --build build
 llama.cpp is built static inside the plugin, with Metal (shader library embedded) on Apple. The plugin exports only
 `uairt_backend_get_api`. CUDA and Vulkan are left to you (`-DGGML_CUDA=ON`) and have not been verified.
 
+### Adreno GPU on Windows ARM64 (OpenCL)
+
+Snapdragon X's GPU is reached through llama.cpp's OpenCL backend, not Vulkan. Install the Adreno OpenCL SDK yourself
+(`OPENCL_SDK_ROOT`, for example `C:\Qualcomm\OpenCL_SDK.3.2.3.2`), then:
+
+```powershell
+cmake -S . -B build-opencl -G "Visual Studio 17 2022" -A ARM64 -DUAIRT_BUILD_LLAMACPP=ON -DGGML_OPENCL=ON "-DCMAKE_PREFIX_PATH=$env:OPENCL_SDK_ROOT"
+cmake --build build-opencl --config Release
+```
+
+Run with the default `n_gpu_layers` (99); `0` stays on the CPU. The HTP (Hexagon NPU) path of llama.cpp (`ggml-hexagon`) is not
+wired into this plugin: it needs the Hexagon SDK, a test-signing certificate and a way to select the device.
+
 ## Use
 
 A `.gguf` model has no tensors. Load it as usual, then use a session:
@@ -59,4 +72,9 @@ device="gpu")`, then `model.generate(prompt, max_tokens=..., temperature=..., to
 `UAIRT_LLAMACPP_TEST_MODEL` to a GGUF path before `cmake` to also run the model tests and
 `tests/compare_with_llamacpp.py`, which checks that greedy output equals llama.cpp's own `llama-completion` for the same
 model (it needs `UAIRT_BUILD_EXAMPLES=ON`, the default), on the CPU and with all layers offloaded (Metal on a Mac). `UAIRT_LLAMACPP_TEST_MODEL` is read when `cmake` configures, so set it before configuring (and reconfigure after changing it).
-Verified on macOS with an Apple M5 (Metal and the CPU path) with Llama 3.2 1B Q4. Linux, Windows, CUDA and Vulkan have not been run.
+Verified on macOS with an Apple M5 (Metal and the CPU path) with Llama 3.2 1B Q4.
+
+Verified on Windows 11 ARM64 (Snapdragon X Elite) with Qwen3-0.6B Q8_0: the CPU build passes `ctest` including the comparison with
+`llama-completion`. The OpenCL build ran the model on the Adreno GPU (the process showed GPU engine use, none with `n_gpu_layers=0`)
+and generated text, but its greedy output differs from the CPU's after the first few tokens and has not been compared with
+llama.cpp's own tool on the GPU, and `ctest` has not been run for it. Linux, CUDA, Vulkan and the Hexagon NPU have not been run.

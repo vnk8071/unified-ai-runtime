@@ -38,6 +38,39 @@ if [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qi microsoft /proc/version 2>/dev/nu
 
 ps() { powershell.exe -NoProfile -Command "$1" 2>/dev/null | tr -d '\r'; }
 
+# Vendor versions: scripts/vendors.tsv holds the tested and minimum versions and the download pages (docs/vendors.md).
+vendors_file="$(dirname "${BASH_SOURCE[0]}")/vendors.tsv"
+vendor_field() { awk -F'\t' -v b="$1" -v c="$2" '$1 == b && $c != "-" { print $c }' "$vendors_file" 2>/dev/null; }
+version_lt() { [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]; }
+# Where to get a backend's SDK; printed when it is missing, so the user (never this script) downloads it.
+vendor_hint() {
+  local url min
+  url="$(vendor_field "$1" 7)"; min="$(vendor_field "$1" 5)"
+  [[ -n "$url" ]] && report info "$1: get it from $url${min:+ (minimum $min)}; you install it and accept its licence"
+}
+# A version taken from an install directory's name, such as .../QAIRT/2.45.0.260326 (empty when it has none).
+dir_version() {
+  local d="${1//\\//}"
+  d="$(basename "${d%/}")"
+  [[ "$d" =~ ^[0-9]+(\.[0-9]+)+ ]] && echo "${BASH_REMATCH[0]}"
+  return 0
+}
+# Compares a detected version with the manifest. Older than the minimum is reported as missing; a version other than
+# the tested one is information, not an error, and means "not verified here".
+vendor_check() {
+  local have="$2" tested min
+  tested="$(vendor_field "$1" 4)"; min="$(vendor_field "$1" 5)"
+  if [[ -z "$have" ]]; then
+    report info "$1: version not detected${tested:+ (tested with $tested)}"
+  elif [[ -n "$min" ]] && version_lt "$have" "$min"; then
+    report missing "$1: version $have is older than the minimum $min"
+  elif [[ -n "$tested" && "$tested" != submodule && "$have" != "$tested"* ]]; then
+    report info "$1: version $have; tested with $tested, so other versions are unverified"
+  else
+    report info "$1: version $have"
+  fi
+}
+
 # Maps a chip name to the Hexagon architecture the QNN skel directory is named after. A hint, not a fact.
 hexagon_hint() {
   case "$1" in
@@ -120,66 +153,104 @@ if [[ -n "$qnn_root" ]]; then
     report missing "qnn: QNN_SDK_ROOT set but include/QNN/QnnInterface.h not found"
   elif [[ ! -f "$qnn_root/include/QNN/System/QnnSystemDlc.h" ]]; then
     report missing "qnn: $qnn_root is too old: it lacks System/QnnSystemDlc.h (the DLC API); use a newer QAIRT"
+    vendor_check qnn "$(dir_version "$qnn_root")"
   else
     report ok "qnn: $qnn_root"
+    vendor_check qnn "$(dir_version "$qnn_root")"
+  fi
+  # Another QAIRT next to the selected one that is newer: the usual cause of "too old" when a newer one is installed.
+  qnn_dir="${qnn_root//\\//}"
+  qnn_have="$(dir_version "$qnn_dir")"
+  qnn_best="" qnn_best_dir=""
+  for candidate in "$(dirname "${qnn_dir%/}")"/*/; do
+    candidate_version="$(dir_version "$candidate")"
+    [[ -n "$candidate_version" && -f "$candidate/include/QNN/QnnInterface.h" ]] || continue
+    if [[ -z "$qnn_best" ]] || version_lt "$qnn_best" "$candidate_version"; then qnn_best="$candidate_version"; qnn_best_dir="${candidate%/}"; fi
+  done
+  if [[ -n "$qnn_have" && -n "$qnn_best" ]] && version_lt "$qnn_have" "$qnn_best"; then
+    report info "qnn: a newer QAIRT $qnn_best is installed at $qnn_best_dir; set QNN_SDK_ROOT to it to use it"
   fi
 elif [[ -n "$found_hint" ]]; then
   report skip "qnn: found $found_hint; set QNN_SDK_ROOT to it (newer QAIRT releases are needed for .dlc models)"
 else
   report skip "qnn: set QNN_SDK_ROOT to your QAIRT SDK directory"
+  vendor_hint qnn
 fi
 
 if [[ -n "${ONNXRUNTIME_ROOT:-}" ]]; then
   if [[ -f "$ONNXRUNTIME_ROOT/include/onnxruntime_c_api.h" ]] ||
      [[ -f "$ONNXRUNTIME_ROOT/include/onnxruntime/onnxruntime_c_api.h" ]]; then
     report ok "onnxruntime: $ONNXRUNTIME_ROOT"
+    vendor_check onnxruntime "$(tr -d '[:space:]' < "$ONNXRUNTIME_ROOT/VERSION_NUMBER" 2>/dev/null)"
   else
     report missing "onnxruntime: header not found under ONNXRUNTIME_ROOT"
+    vendor_hint onnxruntime
   fi
 else
   report skip "onnxruntime: set ONNXRUNTIME_ROOT"
+  vendor_hint onnxruntime
 fi
 
 if [[ -n "${OPENVINO_ROOT:-}" ]]; then
   if [[ -f "$OPENVINO_ROOT/include/openvino/c/openvino.h" ]] ||
      [[ -f "$OPENVINO_ROOT/runtime/include/openvino/c/openvino.h" ]]; then
     report ok "openvino: $OPENVINO_ROOT"
+    vendor_check openvino "$(dir_version "$OPENVINO_ROOT")"
   else
     report missing "openvino: openvino/c/openvino.h not found under OPENVINO_ROOT"
+    vendor_hint openvino
   fi
 else
   report skip "openvino: set OPENVINO_ROOT (pip install openvino, then its site-packages/openvino)"
+  vendor_hint openvino
 fi
 
 if [[ -n "${NCNN_ROOT:-}" ]]; then
   if [[ -f "$NCNN_ROOT/include/ncnn/net.h" ]]; then
     report ok "ncnn: $NCNN_ROOT"
+    vendor_check ncnn "$(sed -n 's/^#define NCNN_VERSION_STRING "\(.*\)"/\1/p' "$NCNN_ROOT/include/ncnn/platform.h" 2>/dev/null | head -n1)"
   else
     report missing "ncnn: include/ncnn/net.h not found under NCNN_ROOT"
+    vendor_hint ncnn
   fi
 else
   report skip "ncnn: set NCNN_ROOT (an NCNN install built with NCNN_VULKAN=ON)"
+  vendor_hint ncnn
 fi
 
 system_trt=""
 for header in /usr/include/x86_64-linux-gnu/NvInfer.h /usr/include/aarch64-linux-gnu/NvInfer.h /usr/include/NvInfer.h; do
   [[ -f "$header" ]] && system_trt="$header" && break
 done
+# NvInferVersion.h defines NV_TENSORRT_MAJOR, _MINOR and _PATCH (and _BUILD).
+trt_version() {
+  [[ -f "$1" ]] || return 0
+  local f="$1" v
+  v="$(for part in MAJOR MINOR PATCH BUILD; do sed -n "s/^#define NV_TENSORRT_$part \([0-9]*\).*/\1/p" "$f" | head -n1; done | paste -sd. -)"
+  [[ "$v" =~ ^[0-9]+\.[0-9]+ ]] && echo "$v"
+  return 0
+}
 if [[ -n "${TENSORRT_ROOT:-}" ]]; then
   if [[ -f "$TENSORRT_ROOT/include/NvInfer.h" ]]; then
     report ok "tensorrt: $TENSORRT_ROOT"
+    vendor_check tensorrt "$(trt_version "$TENSORRT_ROOT/include/NvInferVersion.h")"
   else
     report missing "tensorrt: NvInfer.h not found under TENSORRT_ROOT"
+    vendor_hint tensorrt
   fi
 elif [[ -n "$system_trt" ]]; then
   report ok "tensorrt: system install ($system_trt)"
+  vendor_check tensorrt "$(trt_version "$(dirname "$system_trt")/NvInferVersion.h")"
 else
   report skip "tensorrt: set TENSORRT_ROOT (TensorRT with headers, installed by you)"
+  vendor_hint tensorrt
 fi
 
 llama_root="${UAIRT_LLAMACPP_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/third_party/llama.cpp}"
 if [[ -f "$llama_root/include/llama.h" ]]; then
   report ok "llamacpp: $llama_root"
+  llama_commit="$(git -C "$llama_root" describe --tags --always 2>/dev/null || true)"
+  [[ -n "$llama_commit" ]] && report info "llamacpp: version $llama_commit (a pinned submodule; bumping it needs ctest and a model run, see docs/vendors.md)"
 else
   report skip "llamacpp: run git submodule update --init third_party/llama.cpp (or set UAIRT_LLAMACPP_ROOT)"
 fi

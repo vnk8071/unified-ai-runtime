@@ -15,6 +15,16 @@ First public version. Pre-1.0: the API and ABI may change.
 - Tests that compare each backend with the vendor's own tool: Python ONNX Runtime,
   `qnn-net-run`, CoreML through `coremltools`.
 
+### Added (vendor versions and agent guides)
+- `scripts/vendors.tsv` and `docs/vendors.md`: tested and minimum vendor versions and download pages. `doctor.sh` and
+  `doctor.ps1` detect the installed version, flag one older than the minimum, point at a newer installed QAIRT, and print
+  the download page for a missing SDK (they never download anything). Dependabot proposes llama.cpp submodule bumps.
+- `docs/agents/export-model.md` (choose a format and export a model for a device) and `docs/agents/write-app.md` (write
+  application code against UAIRT).
+- The Windows ARM64 CI job runs without a repository variable, on Visual Studio 2026 (the runner image has no 2022).
+- `doctor` no longer reports a device whose name merely contains "npu" (such as "Hyper-V Input") as an NPU; Visual Studio 2026 is accepted.
+- The llama.cpp backend builds with MSVC; `llm_generate` flushes stdout (OpenCL on Windows ends the process without flushing).
+
 ### Added (Python wheels)
 - A root `pyproject.toml` (scikit-build-core) builds the `uairt` wheel: the Python package, `libuairt` and the ONNX Runtime plugin,
   tagged `py3-none-<platform>` so one wheel per platform serves every Python 3.x. `.github/workflows/wheels.yml` builds and tests

@@ -224,7 +224,10 @@ ONNX Runtime plugin is on PyPI (`pip install "uairt[onnxruntime]"`; see [docs/re
 - [docs/LICENSING.md](docs/LICENSING.md): how vendor licenses shape this repository
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md)
 - [AGENTS.md](AGENTS.md) and [docs/agents/](docs/agents/run-model.md): instructions for coding agents, including a
-  playbook for building UAIRT and running a model on a target device (`scripts/doctor.sh` reports the device)
+  playbook for building UAIRT and running a model on a target device (`scripts/doctor.sh` reports the device), choosing
+  and exporting a model format ([docs/agents/export-model.md](docs/agents/export-model.md)) and writing application code
+  ([docs/agents/write-app.md](docs/agents/write-app.md)). People can follow the same pages
+- [docs/vendors.md](docs/vendors.md): which vendor SDK versions were tested, the minimum versions, and where to get them
 
 ## Vendor SDKs
 

@@ -10,6 +10,11 @@ Follow `docs/agents/run-model.md` end to end: find the device, pick the backend 
 installed by the user, build, run, verify against the vendor tool, and report what actually ran. Look up errors in
 `docs/agents/troubleshooting.md` first.
 
+Two more jobs use the same rules. If the model is not yet in a format a backend loads, or the user asks which format to
+use, follow `docs/agents/export-model.md`. If the user wants a program that uses UAIRT, follow `docs/agents/write-app.md`.
+Vendor versions (tested, minimum, download pages) are in `docs/vendors.md`; `scripts/doctor.sh` compares what is installed
+with them.
+
 ## Commands
 
 - Check the environment: `scripts/doctor.sh`

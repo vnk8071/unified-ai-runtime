@@ -58,6 +58,9 @@ Goal: get a requested backend building and passing tests. Logic lives in
 - Configure with `-DUAIRT_BUILD_LLAMACPP=ON`. Engines take `n_gpu_layers` (default 99, 0 for CPU only); sessions take `n_ctx`.
 - To run the comparison test against llama.cpp's own output, set `UAIRT_LLAMACPP_TEST_MODEL` to a GGUF file before
   `cmake`. Do not commit a model.
+- Adreno GPU on Windows ARM64: the user installs the Adreno OpenCL SDK (`OPENCL_SDK_ROOT`); add `-DGGML_OPENCL=ON` and
+  `-DCMAKE_PREFIX_PATH=$OPENCL_SDK_ROOT`. Vulkan needs the Vulkan SDK (`glslc`) and has not been run. The Hexagon NPU path needs the
+  Hexagon SDK and a signing certificate (a system setting: ask first); see `docs/backends/llamacpp.md`.
 
 ## TFLite
 
@@ -115,4 +118,5 @@ Goal: get a requested backend building and passing tests. Logic lives in
   the HTP backend; pass `--dmabuf` to `compare_with_qnn_net_run.py` to test it.
 - Producing a DLC needs `qairt-converter`, which runs on x86_64 Linux only.
 
+Versions that were tested, the minimum versions and the download pages are in `docs/vendors.md`.
 Backend-specific steps for the other backends are added here as they land.
