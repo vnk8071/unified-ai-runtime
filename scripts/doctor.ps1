@@ -32,7 +32,7 @@ if ($architecture -eq 'ARM64' -and $shellArchitecture -ne 'ARM64') {
 }
 $chip = $processor.Name
 if ($chip) { Report 'info' ('chip: {0}' -f $chip.Trim()) }
-$npu = Get-PnpDevice | Where-Object { $_.FriendlyName -like '*NPU*' -and $_.Status -eq 'OK' } |
+$npu = Get-PnpDevice | Where-Object { $_.FriendlyName -match '\bNPU\b' -and $_.Status -eq 'OK' } |
     Select-Object -First 1 -ExpandProperty FriendlyName
 if ($npu) { Report 'ok' ('npu: {0}' -f $npu) } else { Report 'skip' 'npu: none detected' }
 $gpus = Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }
@@ -59,12 +59,17 @@ foreach ($tool in 'cmake', 'git') {
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 $studio = $null
 $otherStudio = $null
+$studio2026 = $null
 if (Test-Path $vswhere) {
     # The presets name the Visual Studio 2022 generator (version 17), so only 2022 counts.
     $studio = & $vswhere -latest -version '[17.0,18.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName
-    if (-not $studio) { $otherStudio = & $vswhere -latest -products '*' -property displayName }
+    if (-not $studio) {
+        $studio2026 = & $vswhere -latest -version '[18.0,19.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName
+    }
+    if (-not $studio -and -not $studio2026) { $otherStudio = & $vswhere -latest -products '*' -property displayName }
 }
 if ($studio) { Report 'ok' ('cc: {0} (use a preset, or -G "Visual Studio 17 2022")' -f $studio) }
+elseif ($studio2026) { Report 'ok' ('cc: {0} (the presets name Visual Studio 2022; add -G "Visual Studio 18 2026" to the preset configure)' -f $studio2026) }
 elseif ($otherStudio) { Report 'missing' ('cc: found {0}, but the presets and docs use Visual Studio 2022 (generator ''Visual Studio 17 2022'') with the C++ tools; install it or pass your own generator' -f $otherStudio); $script:coreMissing = $true }
 else { Report 'missing' 'cc: Visual Studio 2022 with the C++ tools not found'; $script:coreMissing = $true }
 # The vendor-file test needs Git's bash. A bash.exe in System32 is the WSL launcher, which sees Linux paths.

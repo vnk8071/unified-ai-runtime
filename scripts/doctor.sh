@@ -65,7 +65,7 @@ chip=""
 npu=""
 if [[ $windows == 1 ]]; then
   chip="$(ps '(Get-CimInstance Win32_Processor | Select-Object -First 1).Name')"
-  npu="$(ps "Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object { \$_.FriendlyName -like '*NPU*' -and \$_.Status -eq 'OK' } | Select-Object -First 1 -ExpandProperty FriendlyName")"
+  npu="$(ps "Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object { \$_.FriendlyName -match '\\bNPU\\b' -and \$_.Status -eq 'OK' } | Select-Object -First 1 -ExpandProperty FriendlyName")"
 elif [[ "$(uname -s)" == "Darwin" ]]; then
   chip="$(sysctl -n machdep.cpu.brand_string 2>/dev/null)"
 else
@@ -99,6 +99,9 @@ if have cc; then report ok "cc: $(cc --version | head -1)"
 elif [[ -x "$vswhere" ]] \
      && vs="$("$vswhere" -latest -version '[17.0,18.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName 2>/dev/null)" && [[ -n "$vs" ]]; then
   report ok "cc: $vs (use: cmake -G \"Visual Studio 17 2022\", or a preset)"
+elif [[ -x "$vswhere" ]] \
+     && vs="$("$vswhere" -latest -version '[18.0,19.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName 2>/dev/null)" && [[ -n "$vs" ]]; then
+  report ok "cc: $vs (the presets name Visual Studio 2022; add -G \"Visual Studio 18 2026\" to the preset configure)"
 elif [[ -x "$vswhere" ]] && other="$("$vswhere" -latest -products '*' -property displayName 2>/dev/null)" && [[ -n "$other" ]]; then
   report missing "cc: found $other, but the presets and docs use Visual Studio 2022 (generator 'Visual Studio 17 2022') with the C++ tools; install it or pass your own generator"; core_missing=1
 else report missing "cc: no C compiler"; core_missing=1; fi

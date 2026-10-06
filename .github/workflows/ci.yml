@@ -60,7 +60,8 @@ jobs:
         shell: bash
         run: bash scripts/check_no_vendor_files.sh
 
-  # Windows ARM64 runs on GitHub's hosted windows-11-arm runner (free for public repositories).
+  # Windows ARM64 runs on GitHub's hosted windows-11-arm runner (free for public repositories). Its image has only
+  # Visual Studio 2026, so the configure step overrides the preset's Visual Studio 2022 generator.
   windows-arm64:
     runs-on: windows-11-arm
     steps:
@@ -69,7 +70,7 @@ jobs:
         shell: pwsh
         run: ./scripts/doctor.ps1
       - name: Configure
-        run: cmake --preset windows-arm64-debug "-DCMAKE_C_FLAGS=-W4 -WX" "-DCMAKE_CXX_FLAGS=-W4 -WX -EHsc"
+        run: cmake --preset windows-arm64-debug -G "Visual Studio 18 2026" "-DCMAKE_C_FLAGS=-W4 -WX" "-DCMAKE_CXX_FLAGS=-W4 -WX -EHsc"
       - name: Build
         run: cmake --build --preset windows-arm64-debug
       - name: Test
