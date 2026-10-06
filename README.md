@@ -26,6 +26,36 @@ uairt_model_run(model, &in, 1, &out, 1);
 
 A complete runnable program is in [examples/quickstart.c](examples/quickstart.c).
 
+## Getting started
+
+1. **Bring a model in the format its runtime reads.** UAIRT does not convert or quantize: use an `.onnx`, `.dlc`, `.tflite`,
+   `.mlpackage`, `.gguf` and so on. [docs/agents/export-model.md](docs/agents/export-model.md) shows how to produce one.
+2. **Install.** For Python, `pip install "uairt[onnxruntime]"` (ONNX Runtime only; see [Install (Python)](#install-python)). For
+   any other backend, build from source with that backend's option and its SDK, after checking what the machine supports:
+
+   ```bash
+   scripts/doctor.sh
+   cmake -S . -B build -DUAIRT_BUILD_<BACKEND>=ON && cmake --build build     # for llama.cpp: git submodule update --init third_party/llama.cpp first
+   ```
+
+   Each backend's page in [docs/backends/](docs/backends/README.md) lists what to install and the build flag.
+3. **Look at the model.** `build/run_model --info <plugin> <backend> <model>` prints each input's name, dtype and shape.
+4. **Run it.** The backend comes from the model file and the device in Python, or from a name in C:
+
+   ```python
+   import uairt
+   with uairt.AutoModel.from_file("model.onnx", device="cpu") as model:          # or gpu, npu where the backend has one
+       (y,) = model.run(preprocess(image).astype(model.inputs[0].dtype))
+   ```
+
+   Language models (`.gguf`) use a session: `for piece in model.generate("Hello", max_tokens=40): print(piece, end="")`.
+   In C, copy the call order from [examples/quickstart.c](examples/quickstart.c) or [examples/llm_generate.c](examples/llm_generate.c).
+5. **Check it.** Compare the output with the original framework or the vendor's own tool on the same input.
+
+What you still write: pre- and post-processing (resize, layout, normalization, box decoding, chat templates). Inputs must match the
+model's dtype and shape exactly, because UAIRT never converts silently. If a backend cannot serve the device you ask for, the call fails
+instead of falling back to the CPU. [docs/agents/write-app.md](docs/agents/write-app.md) has the details and the pitfalls.
+
 ## What it is, and is not
 
 UAIRT loads artifacts that each vendor's toolchain already produced (an ONNX file, a QNN
