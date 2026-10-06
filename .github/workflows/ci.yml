@@ -60,10 +60,8 @@ jobs:
         shell: bash
         run: bash scripts/check_no_vendor_files.sh
 
-  # Windows ARM64 needs an ARM64 runner (windows-11-arm), which is not available to every repository. Set the repository
-  # variable ENABLE_WINDOWS_ARM64_CI to true once one is; until then this job is skipped instead of queueing forever.
+  # Windows ARM64 runs on GitHub's hosted windows-11-arm runner (free for public repositories).
   windows-arm64:
-    if: ${{ vars.ENABLE_WINDOWS_ARM64_CI == 'true' }}
     runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@v4

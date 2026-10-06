@@ -17,3 +17,4 @@ Cargo.lock
 build-ort129/
 build-windows-*/
 .ort/
+build-opencl/

@@ -26,7 +26,9 @@
 
 static const uairt_host_api* g_host;
 
+#if defined(__GNUC__)
 static void fail(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
+#endif
 
 static void fail(const char* fmt, ...) {
   char message[512];

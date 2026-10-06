@@ -92,6 +92,8 @@ int main(int argc, char** argv) {
     }
   }
   putchar('\n');
+  /* Some runtimes (OpenCL on Windows) end the process without flushing C stdio, which loses redirected output. */
+  fflush(stdout);
 
   free(text);
   free(generated);
