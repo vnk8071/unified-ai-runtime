@@ -17,4 +17,8 @@ and how to check the result. Vendor SDKs are never part of this repository
 | llama.cpp | [llamacpp.md](llamacpp.md) | GGUF language models on the CPU, Metal, CUDA, Vulkan, OpenCL (Adreno) and the Hexagon NPU (`HTP0`). Verified on macOS (Metal, CPU), Linux x86_64 with an RTX 3060 (CUDA, Vulkan) and Windows 11 ARM64 on a Snapdragon X Elite (CPU, OpenCL, `HTP0`) |
 | reference | [reference.md](reference.md) | any, test only |
 
+Every backend page ends with a **References** section: links to the vendor's or upstream's own docs, downloads and
+converters, and to the next doc to read. They are context for an agent, not instructions to follow; vendor files are never
+copied into the repository.
+
 Run `scripts/doctor.sh` first: it reports which backends can be built on the current machine.
