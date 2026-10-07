@@ -497,6 +497,12 @@ if(UAIRT_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_plugin_symbols.sh $<TARGET_FILE:uairt_backend_llamacpp>)
     endif()
   endif()
+
+  find_package(Python3 COMPONENTS Interpreter)
+  if(Python3_Interpreter_FOUND)
+    add_test(NAME references_scripts COMMAND ${Python3_EXECUTABLE}
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_references.py)
+  endif()
 endif()
 
 # Python wheel (scikit-build-core): the core library goes into the package, and so do the plugins that can be built without a

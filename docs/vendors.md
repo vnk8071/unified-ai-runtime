@@ -40,6 +40,13 @@ Only the user downloads an SDK and accepts its licence. `doctor` never downloads
    [agents/run-model.md](agents/run-model.md). Level 1 (`ctest` only) does not change `tested`.
 4. Only then edit the `tested` and `verified_on` columns, in the same commit as any docs that name the version.
 
+## Checking the links
+
+`python scripts/check_references.py` checks every link in the docs, READMEs, skills and `vendors.tsv` (dead, moved, or a
+local file that does not exist); `--titles` shows what each page is. The `check-references` skill
+(`.claude/skills/check-references/SKILL.md`) says how to act on the result and how to compare a doc with the page it
+cites. It only reads pages: SDKs and drivers stay with the user, as above.
+
 ## Open-source dependencies
 
 llama.cpp is a pinned git submodule (MIT), not a vendor SDK, so it can live in the repository. `.github/dependabot.yml` opens

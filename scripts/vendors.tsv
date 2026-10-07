@@ -9,6 +9,6 @@ onnxruntime	ONNX Runtime	ONNXRUNTIME_ROOT	1.30.0	1.22.0	Linux x86_64, GTX 1650 (
 openvino	OpenVINO	OPENVINO_ROOT	2026.4.1	-	Ubuntu 24.04, Intel Core i9-9900K (CPU only)	https://docs.openvino.ai/
 tensorrt	TensorRT	TENSORRT_ROOT	10.9.0.34	8.5.0	Linux x86_64, GTX 1650 (CUDA 12.8)	https://developer.nvidia.com/tensorrt
 ncnn	NCNN (built with Vulkan)	NCNN_ROOT	-	-	-	https://github.com/Tencent/ncnn/releases
-tflite	TensorFlow Lite C library	TFLITE_LIBRARY	-	-	-	https://ai.google.dev/edge/litert
+tflite	TensorFlow Lite C library	TFLITE_LIBRARY	-	-	-	https://developers.google.com/edge/litert
 llamacpp	llama.cpp (git submodule, MIT)	UAIRT_LLAMACPP_ROOT	submodule	-	macOS Apple M5 (Metal, CPU); Windows 11 ARM64, Snapdragon X Elite (CPU, Adreno GPU via OpenCL)	https://github.com/ggml-org/llama.cpp
 coreml	Xcode (CoreML.framework)	-	-	-	macOS Apple M5	https://developer.apple.com/xcode/
