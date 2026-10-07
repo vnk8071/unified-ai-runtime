@@ -55,12 +55,15 @@ Goal: get a requested backend building and passing tests. Logic lives in
 ## llama.cpp
 
 - Run `git submodule update --init third_party/llama.cpp` once (about 100 MB; no SDK or licence step, llama.cpp is MIT).
-- Configure with `-DUAIRT_BUILD_LLAMACPP=ON`. Engines take `n_gpu_layers` (default 99, 0 for CPU only); sessions take `n_ctx`.
+- Configure with `-DUAIRT_BUILD_LLAMACPP=ON`. Engines take `n_gpu_layers` (default 99, 0 for CPU only) and `device` (a llama.cpp device name such as `CUDA0`, `Vulkan0`, `GPUOpenCL`, `HTP0`); sessions take `n_ctx`.
+- NVIDIA on Linux: `-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=<cc>` with the CUDA toolkit installed by the user. Vulkan: `-DGGML_VULKAN=ON`
+  with `libvulkan-dev`, `glslc` and `spirv-headers` (apt packages: ask before installing). The Python binding needs `-DBUILD_SHARED_LIBS=ON`.
 - To run the comparison test against llama.cpp's own output, set `UAIRT_LLAMACPP_TEST_MODEL` to a GGUF file before
   `cmake`. Do not commit a model.
 - Adreno GPU on Windows ARM64: the user installs the Adreno OpenCL SDK (`OPENCL_SDK_ROOT`); add `-DGGML_OPENCL=ON` and
-  `-DCMAKE_PREFIX_PATH=$OPENCL_SDK_ROOT`. Vulkan needs the Vulkan SDK (`glslc`) and has not been run. The Hexagon NPU path needs the
-  Hexagon SDK and a signing certificate (a system setting: ask first); see `docs/backends/llamacpp.md`.
+  `-DCMAKE_PREFIX_PATH=$OPENCL_SDK_ROOT`. Vulkan on that GPU has not been run. The Hexagon NPU (`device=HTP0`) needs the
+  Hexagon SDK, test signing (`bcdedit`, needs Secure Boot off and a reboot: ask first), a password-free signing certificate
+  and `ADSP_LIBRARY_PATH` set before the process starts; see `docs/backends/llamacpp.md`.
 
 ## TFLite
 

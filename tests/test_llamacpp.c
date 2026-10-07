@@ -273,6 +273,16 @@ int main(int argc, char** argv) {
   write_file(path, corrupt, sizeof(corrupt));
   CHECK(try_load(path) == UAIRT_ERR_INCOMPATIBLE_MODEL);
 
+  uairt_option empty_device = {"device", ""};
+  CHECK(uairt_engine_create("llamacpp", &empty_device, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
+  uairt_option no_device = {"device", "no_such_device"};
+  CHECK(uairt_engine_create("llamacpp", &no_device, 1, &engine) == UAIRT_OK);
+  snprintf(path, sizeof(path), "%s/not_a_model.gguf", argv[2]);
+  uairt_model_source plain = {.struct_size = sizeof(plain), .path = path};
+  CHECK(uairt_model_load(engine, &plain, &model) == UAIRT_ERR_INVALID_ARGUMENT);
+  CHECK(strstr(uairt_last_error(), "no_such_device") != NULL);
+  uairt_engine_destroy(engine);
+
   if (argc == 4) {
     test_model(argv[3]);
   }

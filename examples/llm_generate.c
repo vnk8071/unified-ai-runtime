@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /*
  * Greedy text generation through the session API:
- *   llm_generate <plugin> <model.gguf> "<prompt>" <n_tokens> [n_gpu_layers]
+ *   llm_generate <plugin> <model.gguf> "<prompt>" <n_tokens> [n_gpu_layers [device]]
  * Prints the prompt followed by the generated text. Tokenizing and sampling are the caller's job; here sampling is
  * "pick the largest logit".
  */
@@ -17,8 +17,8 @@ static int die(const char* what, uairt_status status) {
 }
 
 int main(int argc, char** argv) {
-  if (argc < 5 || argc > 6) {
-    fprintf(stderr, "usage: %s <plugin> <model.gguf> \"<prompt>\" <n_tokens> [n_gpu_layers]\n", argv[0]);
+  if (argc < 5 || argc > 7) {
+    fprintf(stderr, "usage: %s <plugin> <model.gguf> \"<prompt>\" <n_tokens> [n_gpu_layers [device]]\n", argv[0]);
     return 2;
   }
   const char* prompt = argv[3];
@@ -27,9 +27,9 @@ int main(int argc, char** argv) {
   if (status != UAIRT_OK) {
     return die("load plugin", status);
   }
-  uairt_option layers = {"n_gpu_layers", argc == 6 ? argv[5] : "99"};
+  uairt_option options[2] = {{"n_gpu_layers", argc >= 6 ? argv[5] : "99"}, {"device", argc == 7 ? argv[6] : NULL}};
   uairt_engine* engine = NULL;
-  if ((status = uairt_engine_create("llamacpp", &layers, 1, &engine)) != UAIRT_OK) {
+  if ((status = uairt_engine_create("llamacpp", options, argc == 7 ? 2 : 1, &engine)) != UAIRT_OK) {
     return die("create engine", status);
   }
   uairt_model_source source = {.struct_size = sizeof(source), .path = argv[2]};

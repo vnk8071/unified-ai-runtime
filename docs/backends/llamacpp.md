@@ -17,7 +17,7 @@ cmake -S . -B build -DUAIRT_BUILD_LLAMACPP=ON && cmake --build build
 ```
 
 llama.cpp is built static inside the plugin, with Metal (shader library embedded) on Apple. The plugin exports only
-`uairt_backend_get_api`. CUDA and Vulkan are left to you (`-DGGML_CUDA=ON`) and have not been verified.
+`uairt_backend_get_api`. CUDA and Vulkan are left to you (`-DGGML_CUDA=ON`; verified, see Check) and `-DGGML_VULKAN=ON` (needs `libvulkan-dev`, `glslc` and `spirv-headers`; verified on NVIDIA, see Check).
 
 ### Adreno GPU on Windows ARM64 (OpenCL)
 
@@ -29,8 +29,32 @@ cmake -S . -B build-opencl -G "Visual Studio 17 2022" -A ARM64 -DUAIRT_BUILD_LLA
 cmake --build build-opencl --config Release
 ```
 
-Run with the default `n_gpu_layers` (99); `0` stays on the CPU. The HTP (Hexagon NPU) path of llama.cpp (`ggml-hexagon`) is not
-wired into this plugin: it needs the Hexagon SDK, a test-signing certificate and a way to select the device.
+Run with the default `n_gpu_layers` (99); `0` stays on the CPU. The option `device` picks one llama.cpp device by name
+(`GPUOpenCL`, `HTP0`, ...); a name this build does not have fails at model load with `UAIRT_ERR_INVALID_ARGUMENT`.
+
+### Hexagon NPU on Windows ARM64 (HTP0)
+
+llama.cpp's `ggml-hexagon` runs on the NPU only with signed skeleton libraries. You do the system steps
+(`third_party/llama.cpp/docs/backend/snapdragon/windows.md`): Hexagon SDK, `bcdedit /set TESTSIGNING ON` (Secure Boot must be
+off, then reboot), and a personal certificate imported into Trusted Root and Trusted Publishers. The `.pfx` must have no
+password: llama.cpp's build passes it to `signtool` without one. Build with the clang toolchain, not Visual Studio:
+
+```powershell
+# in a "vcvarsarm64" environment; set HEXAGON_SDK_ROOT, HEXAGON_TOOLS_ROOT, OPENCL_SDK_ROOT, WINDOWS_SDK_BIN first
+$f = '-march=armv8.7a+fp16+dotprod+i8mm -fvectorize -ffp-model=fast -fno-finite-math-only -D_GNU_SOURCE'
+cmake -S . -B build-hex -G Ninja -DCMAKE_BUILD_TYPE=Release -DUAIRT_BUILD_LLAMACPP=ON -DGGML_HEXAGON=ON -DGGML_OPENCL=ON `
+  -DGGML_OPENMP=OFF -DGGML_LLAMAFILE=OFF -DLLAMA_OPENSSL=OFF -DPREBUILT_LIB_DIR=windows_aarch64 `
+  -DCMAKE_TOOLCHAIN_FILE=third_party/llama.cpp/cmake/arm64-windows-llvm.cmake -DGGML_HEXAGON_HTP_CERT=<path>.pfx `
+  "-DCMAKE_PREFIX_PATH=$env:OPENCL_SDK_ROOT" -DHEXAGON_SDK_ROOT=$env:HEXAGON_SDK_ROOT -DHEXAGON_TOOLS_ROOT=$env:HEXAGON_TOOLS_ROOT `
+  "-DCMAKE_C_FLAGS=$f" "-DCMAKE_CXX_FLAGS=$f"
+cmake --build build-hex
+```
+
+`-fno-finite-math-only` is missing from the Windows preset in the pinned llama.cpp, and `-flto` failed to link with
+QAIRT's clang 19, so neither preset flag set is used as is. Run with `ADSP_LIBRARY_PATH` set to the directory that holds
+`libggml-htp-v73.so` and `libggml-htp.cat` (`build-hex/llama.cpp/ggml/src/ggml-hexagon`) before the process starts, and
+`device=HTP0` (`llm_generate <plugin> <model.gguf> "<prompt>" <n> 99 HTP0`). Without it the session fails with
+`failed to open session ... error 0x80000406`, also when test signing is off.
 
 ## Use
 
@@ -76,5 +100,36 @@ Verified on macOS with an Apple M5 (Metal and the CPU path) with Llama 3.2 1B Q4
 
 Verified on Windows 11 ARM64 (Snapdragon X Elite) with Qwen3-0.6B Q8_0: the CPU build passes `ctest` including the comparison with
 `llama-completion`. The OpenCL build ran the model on the Adreno GPU (the process showed GPU engine use, none with `n_gpu_layers=0`)
-and generated text, but its greedy output differs from the CPU's after the first few tokens and has not been compared with
-llama.cpp's own tool on the GPU, and `ctest` has not been run for it. Linux, CUDA, Vulkan and the Hexagon NPU have not been run.
+and generated text, but its greedy output differs from the CPU's after the first few tokens on Qwen3-0.6B. `ctest` passes for the
+OpenCL build (8 of 8, with the comparison against `llama-completion`). Qwen3-4B Q4_K_M ran about 17 tokens/s on the Adreno GPU
+and 1.6 tokens/s on the CPU in `llama-completion`.
+
+Hexagon NPU (X1E78100, v73, test signing on): `device=HTP0` ran Qwen3-0.6B Q8_0 and Qwen3-4B Q4_K_M and generated text.
+Through the plugin, Qwen3-0.6B Q8_0 generated about 48 tokens/s on HTP0 and about 68 tokens/s on `GPUOpenCL` (timed
+200 tokens minus 8 tokens, median of 3 runs). `ctest` passes (8 of 8) for that build, but the model tests there use the
+default device list, not `HTP0` specifically. Greedy output of `HTP0` against the CPU (OpenCL build, `n_gpu_layers=0`, which
+`ctest` compares with `llama-completion`): identical for Qwen3-0.6B "Write one sentence about the ocean." (64 tokens) and
+Qwen3-4B Q4_K_M "The capital of France is" (32 tokens), but Qwen3-0.6B "The capital of France is" differs from the CPU after
+30 characters (the same text as the GPU gives). `signtool verify /v /pa libggml-htp.cat` (arm64 `signtool`) succeeds and
+lists all four skeleton libraries.
+
+CUDA on Linux (Ubuntu 24.04 x86_64, RTX 3060 Laptop 12 GB, CUDA 12.8, gcc 13), built with
+`cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DUAIRT_BUILD_LLAMACPP=ON -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86`: `ctest` passes
+(9 of 9, with the comparison against `llama-completion` and the symbol check). Qwen3-0.6B Q8_0 through the plugin generated about
+251 tokens/s with `device=CUDA0` and about 28 tokens/s on the CPU (200 tokens minus 8, median of 3 runs). Greedy output equals
+the CPU's for "Write one sentence about the ocean." and differs for "The capital of France is" from byte 48.
+The Python `AutoModel` (a `-DBUILD_SHARED_LIBS=ON` build, `ctest` 10 of 10 with `python_sessions`, `UAIRT_LIBRARY` and
+`UAIRT_PLUGIN_PATH` set) maps `device="gpu"` to `n_gpu_layers=99` and `device="cpu"` to `0`; on the same machine `generate()`
+ran about 255 tokens/s on the GPU (GPU memory 15 MiB idle, 755 MiB with the model loaded) and about 31 tokens/s on the CPU,
+`options={"device": "CUDA0"}` gave the same text as `device="gpu"`, and an unknown device name raises `InvalidArgument`.
+Qwen3-14B Q4_K_M (9.0 GB) fits the 12 GB card: about 33 tokens/s through `AutoModel`, against 2.4 tokens/s on the CPU, with the
+first 105 characters equal. VRAM in use was 9.0 GB at `n_ctx=2048`, 9.9 GB at 8192 and 11.2 GB at 16384; `n_ctx=40960` fails with
+`OutOfMemory` ("cannot create a llama.cpp context"). `n_ctx` is a session option: `model.session({"n_ctx": "8192"})`, passed to
+`generate(..., session=)`, and is not accepted as an engine option.
+
+Vulkan on the same machine (`apt install libvulkan-dev glslc spirv-headers`; `-DGGML_VULKAN=ON`, no CUDA in that build): `ctest`
+passes (10 of 10), llama.cpp picks `Vulkan0 (NVIDIA GeForce RTX 3060 Laptop GPU)`. Qwen3-0.6B Q8_0 through the plugin generated about
+280 tokens/s with `device=Vulkan0` and about 31 tokens/s on the CPU, and greedy output equals the CPU's for both test prompts. Through
+`AutoModel` the 0.6B ran 117 to 202 tokens/s (the first measured load was the slowest) and the 14B Q4_K_M 22.5 to 27.5 tokens/s
+(CUDA: 33), with the same VRAM use and the same `n_ctx=40960` out-of-memory failure as CUDA. Vulkan on the Adreno GPU of Snapdragon X
+has not been run.

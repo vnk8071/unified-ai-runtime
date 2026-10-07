@@ -91,7 +91,9 @@ to `<QAIRT root>\lib\hexagon-v73\unsigned` before starting Python for `npu`; see
 
 ## Language models (GGUF)
 
-With the llamacpp plugin available, `uairt.AutoModel.from_file("model.gguf", device="gpu")` loads a GGUF model. It has
+With the llamacpp plugin available, `uairt.AutoModel.from_file("model.gguf", device="gpu")` loads a GGUF model
+(`device="gpu"` is `n_gpu_layers=99`, `"cpu"` is `0`; add `options={"device": "CUDA0"}` to pick one llama.cpp device,
+and pass `n_ctx` to the session: `model.session({"n_ctx": "8192"})` with `generate(..., session=)`). It has
 no `run`; use `model.generate(prompt, max_tokens=64, temperature=0.0, top_k=0, top_p=1.0, seed=None, stop_tokens=())`,
 which yields text pieces and samples in NumPy, or your own loop over `model.tokenize(text)`, `model.session(n_ctx=...)`,
 `session.append(tokens)` and `session.logits()`. Close sessions before their model. `generate()` does not stop at an end-of-generation token by itself (the C API exposes no special-token ids); pass `stop_tokens`, or limit `max_tokens`. For a Llama 3 style model,
