@@ -24,7 +24,7 @@ a Hexagon architecture hint (it is a hint: check it against the chip before rely
 | NCNN `.param` + `.bin` | `ncnn` | CPU, any Vulkan GPU | NCNN built with Vulkan, a Vulkan driver; `input_shapes` option |
 | `.engine`, `.plan` (TensorRT) | `tensorrt` | NVIDIA GPU (CUDA) | TensorRT 8.5+ with headers, CUDA toolkit; build the engine on the GPU that runs it |
 | `.mlmodel`, `.mlpackage` | `coreml` | Apple CPU, GPU, Neural Engine | Xcode (macOS) |
-| `.gguf` | `llamacpp` | CPU; Apple GPU (Metal) | `git submodule update --init third_party/llama.cpp`; build with `-DUAIRT_BUILD_LLAMACPP=ON` |
+| `.gguf` | `llamacpp` | CPU; Apple GPU (Metal); NVIDIA GPU (CUDA, Vulkan); Adreno GPU (OpenCL); Hexagon NPU (`device=HTP0`); pick with `device` | `git submodule update --init third_party/llama.cpp`; build with `-DUAIRT_BUILD_LLAMACPP=ON` plus `-DGGML_CUDA=ON`, `-DGGML_VULKAN=ON`, `-DGGML_OPENCL=ON` or `-DGGML_HEXAGON=ON` (see `docs/backends/llamacpp.md`) |
 | PyTorch (`.pt`, `.pth`) | none | | export to ONNX first, then use `onnxruntime` |
 
 - A PyTorch model has no backend of its own: `torch.onnx.export` it, then follow the `.onnx` row. `torch` has no

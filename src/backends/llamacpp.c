@@ -23,6 +23,8 @@
 #endif
 
 #define OPTION_N_GPU_LAYERS "n_gpu_layers"
+#define OPTION_DEVICE "device"
+#define DEVICE_NAME_MAX 64
 
 static const uairt_host_api* g_host;
 
@@ -43,6 +45,7 @@ static void fail(const char* fmt, ...) {
 
 typedef struct {
   int n_gpu_layers;
+  char device[DEVICE_NAME_MAX]; /* empty: llama.cpp uses every device it finds */
 } engine_t;
 
 typedef struct {
@@ -90,12 +93,21 @@ static uairt_status create_engine(const uairt_option* options, size_t num_option
   }
   engine->n_gpu_layers = 99;
   for (size_t i = 0; i < num_options; ++i) {
+    const char* value = options[i].value ? options[i].value : "";
+    if (strcmp(options[i].key, OPTION_DEVICE) == 0) {
+      if (!*value || strlen(value) >= sizeof(engine->device)) {
+        fail("%s must be a device name of 1 to %d characters, got '%s'", OPTION_DEVICE, DEVICE_NAME_MAX - 1, value);
+        free(engine);
+        return UAIRT_ERR_INVALID_ARGUMENT;
+      }
+      memcpy(engine->device, value, strlen(value) + 1);
+      continue;
+    }
     if (strcmp(options[i].key, OPTION_N_GPU_LAYERS) != 0) {
       fail("unknown option '%s'", options[i].key);
       free(engine);
       return UAIRT_ERR_INVALID_ARGUMENT;
     }
-    const char* value = options[i].value ? options[i].value : "";
     char* end = NULL;
     errno = 0;
     long layers = strtol(value, &end, 10);
@@ -134,6 +146,16 @@ static uairt_status load_model(void* engine_handle, const uairt_model_source* so
   }
   struct llama_model_params params = llama_model_default_params();
   params.n_gpu_layers = engine->n_gpu_layers;
+  ggml_backend_dev_t devices[2] = {NULL, NULL};
+  if (engine->device[0]) {
+    devices[0] = ggml_backend_dev_by_name(engine->device);
+    if (!devices[0]) {
+      fail("no llama.cpp device named '%s' in this build", engine->device);
+      free(model);
+      return UAIRT_ERR_INVALID_ARGUMENT;
+    }
+    params.devices = devices;
+  }
   model->model = llama_model_load_from_file(source->path, params);
   if (!model->model) {
     fail("cannot load '%s' as a GGUF model", source->path);

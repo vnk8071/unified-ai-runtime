@@ -277,6 +277,10 @@ if(UAIRT_BUILD_LLAMACPP)
   endif()
   add_subdirectory(${UAIRT_LLAMACPP_ROOT} ${CMAKE_CURRENT_BINARY_DIR}/llama.cpp EXCLUDE_FROM_ALL)
   set(BUILD_SHARED_LIBS ${UAIRT_SAVED_BUILD_SHARED_LIBS})
+  # ggml-hexagon defines its Windows driver stubs with dllexport only when this is set, which a static build never does.
+  if(TARGET ggml-hexagon)
+    target_compile_definitions(ggml-hexagon PRIVATE GGML_BACKEND_BUILD)
+  endif()
 
   add_library(uairt_backend_llamacpp MODULE src/backends/llamacpp.c)
   target_include_directories(uairt_backend_llamacpp PRIVATE include)

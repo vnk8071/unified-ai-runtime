@@ -14,7 +14,7 @@ and how to check the result. Vendor SDKs are never part of this repository
 | OpenVINO | [openvino.md](openvino.md) | Linux, Windows (verified on a Linux CPU) |
 | NCNN | [ncnn.md](ncnn.md) | Linux (CPU and Vulkan GPU, verified on a GTX 1650) |
 | TensorRT | [tensorrt.md](tensorrt.md) | Linux with an NVIDIA GPU (verified on a GTX 1650) |
-| llama.cpp | [llamacpp.md](llamacpp.md) | macOS (Metal); GGUF language models. Verified on macOS only (Metal and CPU) |
+| llama.cpp | [llamacpp.md](llamacpp.md) | GGUF language models on the CPU, Metal, CUDA, Vulkan, OpenCL (Adreno) and the Hexagon NPU (`HTP0`). Verified on macOS (Metal, CPU), Linux x86_64 with an RTX 3060 (CUDA, Vulkan) and Windows 11 ARM64 on a Snapdragon X Elite (CPU, OpenCL, `HTP0`) |
 | reference | [reference.md](reference.md) | any, test only |
 
 Run `scripts/doctor.sh` first: it reports which backends can be built on the current machine.
