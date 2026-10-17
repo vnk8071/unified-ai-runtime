@@ -3,7 +3,7 @@
 
 Programs that time other frameworks on the same model and device as UAIRT, so the numbers in
 `docs/design.md` can be reproduced. They are not built by CMake because they need headers and
-libraries that are not part of this repository.
+libraries that are not part of this repository. The exception is `core_overhead.c` below, which needs only UAIRT.
 
 ## `tflite_bench.c`
 
@@ -57,4 +57,14 @@ Runtime and UAIRT run the same compiled graph:
 ```bash
 ./ort_bench --core libonnxruntime.so --opt backend_path=$QNN_SDK_ROOT/lib/<target>/libQnnHtp.so \
   --opt htp_performance_mode=burst model_ctx.onnx input.bin out_ 100
+```
+
+## `core_overhead.c`
+
+Times `uairt_model_run` on zero-filled host buffers; CMake builds it as `bench_core_overhead` with the tests. With the
+`reference` backend the plugin's work is a 16-byte copy, so the number is the core's own per-run cost (validation and dispatch):
+
+```bash
+build/bench_core_overhead reference unused
+build/bench_core_overhead build/libuairt_backend_executorch.so executorch model.pte
 ```

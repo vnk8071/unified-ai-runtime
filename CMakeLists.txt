@@ -342,6 +342,9 @@ if(UAIRT_BUILD_TESTS)
   set_target_properties(uairt_reference_plugin PROPERTIES
     PREFIX "" C_VISIBILITY_PRESET hidden)
 
+  add_executable(bench_core_overhead tests/bench/core_overhead.c)
+  target_link_libraries(bench_core_overhead PRIVATE uairt)
+
   add_executable(test_core tests/test_core.c)
   target_link_libraries(test_core PRIVATE uairt)
   add_test(NAME core COMMAND test_core $<TARGET_FILE:uairt_reference_plugin>)
