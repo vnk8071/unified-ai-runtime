@@ -55,6 +55,12 @@ First public version. Pre-1.0: the API and ABI may change.
 - `.gitattributes` keeps text files, and shell scripts in particular, LF in every checkout.
 - The docs and `AGENTS.md` separate "core verified" from "backend verified".
 
+### Added (whisper.cpp)
+
+- whisper.cpp backend (`whispercpp`, a C plugin): speech to text with ggml Whisper models. Float32 16 kHz audio in, UTF-8 text and
+  its length out; `n_samples` and `max_text_bytes` set the static shapes. Built with `-DUAIRT_BUILD_WHISPERCPP=ON` against a
+  shared whisper.cpp install. Verified on an Apple M5 (CPU and Metal, `tiny.en`) against `whisper-cli`; `doctor.sh` reports it.
+
 ### Added (ExecuTorch)
 
 - Plugins may export `uairt_backend_global_symbols` to be opened `RTLD_GLOBAL` instead of `RTLD_LOCAL` (POSIX only, opt-in per

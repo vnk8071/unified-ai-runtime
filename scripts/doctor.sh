@@ -218,6 +218,19 @@ else
   vendor_hint ncnn
 fi
 
+if [[ -n "${WHISPER_ROOT:-}" ]]; then
+  if [[ -f "$WHISPER_ROOT/include/whisper.h" ]]; then
+    report ok "whispercpp: $WHISPER_ROOT"
+    vendor_check whispercpp "$(sed -n 's/^set(WHISPER_VERSION[[:space:]]*\(.*\))/\1/p' "$WHISPER_ROOT/lib/cmake/whisper/whisper-config.cmake" 2>/dev/null | head -n1)"
+  else
+    report missing "whispercpp: include/whisper.h not found under WHISPER_ROOT"
+    vendor_hint whispercpp
+  fi
+else
+  report skip "whispercpp: set WHISPER_ROOT (a whisper.cpp install built with -DBUILD_SHARED_LIBS=ON)"
+  vendor_hint whispercpp
+fi
+
 if [[ -n "${EXECUTORCH_ROOT:-}" ]]; then
   if [[ -f "$EXECUTORCH_ROOT/lib/cmake/ExecuTorch/executorch-config.cmake" && -f "$EXECUTORCH_ROOT/include/executorch/extension/module/module.h" ]]; then
     report ok "executorch: $EXECUTORCH_ROOT"

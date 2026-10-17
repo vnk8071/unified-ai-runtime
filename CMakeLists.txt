@@ -216,6 +216,29 @@ if(UAIRT_BUILD_NCNN)
   install(TARGETS uairt_backend_ncnn LIBRARY DESTINATION lib/uairt)
 endif()
 
+option(UAIRT_BUILD_WHISPERCPP "Build the whisper.cpp backend plugin" OFF)
+if(UAIRT_BUILD_WHISPERCPP)
+  set(WHISPER_ROOT "$ENV{WHISPER_ROOT}" CACHE PATH
+      "whisper.cpp install prefix (include/whisper.h and lib/libwhisper); build it as shared libraries")
+  find_path(UAIRT_WHISPER_INCLUDE whisper.h HINTS ${WHISPER_ROOT}/include NO_DEFAULT_PATH)
+  find_library(UAIRT_WHISPER_LIBRARY NAMES whisper HINTS ${WHISPER_ROOT}/lib ${WHISPER_ROOT}/lib64 NO_DEFAULT_PATH)
+  if(NOT UAIRT_WHISPER_INCLUDE OR NOT UAIRT_WHISPER_LIBRARY)
+    message(FATAL_ERROR
+      "whisper.cpp not found. Set WHISPER_ROOT to an install prefix containing include/whisper.h and lib/libwhisper "
+      "(configure whisper.cpp with -DBUILD_SHARED_LIBS=ON and run cmake --install).")
+  endif()
+  get_filename_component(UAIRT_WHISPER_LIBRARY_DIR ${UAIRT_WHISPER_LIBRARY} DIRECTORY)
+
+  add_library(uairt_backend_whispercpp MODULE src/backends/whispercpp.c)
+  target_include_directories(uairt_backend_whispercpp PRIVATE include)
+  target_include_directories(uairt_backend_whispercpp SYSTEM PRIVATE ${UAIRT_WHISPER_INCLUDE})
+  target_compile_definitions(uairt_backend_whispercpp PRIVATE UAIRT_BUILDING_SHARED)
+  target_link_libraries(uairt_backend_whispercpp PRIVATE ${UAIRT_WHISPER_LIBRARY})
+  set_target_properties(uairt_backend_whispercpp PROPERTIES
+    PREFIX "lib" C_VISIBILITY_PRESET hidden BUILD_RPATH ${UAIRT_WHISPER_LIBRARY_DIR})
+  install(TARGETS uairt_backend_whispercpp LIBRARY DESTINATION lib/uairt)
+endif()
+
 option(UAIRT_BUILD_EXECUTORCH "Build the ExecuTorch backend plugin" OFF)
 if(UAIRT_BUILD_EXECUTORCH)
   set(EXECUTORCH_ROOT "$ENV{EXECUTORCH_ROOT}" CACHE PATH
@@ -430,6 +453,21 @@ if(UAIRT_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_ncnn.py
         $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_ncnn>
         $ENV{UAIRT_NCNN_TEST_MODEL} $ENV{UAIRT_NCNN_TEST_SHAPES})
+    endif()
+  endif()
+
+  if(UAIRT_BUILD_WHISPERCPP)
+    add_executable(test_whispercpp tests/test_whispercpp.c)
+    target_link_libraries(test_whispercpp PRIVATE uairt)
+    add_test(NAME whispercpp_errors COMMAND test_whispercpp $<TARGET_FILE:uairt_backend_whispercpp>
+      ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
+    if(DEFINED ENV{UAIRT_WHISPERCPP_TEST_MODEL} AND DEFINED ENV{UAIRT_WHISPERCPP_TEST_AUDIO}
+       AND DEFINED ENV{UAIRT_WHISPERCPP_CLI})
+      find_package(Python3 REQUIRED COMPONENTS Interpreter)
+      add_test(NAME whispercpp_vs_whisper_cli COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_whisper_cli.py
+        $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_whispercpp>
+        $ENV{UAIRT_WHISPERCPP_CLI} $ENV{UAIRT_WHISPERCPP_TEST_MODEL} $ENV{UAIRT_WHISPERCPP_TEST_AUDIO})
     endif()
   endif()
 

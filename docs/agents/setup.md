@@ -89,6 +89,13 @@ Goal: get a requested backend building and passing tests. Logic lives in
 - `.param` files record no input shapes: pass `input_shapes`. Vulkan needs a working driver: in a container, `vulkaninfo
   --summary` showing "Found no drivers" means the graphics libraries are missing.
 
+## whisper.cpp
+
+- Build whisper.cpp from source with `-DBUILD_SHARED_LIBS=ON` and install it; set `WHISPER_ROOT` to the prefix and configure with
+  `-DUAIRT_BUILD_WHISPERCPP=ON`. The user does this; see `docs/backends/whispercpp.md`.
+- A Whisper ggml model is a user download (a model, not an SDK, but it is large): ask before fetching one, and keep it out of the
+  repository. Set `UAIRT_WHISPERCPP_CLI`, `UAIRT_WHISPERCPP_TEST_MODEL` and `UAIRT_WHISPERCPP_TEST_AUDIO` to run the comparison test.
+
 ## ExecuTorch
 
 - Build ExecuTorch from source with the Module, Tensor, data loader, flat tensor and named data map extensions and install it
