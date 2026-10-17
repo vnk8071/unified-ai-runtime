@@ -54,6 +54,15 @@ returning an error so users get a useful `uairt_last_error()`.
 8. **Strict C.** Build with `-std=c11 -Wall -Wextra -Wpedantic -Werror`. Define
    `_POSIX_C_SOURCE 200809L` before includes if you use `strdup`, `setenv` or similar.
 
+## Global symbols (rare)
+
+Plugins are opened with `RTLD_LOCAL`, so nothing a plugin exports is visible to other libraries. If a library the plugin loads
+later needs to resolve symbols from the plugin (the ExecuTorch Metal delegate does: a compiled library inside the model looks up
+`aoti_torch_*` in the global namespace), export a data symbol named `UAIRT_BACKEND_GLOBAL_SYMBOLS_SYMBOL`
+(`uairt_backend_global_symbols`, see `<uairt/uairt_backend.h>`) and the loader reopens the plugin with `RTLD_GLOBAL`. Do it only
+when needed and only in the build that needs it: global symbols can clash with another plugin's copy of the same library.
+It is ignored on Windows. `tests/test_global_symbols.c` covers both cases.
+
 ## Steps
 
 1. Copy `src/backends/reference.c` and rename the entry points.

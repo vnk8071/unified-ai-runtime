@@ -216,6 +216,38 @@ if(UAIRT_BUILD_NCNN)
   install(TARGETS uairt_backend_ncnn LIBRARY DESTINATION lib/uairt)
 endif()
 
+option(UAIRT_BUILD_EXECUTORCH "Build the ExecuTorch backend plugin" OFF)
+if(UAIRT_BUILD_EXECUTORCH)
+  set(EXECUTORCH_ROOT "$ENV{EXECUTORCH_ROOT}" CACHE PATH
+      "ExecuTorch install prefix (lib/cmake/ExecuTorch); build it with the Module and Tensor extensions and the same C++ toolchain as this plugin")
+  cmake_policy(PUSH)
+  cmake_policy(SET CMP0144 NEW)
+  find_package(executorch CONFIG REQUIRED PATHS ${EXECUTORCH_ROOT} NO_DEFAULT_PATH)
+  cmake_policy(POP)
+
+  add_library(uairt_backend_executorch MODULE src/backends/executorch.cpp)
+  target_include_directories(uairt_backend_executorch PRIVATE include)
+  target_include_directories(uairt_backend_executorch SYSTEM PRIVATE ${EXECUTORCH_INCLUDE_DIRS})
+  target_compile_features(uairt_backend_executorch PRIVATE cxx_std_17)
+  target_compile_definitions(uairt_backend_executorch PRIVATE UAIRT_BUILDING_SHARED)
+  # Not ${EXECUTORCH_LIBRARIES}: it lists both portable_ops_lib and optimized_ops_lib, and linking both registers every
+  # operator twice, which aborts when the plugin is loaded. optimized_native_cpu_ops_lib falls back to portable kernels.
+  target_link_libraries(uairt_backend_executorch PRIVATE
+    executorch extension_module_static extension_tensor xnnpack_backend optimized_native_cpu_ops_lib)
+  # Experimental, see docs/backends/executorch.md: the delegate links PyTorch's libomp by an install name that may not
+  # exist, and its generated code needs this plugin's symbols to be global (the plugin opts in, see uairt_backend.h).
+  option(UAIRT_EXECUTORCH_METAL "Link ExecuTorch's experimental Metal delegate into the ExecuTorch plugin" OFF)
+  if(UAIRT_EXECUTORCH_METAL)
+    if(NOT TARGET metal_backend)
+      message(FATAL_ERROR "UAIRT_EXECUTORCH_METAL needs an ExecuTorch install built with -DEXECUTORCH_BUILD_METAL=ON")
+    endif()
+    target_link_libraries(uairt_backend_executorch PRIVATE metal_backend)
+    target_compile_definitions(uairt_backend_executorch PRIVATE UAIRT_EXECUTORCH_GLOBAL_SYMBOLS)
+  endif()
+  set_target_properties(uairt_backend_executorch PROPERTIES PREFIX "lib" CXX_VISIBILITY_PRESET hidden)
+  install(TARGETS uairt_backend_executorch LIBRARY DESTINATION lib/uairt)
+endif()
+
 option(UAIRT_BUILD_TENSORRT "Build the NVIDIA TensorRT backend plugin" OFF)
 if(UAIRT_BUILD_TENSORRT)
   enable_language(CXX)
@@ -314,6 +346,19 @@ if(UAIRT_BUILD_TESTS)
   target_link_libraries(test_core PRIVATE uairt)
   add_test(NAME core COMMAND test_core $<TARGET_FILE:uairt_reference_plugin>)
 
+  if(NOT WIN32)
+    foreach(marker 0 1)
+      add_library(uairt_global_symbols_test_${marker} MODULE tests/global_symbols_plugin.c)
+      target_compile_definitions(uairt_global_symbols_test_${marker} PRIVATE UAIRT_BUILDING_SHARED WITH_MARKER=${marker})
+      target_include_directories(uairt_global_symbols_test_${marker} PRIVATE include)
+      set_target_properties(uairt_global_symbols_test_${marker} PROPERTIES PREFIX "" C_VISIBILITY_PRESET hidden)
+    endforeach()
+    add_executable(test_global_symbols tests/test_global_symbols.c)
+    target_link_libraries(test_global_symbols PRIVATE uairt ${CMAKE_DL_LIBS})
+    add_test(NAME global_symbols_opt_out COMMAND test_global_symbols $<TARGET_FILE:uairt_global_symbols_test_0> 0)
+    add_test(NAME global_symbols_opt_in COMMAND test_global_symbols $<TARGET_FILE:uairt_global_symbols_test_1> 1)
+  endif()
+
   foreach(variant 1 2 3)
     add_library(uairt_session_test_${variant} MODULE tests/session_test_plugin.c)
     target_compile_definitions(uairt_session_test_${variant} PRIVATE
@@ -382,6 +427,18 @@ if(UAIRT_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_ncnn.py
         $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_ncnn>
         $ENV{UAIRT_NCNN_TEST_MODEL} $ENV{UAIRT_NCNN_TEST_SHAPES})
+    endif()
+  endif()
+
+  if(UAIRT_BUILD_EXECUTORCH)
+    add_executable(test_executorch tests/test_executorch.c)
+    target_link_libraries(test_executorch PRIVATE uairt)
+    add_test(NAME executorch_errors COMMAND test_executorch $<TARGET_FILE:uairt_backend_executorch>
+      ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
+    if(DEFINED ENV{UAIRT_EXECUTORCH_PYTHON})
+      add_test(NAME executorch_vs_executorch_python COMMAND $ENV{UAIRT_EXECUTORCH_PYTHON}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_executorch.py
+        $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_executorch>)
     endif()
   endif()
 

@@ -26,6 +26,7 @@ repository: read the tool's `--help` for the installed version first, and report
 | Intel CPU, GPU, NPU | OpenVINO IR (`.xml` + `.bin`) | `openvino` | any machine with the `openvino` Python package |
 | NVIDIA GPU | `.engine` or `.plan` | `tensorrt` | the GPU that will run it (an engine is not portable) |
 | Vulkan GPU, small CNNs | NCNN `.param` + `.bin` | `ncnn` | any machine with `pnnx` |
+| PyTorch model, CPU or an ExecuTorch delegate | `.pte` | `executorch` | any machine with the `executorch` Python package; the delegate named at export must be built into the runtime |
 | Apple CPU, GPU, Neural Engine | `.mlpackage` | `coreml` | macOS with `coremltools` |
 | Mobile CPU, QNN delegate | `.tflite` | `tflite` | a machine with the TFLite or `ai-edge-torch` converter |
 

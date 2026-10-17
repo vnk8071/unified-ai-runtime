@@ -76,7 +76,7 @@ return `UAIRT_ERR_INVALID_ARGUMENT`.
 | `uairt_tensor_init(t)` | zero a tensor, set `struct_size`, host domain, `dmabuf_fd = -1` |
 | `uairt_tensor_num_elements(t)` | `-1` if the shape is invalid |
 | `uairt_backend_count()`, `uairt_backend_name(i)` | registered backends |
-| `uairt_load_backend_library(path)` | `dlopen` a plugin and register it; plugins stay loaded for the process lifetime. On Windows it uses `LoadLibrary`. |
+| `uairt_load_backend_library(path)` | `dlopen` a plugin and register it; plugins stay loaded for the process lifetime. Plugins are opened `RTLD_LOCAL`, unless one exports `uairt_backend_global_symbols` to opt in to `RTLD_GLOBAL`. On Windows it uses `LoadLibrary` and the opt-in is ignored. |
 | `uairt_engine_create(name, options, n, &engine)` | |
 | `uairt_model_load(engine, &source, &model)` | |
 | `uairt_model_num_inputs/outputs(model)` | |
@@ -110,6 +110,7 @@ such order, so its inputs and outputs are sorted by name.
 | TFLite | `tflite` | `.tflite` (path or memory), static shapes; optional QNN delegate (HTP) | `num_threads`, `delegate` (`none`, `qnn`), and with `qnn`: `delegate_library`*, `backend_library`*, `skel_dir`, `htp_performance_mode` (`default`, `burst`, `high_performance`, `sustained`, `balanced`, `power_saver`), `htp_precision` (`quantized`, `fp16`), `adsp_library_path` | host |
 | OpenVINO | `openvino` | OpenVINO IR `.xml`, `.onnx`, or a directory with one `.xml` (path only), static shapes | `device` (`CPU`, `GPU`, `NPU`, `AUTO`, ...), `performance_hint`, `num_threads`, `cache_dir` | host |
 | NCNN | `ncnn` | `.param` + `.bin` or a directory with one (path only), float32, static shapes | `input_shapes` (required), `device` (`cpu`, `vulkan`), `vulkan_device`, `fp16`, `num_threads` | host |
+| ExecuTorch | `executorch` | `.pte` (path only), tensor I/O, static shapes, contiguous | `method` (default `forward`) | host |
 | TensorRT | `tensorrt` | serialized engine `.engine` / `.plan` (ultralytics exports load as is), static shapes | `device` (CUDA device index) | host, pinned |
 | CoreML | `coreml` | `.mlmodelc`, `.mlpackage`, `.mlmodel` (path only), multi-array I/O and fixed-size image inputs (uint8 `[1,H,W,C]`), static shapes | `compute_units`: `all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne` | host |
 | llama.cpp | `llamacpp` | `.gguf` (path only), session API instead of `run` | `n_gpu_layers`, `device` (a llama.cpp device name such as `CUDA0`, `Vulkan0`, `GPUOpenCL` or `HTP0`; an unknown name fails at model load) | host |
@@ -140,6 +141,7 @@ rows for the reference backend list by platform.
 | NCNN CPU, Vulkan | Windows 11 ARM64, Snapdragon X Elite CPU and Adreno X1-85 GPU (Vulkan 1.3) | NCNN master built natively with Visual Studio, Release; the same yolov8n model, 28 ms on the CPU and 22 to 26 ms on the GPU, same detections |
 | NCNN CPU, Vulkan | Ubuntu 24.04 x86_64, i9-9900K and NVIDIA GTX 1650 (Vulkan 1.4) | NCNN master built with `NCNN_VULKAN=ON`; a yolov8n model, 79 ms on the CPU and 21.9 ms on the GPU |
 | TensorRT | Ubuntu 24.04 x86_64, NVIDIA GTX 1650 (compute 7.5), driver 580.178; built and error-path tested also on an RTX 2060 | TensorRT 10.9.0.34, CUDA 12.8; a yolov8n engine, outputs bit-identical to TensorRT's Python API |
+| ExecuTorch, portable kernels and XNNPACK delegate | macOS 26.6.2 on an Apple M5 | ExecuTorch 1.6.0 built from source (commit b172a36), CPU only; a small synthetic conv net, outputs equal to ExecuTorch's Python runtime. Not a real model |
 | llamacpp, Metal and CPU | macOS on an Apple M5 | llama.cpp at the pinned submodule commit; Llama 3.2 1B Q4, greedy output identical to llama.cpp's `llama-completion` |
 | llamacpp, CUDA, Vulkan and CPU | Ubuntu 24.04 x86_64, NVIDIA RTX 3060 Laptop 12 GB, driver 580.95, CUDA 12.8 | same pinned llama.cpp; Qwen3-0.6B Q8_0 and Qwen3-14B Q4_K_M; `ctest` 10 of 10 on each build; 0.6B about 251 (CUDA), 280 (Vulkan) and 31 (CPU) tokens/s; the Python `AutoModel` ran both |
 | llamacpp, OpenCL, Hexagon NPU (`HTP0`) and CPU | Windows 11 ARM64, Snapdragon X Elite (Adreno X1-85, Hexagon v73, test signing on) | same pinned llama.cpp; Qwen3-0.6B Q8_0 and Qwen3-4B Q4_K_M; `ctest` passes on the OpenCL and the Hexagon builds; 0.6B about 68 (OpenCL) and 48 (`HTP0`) tokens/s; `HTP0` output equals the CPU's on two of three prompts |

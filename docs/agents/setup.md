@@ -89,6 +89,14 @@ Goal: get a requested backend building and passing tests. Logic lives in
 - `.param` files record no input shapes: pass `input_shapes`. Vulkan needs a working driver: in a container, `vulkaninfo
   --summary` showing "Found no drivers" means the graphics libraries are missing.
 
+## ExecuTorch
+
+- Build ExecuTorch from source with the Module, Tensor, data loader, flat tensor and named data map extensions and install it
+  with the same C++ toolchain as the plugin; set `EXECUTORCH_ROOT` to the prefix and configure with
+  `-DUAIRT_BUILD_EXECUTORCH=ON`. The user does this; see `docs/backends/executorch.md` for the exact flags.
+- Set `UAIRT_EXECUTORCH_PYTHON` to a Python with `torch`, `numpy` and `executorch` to run the comparison test. Do not install
+  those into the user's own environments without asking.
+
 ## TensorRT
 
 - NVIDIA GPU, driver and CUDA toolkit, plus TensorRT 8.5+ with headers. The user installs TensorRT under NVIDIA's licence;

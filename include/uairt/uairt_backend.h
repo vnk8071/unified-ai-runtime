@@ -11,6 +11,13 @@ extern "C" {
 #define UAIRT_BACKEND_ABI_VERSION 1
 #define UAIRT_BACKEND_ENTRY_SYMBOL "uairt_backend_get_api"
 
+/*
+ * Optional, POSIX only. A plugin that exports this symbol (any non-NULL data symbol) is opened with RTLD_GLOBAL, so
+ * libraries it loads later (for example a compiled library inside a model) can resolve symbols from the plugin. Leave it
+ * out unless needed: global symbols can clash with those of other plugins. Ignored on Windows.
+ */
+#define UAIRT_BACKEND_GLOBAL_SYMBOLS_SYMBOL "uairt_backend_global_symbols"
+
 typedef struct uairt_host_api {
   uint32_t struct_size;
   uint32_t abi_version;

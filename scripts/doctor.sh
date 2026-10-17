@@ -218,6 +218,19 @@ else
   vendor_hint ncnn
 fi
 
+if [[ -n "${EXECUTORCH_ROOT:-}" ]]; then
+  if [[ -f "$EXECUTORCH_ROOT/lib/cmake/ExecuTorch/executorch-config.cmake" && -f "$EXECUTORCH_ROOT/include/executorch/extension/module/module.h" ]]; then
+    report ok "executorch: $EXECUTORCH_ROOT"
+    vendor_check executorch ""
+  else
+    report missing "executorch: lib/cmake/ExecuTorch and the Module extension headers not found under EXECUTORCH_ROOT"
+    vendor_hint executorch
+  fi
+else
+  report skip "executorch: set EXECUTORCH_ROOT (an install with -DEXECUTORCH_BUILD_EXTENSION_MODULE=ON and _TENSOR=ON)"
+  vendor_hint executorch
+fi
+
 system_trt=""
 for header in /usr/include/x86_64-linux-gnu/NvInfer.h /usr/include/aarch64-linux-gnu/NvInfer.h /usr/include/NvInfer.h; do
   [[ -f "$header" ]] && system_trt="$header" && break

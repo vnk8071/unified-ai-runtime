@@ -55,6 +55,15 @@ First public version. Pre-1.0: the API and ABI may change.
 - `.gitattributes` keeps text files, and shell scripts in particular, LF in every checkout.
 - The docs and `AGENTS.md` separate "core verified" from "backend verified".
 
+### Added (ExecuTorch)
+
+- Plugins may export `uairt_backend_global_symbols` to be opened `RTLD_GLOBAL` instead of `RTLD_LOCAL` (POSIX only, opt-in per
+  plugin; the default is unchanged). The ExecuTorch Metal build uses it.
+
+- ExecuTorch backend (`executorch`, a C++ plugin): `.pte`, tensor I/O, static shapes, `method` option. Built with
+  `-DUAIRT_BUILD_EXECUTORCH=ON` against an install you build. Verified on an Apple M5 CPU only (portable kernels and the
+  XNNPACK delegate, a small synthetic net); `doctor.sh` reports it.
+
 ### Added (OpenVINO and NCNN)
 - OpenVINO backend (`openvino`, C): IR, ONNX or a directory holding one `.xml`; any OpenVINO device; `device`,
   `performance_hint`, `num_threads`, `cache_dir`. Built with `-DUAIRT_BUILD_OPENVINO=ON`. Verified on an Intel CPU
