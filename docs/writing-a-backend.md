@@ -38,6 +38,9 @@ returning an error so users get a useful `uairt_last_error()`.
 2. **Do not link the core library.** Plugins talk to the host only through the tables.
    If you need `uairt_dtype_size` or similar, write a local copy. Check with
    `nm -u libuairt_backend_x.so | grep uairt` (should print nothing).
+   Small helpers that backends share live in `src/backends/common.h`, which is header-only so nothing is linked:
+   `uairt_backend_fail(host, fmt, ...)` (formats an error for `uairt_last_error()`; a backend usually defines
+   `#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)`) and `uairt_backend_file_exists(path)`.
 3. **The core validates first.** Before `run`, the core has checked counts, dtypes, shapes,
    buffer sizes and memory domains against what `input_info`/`output_info` returned, so
    `run` does not repeat it. It still must not read or write beyond `nbytes`.

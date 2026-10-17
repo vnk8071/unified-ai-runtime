@@ -31,6 +31,8 @@
 #include <System/QnnSystemInterface.h>
 #include <uairt/uairt_backend.h>
 
+#include "common.h"
+
 #if defined(_WIN32)
 static void* uairt_dlopen(const char* path) {
   return (void*)LoadLibraryExA(path, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
@@ -141,20 +143,7 @@ typedef struct {
 
 static const uairt_host_api* g_host;
 
-#if defined(__GNUC__)
-static void fail(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
-#endif
-
-static void fail(const char* fmt, ...) {
-  char message[320];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(message, sizeof(message), fmt, args);
-  va_end(args);
-  if (g_host && g_host->set_error) {
-    g_host->set_error(message);
-  }
-}
+#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)
 
 static uairt_status check(const engine_t* engine, Qnn_ErrorHandle_t error, const char* what) {
   if (error == QNN_SUCCESS) {

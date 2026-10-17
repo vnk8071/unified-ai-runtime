@@ -16,6 +16,8 @@
 
 #include <uairt/uairt_backend.h>
 
+#include "common.h"
+
 #define OPTION_COMPUTE_UNITS "compute_units"
 
 typedef struct {
@@ -47,18 +49,7 @@ typedef struct {
 
 static const uairt_host_api* g_host;
 
-static void fail(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
-
-static void fail(const char* fmt, ...) {
-  char message[512];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(message, sizeof(message), fmt, args);
-  va_end(args);
-  if (g_host && g_host->set_error) {
-    g_host->set_error(message);
-  }
-}
+#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)
 
 static void fail_error(const char* what, NSError* error) {
   fail("%s: %s", what, error ? error.localizedDescription.UTF8String : "unknown error");

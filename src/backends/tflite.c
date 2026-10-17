@@ -22,6 +22,8 @@
 #include "tensorflow/lite/c/c_api.h"
 #include <uairt/uairt_backend.h>
 
+#include "common.h"
+
 #ifdef UAIRT_TFLITE_QNN_DELEGATE
 #include "QnnTFLiteDelegate.h"
 #endif
@@ -102,16 +104,7 @@ static const char* uairt_dlerror(void) {
 #define uairt_dlerror dlerror
 #endif
 
-static void fail(const char* fmt, ...) {
-  char message[MESSAGE_CAPACITY];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(message, sizeof(message), fmt, args);
-  va_end(args);
-  if (g_host && g_host->set_error) {
-    g_host->set_error(message);
-  }
-}
+#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)
 
 static void fail_with_tflite_message(const char* what) {
   fail("%s%s%s", what, g_tflite_message[0] ? ": " : "", g_tflite_message);

@@ -21,6 +21,8 @@
 #include <onnxruntime_c_api.h>
 #include <uairt/uairt_backend.h>
 
+#include "common.h"
+
 #define OPTION_THREADS "intra_op_threads"
 #define OPTION_EP "execution_provider"
 #define OPTION_EP_LIBRARY "ep_library"
@@ -71,16 +73,7 @@ static wchar_t* utf8_to_wide(const char* text) {
 }
 #endif
 
-static void fail(const char* fmt, ...) {
-  char message[1024];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(message, sizeof(message), fmt, args);
-  va_end(args);
-  if (g_host && g_host->set_error) {
-    g_host->set_error(message);
-  }
-}
+#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)
 
 static uairt_status check(OrtStatus* status) {
   if (!status) {

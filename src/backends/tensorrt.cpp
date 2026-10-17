@@ -21,6 +21,8 @@
 
 #include <uairt/uairt_backend.h>
 
+#include "common.h"
+
 #define OPTION_DEVICE "device"
 
 namespace {
@@ -28,16 +30,7 @@ namespace {
 const uairt_host_api* g_host;
 thread_local std::string t_trt_message;
 
-void fail(const char* fmt, ...) {
-  char message[512];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(message, sizeof(message), fmt, args);
-  va_end(args);
-  if (g_host && g_host->set_error) {
-    g_host->set_error(message);
-  }
-}
+#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)
 
 class Logger : public nvinfer1::ILogger {
  public:

@@ -34,6 +34,8 @@
 
 #include <uairt/uairt_backend.h>
 
+#include "common.h"
+
 #define OPTION_DEVICE "device"
 #define OPTION_VULKAN_DEVICE "vulkan_device"
 #define OPTION_THREADS "num_threads"
@@ -44,16 +46,7 @@ namespace {
 
 const uairt_host_api* g_host;
 
-void fail(const char* fmt, ...) {
-  char message[1024];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(message, sizeof(message), fmt, args);
-  va_end(args);
-  if (g_host && g_host->set_error) {
-    g_host->set_error(message);
-  }
-}
+#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)
 
 #if NCNN_VULKAN
 // ncnn::create_gpu_instance and destroy_gpu_instance are process-wide, so count the engines that use Vulkan.
@@ -299,14 +292,6 @@ std::string find_param_in_directory(const std::string& directory) {
 #endif
 }
 
-bool file_exists(const std::string& path) {
-  FILE* file = std::fopen(path.c_str(), "rb");
-  if (file) {
-    std::fclose(file);
-  }
-  return file != nullptr;
-}
-
 uairt_status load_model(void* engine_handle, const uairt_model_source* source, void** out_model) {
   const Engine* engine = static_cast<Engine*>(engine_handle);
   if (!source->path) {
@@ -330,7 +315,7 @@ uairt_status load_model(void* engine_handle, const uairt_model_source* source, v
     } else {
       weights += ".bin";
     }
-    if (!file_exists(param) || !file_exists(weights)) {
+    if (!uairt_backend_file_exists(param.c_str()) || !uairt_backend_file_exists(weights.c_str())) {
       fail("cannot open the NCNN model files '%s' and '%s'", param.c_str(), weights.c_str());
       return UAIRT_ERR_IO;
     }

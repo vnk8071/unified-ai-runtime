@@ -25,6 +25,8 @@
 #include <openvino/c/openvino.h>
 #include <uairt/uairt_backend.h>
 
+#include "common.h"
+
 #define OPTION_DEVICE "device"
 #define OPTION_HINT "performance_hint"
 #define OPTION_THREADS "num_threads"
@@ -56,20 +58,7 @@ typedef struct {
 
 static const uairt_host_api* g_host;
 
-#if defined(__GNUC__)
-static void fail(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
-#endif
-
-static void fail(const char* fmt, ...) {
-  char message[1024];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(message, sizeof(message), fmt, args);
-  va_end(args);
-  if (g_host && g_host->set_error) {
-    g_host->set_error(message);
-  }
-}
+#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)
 
 /* Reports the last OpenVINO error and maps the status code. */
 static uairt_status check(ov_status_e status, const char* what) {

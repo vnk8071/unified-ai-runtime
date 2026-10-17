@@ -20,6 +20,8 @@
 
 #include <uairt/uairt_backend.h>
 
+#include "common.h"
+
 #define OPTION_METHOD "method"
 
 namespace {
@@ -33,16 +35,7 @@ using executorch::runtime::TensorInfo;
 
 const uairt_host_api* g_host;
 
-void fail(const char* fmt, ...) {
-  char message[1024];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(message, sizeof(message), fmt, args);
-  va_end(args);
-  if (g_host && g_host->set_error) {
-    g_host->set_error(message);
-  }
-}
+#define fail(...) uairt_backend_fail(g_host, __VA_ARGS__)
 
 struct Engine {
   std::string method = "forward";
@@ -77,14 +70,6 @@ uairt_dtype to_uairt_dtype(ScalarType type) {
     case ScalarType::Bool: return UAIRT_DTYPE_BOOL;
     default: return UAIRT_DTYPE_UNKNOWN;
   }
-}
-
-bool file_exists(const std::string& path) {
-  FILE* file = std::fopen(path.c_str(), "rb");
-  if (file) {
-    std::fclose(file);
-  }
-  return file != nullptr;
 }
 
 uairt_status create_engine(const uairt_option* options, size_t num_options, void** out_engine) {
@@ -172,7 +157,7 @@ uairt_status load_model(void* engine_handle, const uairt_model_source* source, v
   }
   try {
     const std::string path = source->path;
-    if (!file_exists(path)) {
+    if (!uairt_backend_file_exists(path.c_str())) {
       fail("cannot open the ExecuTorch model '%s'", path.c_str());
       return UAIRT_ERR_IO;
     }
