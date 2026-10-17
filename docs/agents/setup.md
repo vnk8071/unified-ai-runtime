@@ -84,17 +84,19 @@ Goal: get a requested backend building and passing tests. Logic lives in
 
 ## NCNN
 
-- Build NCNN from source with `-DNCNN_VULKAN=ON` and install it, with the same C++ toolchain as the plugin; set `NCNN_ROOT`
-  to the prefix and configure with `-DUAIRT_BUILD_NCNN=ON`. The user does this; see `docs/backends/ncnn.md`.
+- Run `git submodule update --init third_party/ncnn` (NCNN is BSD-3-Clause, so no licence step) and configure with `-DUAIRT_BUILD_NCNN=ON`:
+  it builds the pinned NCNN for the CPU. For Vulkan add `-DUAIRT_NCNN_VULKAN=ON` and use `--init --recursive` (it needs glslang), or
+  build NCNN yourself and set `NCNN_ROOT` to the install prefix; see `docs/backends/ncnn.md`.
 - `.param` files record no input shapes: pass `input_shapes`. Vulkan needs a working driver: in a container, `vulkaninfo
   --summary` showing "Found no drivers" means the graphics libraries are missing.
 
 ## whisper.cpp
 
-- Build whisper.cpp from source with `-DBUILD_SHARED_LIBS=ON` and install it; set `WHISPER_ROOT` to the prefix and configure with
-  `-DUAIRT_BUILD_WHISPERCPP=ON`. The user does this; see `docs/backends/whispercpp.md`.
+- Run `git submodule update --init third_party/whisper.cpp` (MIT, no licence step) and configure with `-DUAIRT_BUILD_WHISPERCPP=ON`; or
+  build whisper.cpp yourself with `-DBUILD_SHARED_LIBS=ON` and set `WHISPER_ROOT` to the install prefix. See `docs/backends/whispercpp.md`.
+  With `UAIRT_BUILD_LLAMACPP=ON` as well, both compile against llama.cpp's ggml.
 - A Whisper ggml model is a user download (a model, not an SDK, but it is large): ask before fetching one, and keep it out of the
-  repository. Set `UAIRT_WHISPERCPP_CLI`, `UAIRT_WHISPERCPP_TEST_MODEL` and `UAIRT_WHISPERCPP_TEST_AUDIO` to run the comparison test.
+  repository. Set `UAIRT_WHISPERCPP_TEST_MODEL` and `UAIRT_WHISPERCPP_TEST_AUDIO` (and `UAIRT_WHISPERCPP_CLI` with `WHISPER_ROOT`) to run the comparison test.
 
 ## ExecuTorch
 

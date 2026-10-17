@@ -5,10 +5,18 @@ Source: `src/backends/ncnn.cpp`, a C++ plugin behind the C backend ABI. Plugin: 
 
 ## You install
 
-NCNN (BSD-3-Clause), built from https://github.com/Tencent/ncnn with `-DNCNN_VULKAN=ON` for the GPU path, and installed to a
-prefix. Build it with the **same C++ toolchain** as this plugin: the plugin uses NCNN's C++ API, because NCNN's C API cannot
-tell whether a GPU is usable. The Vulkan path also needs a Vulkan driver (on NVIDIA, the graphics libraries of the driver
-package, for example `libnvidia-gl-<version>`; many containers lack them).
+Nothing for the CPU: NCNN (BSD-3-Clause, with some third-party parts under zlib and BSD-2) is a pinned git submodule, built into the
+plugin and linked statically with its symbols hidden, so it cannot clash with another NCNN in your application.
+
+```bash
+git submodule update --init third_party/ncnn                 # CPU
+git submodule update --init --recursive third_party/ncnn     # also glslang, needed for Vulkan
+```
+
+To build NCNN yourself instead (a different version, or a build you share with other code), install it and set `NCNN_ROOT`; that
+takes priority over the submodule. Build it with the **same C++ toolchain** as this plugin: the plugin uses NCNN's C++ API,
+because NCNN's C API cannot tell whether a GPU is usable. The Vulkan path needs a Vulkan driver (on NVIDIA, the graphics libraries
+of the driver package, for example `libnvidia-gl-<version>`; many containers lack them).
 
 ```bash
 git clone --depth 1 --recurse-submodules https://github.com/Tencent/ncnn.git && cd ncnn
@@ -24,7 +32,9 @@ loader is bundled (`NCNN_SIMPLEVK`), so no Vulkan SDK is needed, only the GPU's 
 ## Build
 
 ```bash
-export NCNN_ROOT=$HOME/ncnn-install        # contains include/ncnn/net.h and lib/libncnn
+cmake -S . -B build -DUAIRT_BUILD_NCNN=ON && cmake --build build                          # the pinned submodule, CPU
+cmake -S . -B build -DUAIRT_BUILD_NCNN=ON -DUAIRT_NCNN_VULKAN=ON && cmake --build build   # the pinned submodule, Vulkan
+export NCNN_ROOT=$HOME/ncnn-install        # or your own install: include/ncnn/net.h and lib/libncnn
 cmake -S . -B build -DUAIRT_BUILD_NCNN=ON && cmake --build build
 ```
 
@@ -64,6 +74,10 @@ Engine options:
 float32 tensors only; static shapes; host memory; models from a path, not from memory.
 
 ## Check
+
+The pinned submodule (commit `2cbb264`) built for the CPU on an Apple M5 and ran a hand-written one-layer fully connected net: the output
+equals a numpy matrix product to 6e-8 with `fp16=false`, and to 5e-4 with NCNN's default fp16 on ARM. The Vulkan build of the
+submodule was not run.
 
 `ctest` runs `ncnn_errors`. For the comparison with NCNN's Python API (CPU reference) set `UAIRT_NCNN_TEST_MODEL`,
 `UAIRT_NCNN_TEST_SHAPES` (for example `3x640x640`) and `UAIRT_NCNN_PYTHON` (a Python with `ncnn` and numpy) before cmake.

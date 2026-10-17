@@ -9,6 +9,8 @@ UAIRT is Apache-2.0. It wraps vendor runtimes that are not open source.
 | CoreML | Apple proprietary | Apple system framework | Never |
 | TensorRT | Apache-2.0 (NVIDIA/TensorRT repo) | NVIDIA proprietary | Never |
 | llama.cpp | MIT | MIT | As a pinned git submodule at `third_party/llama.cpp` (only the pin is in the repo) |
+| whisper.cpp | MIT | MIT | As a pinned git submodule at `third_party/whisper.cpp` |
+| NCNN | BSD-3-Clause, plus bundled zlib, BSD-2 and BSD-3 components | same | As a pinned git submodule at `third_party/ncnn` |
 
 ## Rules
 
@@ -20,9 +22,11 @@ UAIRT is Apache-2.0. It wraps vendor runtimes that are not open source.
 4. Do not reverse engineer vendor binaries or artifact formats.
 5. Do not use TensorRT in the same binary as copyleft-licensed code.
 6. Document in each backend that the vendor SDK and its license are required.
-7. Exception to rule 1: llama.cpp (MIT, not a vendor SDK) is a pinned submodule under `third_party/`, built only when
-   `UAIRT_BUILD_LLAMACPP=ON`. The repository holds the submodule pin, not llama.cpp's files, and releases that include
-   the plugin must ship `THIRD_PARTY_NOTICES.md`.
+7. Exception to rule 1: llama.cpp, whisper.cpp (both MIT) and NCNN (BSD-3-Clause) are open source, not vendor SDKs, and are
+   pinned submodules under `third_party/`, built only when `UAIRT_BUILD_LLAMACPP`, `UAIRT_BUILD_WHISPERCPP` or `UAIRT_BUILD_NCNN`
+   is `ON`. The repository holds the submodule pins, not their files, and releases that include a plugin must ship
+   `THIRD_PARTY_NOTICES.md`. A user-provided install (`NCNN_ROOT`, `WHISPER_ROOT`) overrides the submodule. Nothing else
+   becomes a submodule without a licence check and an entry here.
 
 ## Notes from the license texts reviewed (not legal advice)
 

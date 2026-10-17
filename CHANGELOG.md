@@ -55,6 +55,12 @@ First public version. Pre-1.0: the API and ABI may change.
 - `.gitattributes` keeps text files, and shell scripts in particular, LF in every checkout.
 - The docs and `AGENTS.md` separate "core verified" from "backend verified".
 
+### Added (submodules)
+
+- NCNN and whisper.cpp are pinned git submodules like llama.cpp (`third_party/ncnn`, `third_party/whisper.cpp`), built statically into
+  their plugins with only `uairt_backend_get_api` visible. `NCNN_ROOT` and `WHISPER_ROOT` still select your own install instead.
+  `docs/LICENSING.md` and `THIRD_PARTY_NOTICES.md` list them.
+
 ### Added (whisper.cpp)
 
 - whisper.cpp backend (`whispercpp`, a C plugin): speech to text with ggml Whisper models. Float32 16 kHz audio in, UTF-8 text and

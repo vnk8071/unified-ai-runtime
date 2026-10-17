@@ -179,12 +179,13 @@ build/run_model --repeat 50 --option device=CPU build/libuairt_backend_openvino.
 
 ### NCNN (CPU and Vulkan GPUs)
 
-Build NCNN with `-DNCNN_VULKAN=ON` (same C++ toolchain as the plugin) and set `NCNN_ROOT` to its install prefix. NCNN's
-`.param` records no input shapes, so pass them:
+NCNN is a pinned submodule: `git submodule update --init third_party/ncnn`, then build it into the plugin with
+`-DUAIRT_BUILD_NCNN=ON` (CPU; add `-DUAIRT_NCNN_VULKAN=ON` and `--init --recursive` for Vulkan). Or build NCNN yourself and set
+`NCNN_ROOT` to its install prefix. NCNN's `.param` records no input shapes, so pass them:
 
 ```bash
-export NCNN_ROOT=$HOME/ncnn-install
-cmake -S . -B build -DUAIRT_BUILD_NCNN=ON && cmake --build build
+git submodule update --init third_party/ncnn
+cmake -S . -B build -DUAIRT_BUILD_NCNN=ON -DUAIRT_NCNN_VULKAN=ON && cmake --build build
 build/run_model --repeat 100 --option input_shapes=3x640x640 --option device=vulkan --option fp16=false \
   build/libuairt_backend_ncnn.so ncnn yolov8n_ncnn_model out in0.bin
 ```

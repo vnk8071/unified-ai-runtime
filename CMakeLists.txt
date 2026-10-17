@@ -196,47 +196,54 @@ option(UAIRT_BUILD_NCNN "Build the NCNN backend plugin" OFF)
 if(UAIRT_BUILD_NCNN)
   enable_language(CXX)
   set(NCNN_ROOT "$ENV{NCNN_ROOT}" CACHE PATH
-      "NCNN install prefix (include/ncnn/net.h and lib/libncnn); build it with the same C++ toolchain as this plugin")
-  find_path(UAIRT_NCNN_INCLUDE net.h HINTS ${NCNN_ROOT}/include/ncnn ${NCNN_ROOT}/include)
-  find_library(UAIRT_NCNN_LIBRARY NAMES ncnn HINTS ${NCNN_ROOT}/lib ${NCNN_ROOT}/lib64)
-  if(NOT UAIRT_NCNN_INCLUDE OR NOT UAIRT_NCNN_LIBRARY)
-    message(FATAL_ERROR
-      "NCNN not found. Set NCNN_ROOT to an NCNN install prefix containing include/ncnn/net.h and lib/libncnn.")
-  endif()
-  get_filename_component(UAIRT_NCNN_LIBRARY_DIR ${UAIRT_NCNN_LIBRARY} DIRECTORY)
+      "NCNN install prefix (include/ncnn/net.h and lib/libncnn), used instead of the pinned submodule; build it with the same C++ toolchain as this plugin")
+  set(UAIRT_NCNN_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ncnn" CACHE PATH "NCNN source tree; the default is the pinned submodule")
+  option(UAIRT_NCNN_VULKAN "Build the pinned NCNN with Vulkan (needs: git submodule update --init --recursive third_party/ncnn)" OFF)
 
   add_library(uairt_backend_ncnn MODULE src/backends/ncnn.cpp)
   target_include_directories(uairt_backend_ncnn PRIVATE include)
-  target_include_directories(uairt_backend_ncnn SYSTEM PRIVATE ${UAIRT_NCNN_INCLUDE})
   target_compile_features(uairt_backend_ncnn PRIVATE cxx_std_17)
   target_compile_definitions(uairt_backend_ncnn PRIVATE UAIRT_BUILDING_SHARED)
-  target_link_libraries(uairt_backend_ncnn PRIVATE ${UAIRT_NCNN_LIBRARY})
-  set_target_properties(uairt_backend_ncnn PROPERTIES
-    PREFIX "lib" CXX_VISIBILITY_PRESET hidden BUILD_RPATH ${UAIRT_NCNN_LIBRARY_DIR})
-  install(TARGETS uairt_backend_ncnn LIBRARY DESTINATION lib/uairt)
-endif()
-
-option(UAIRT_BUILD_WHISPERCPP "Build the whisper.cpp backend plugin" OFF)
-if(UAIRT_BUILD_WHISPERCPP)
-  set(WHISPER_ROOT "$ENV{WHISPER_ROOT}" CACHE PATH
-      "whisper.cpp install prefix (include/whisper.h and lib/libwhisper); build it as shared libraries")
-  find_path(UAIRT_WHISPER_INCLUDE whisper.h HINTS ${WHISPER_ROOT}/include NO_DEFAULT_PATH)
-  find_library(UAIRT_WHISPER_LIBRARY NAMES whisper HINTS ${WHISPER_ROOT}/lib ${WHISPER_ROOT}/lib64 NO_DEFAULT_PATH)
-  if(NOT UAIRT_WHISPER_INCLUDE OR NOT UAIRT_WHISPER_LIBRARY)
-    message(FATAL_ERROR
-      "whisper.cpp not found. Set WHISPER_ROOT to an install prefix containing include/whisper.h and lib/libwhisper "
-      "(configure whisper.cpp with -DBUILD_SHARED_LIBS=ON and run cmake --install).")
+  if(NCNN_ROOT)
+    find_path(UAIRT_NCNN_INCLUDE net.h HINTS ${NCNN_ROOT}/include/ncnn ${NCNN_ROOT}/include)
+    find_library(UAIRT_NCNN_LIBRARY NAMES ncnn HINTS ${NCNN_ROOT}/lib ${NCNN_ROOT}/lib64)
+    if(NOT UAIRT_NCNN_INCLUDE OR NOT UAIRT_NCNN_LIBRARY)
+      message(FATAL_ERROR
+        "NCNN not found. Set NCNN_ROOT to an NCNN install prefix containing include/ncnn/net.h and lib/libncnn.")
+    endif()
+    get_filename_component(UAIRT_NCNN_LIBRARY_DIR ${UAIRT_NCNN_LIBRARY} DIRECTORY)
+    target_include_directories(uairt_backend_ncnn SYSTEM PRIVATE ${UAIRT_NCNN_INCLUDE})
+    target_link_libraries(uairt_backend_ncnn PRIVATE ${UAIRT_NCNN_LIBRARY})
+    set_target_properties(uairt_backend_ncnn PROPERTIES
+      PREFIX "lib" CXX_VISIBILITY_PRESET hidden BUILD_RPATH ${UAIRT_NCNN_LIBRARY_DIR})
+  else()
+    if(NOT EXISTS "${UAIRT_NCNN_SOURCE}/CMakeLists.txt")
+      message(FATAL_ERROR
+        "NCNN not found at ${UAIRT_NCNN_SOURCE}. Run: git submodule update --init third_party/ncnn "
+        "(or set NCNN_ROOT to an NCNN install, or UAIRT_NCNN_SOURCE to a checkout).")
+    endif()
+    set(UAIRT_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    set(NCNN_SHARED_LIB OFF CACHE BOOL "" FORCE)
+    set(NCNN_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(NCNN_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(NCNN_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
+    set(NCNN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(NCNN_PYTHON OFF CACHE BOOL "" FORCE)
+    set(NCNN_VULKAN ${UAIRT_NCNN_VULKAN} CACHE BOOL "" FORCE)
+    add_subdirectory(${UAIRT_NCNN_SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/ncnn EXCLUDE_FROM_ALL)
+    set(BUILD_SHARED_LIBS ${UAIRT_SAVED_BUILD_SHARED_LIBS})
+    target_link_libraries(uairt_backend_ncnn PRIVATE ncnn)
+    set_target_properties(uairt_backend_ncnn PROPERTIES PREFIX "lib" CXX_VISIBILITY_PRESET hidden)
+    # NCNN is linked statically: keep its symbols out of the process so they cannot clash with the application's own NCNN.
+    if(APPLE)
+      target_link_options(uairt_backend_ncnn PRIVATE -Wl,-exported_symbol,_uairt_backend_get_api)
+    elseif(NOT WIN32)
+      target_link_options(uairt_backend_ncnn PRIVATE -Wl,--exclude-libs,ALL)
+    endif()
   endif()
-  get_filename_component(UAIRT_WHISPER_LIBRARY_DIR ${UAIRT_WHISPER_LIBRARY} DIRECTORY)
-
-  add_library(uairt_backend_whispercpp MODULE src/backends/whispercpp.c)
-  target_include_directories(uairt_backend_whispercpp PRIVATE include)
-  target_include_directories(uairt_backend_whispercpp SYSTEM PRIVATE ${UAIRT_WHISPER_INCLUDE})
-  target_compile_definitions(uairt_backend_whispercpp PRIVATE UAIRT_BUILDING_SHARED)
-  target_link_libraries(uairt_backend_whispercpp PRIVATE ${UAIRT_WHISPER_LIBRARY})
-  set_target_properties(uairt_backend_whispercpp PROPERTIES
-    PREFIX "lib" C_VISIBILITY_PRESET hidden BUILD_RPATH ${UAIRT_WHISPER_LIBRARY_DIR})
-  install(TARGETS uairt_backend_whispercpp LIBRARY DESTINATION lib/uairt)
+  install(TARGETS uairt_backend_ncnn LIBRARY DESTINATION lib/uairt)
 endif()
 
 option(UAIRT_BUILD_EXECUTORCH "Build the ExecuTorch backend plugin" OFF)
@@ -356,6 +363,69 @@ if(UAIRT_BUILD_LLAMACPP)
   endif()
 endif()
 
+option(UAIRT_BUILD_WHISPERCPP "Build the whisper.cpp backend plugin" OFF)
+if(UAIRT_BUILD_WHISPERCPP)
+  enable_language(CXX)
+  set(WHISPER_ROOT "$ENV{WHISPER_ROOT}" CACHE PATH
+      "whisper.cpp install prefix (include/whisper.h and lib/libwhisper, built shared), used instead of the pinned submodule")
+  set(UAIRT_WHISPERCPP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/whisper.cpp" CACHE PATH
+      "whisper.cpp source tree; the default is the pinned submodule")
+
+  add_library(uairt_backend_whispercpp MODULE src/backends/whispercpp.c)
+  target_include_directories(uairt_backend_whispercpp PRIVATE include)
+  target_compile_definitions(uairt_backend_whispercpp PRIVATE UAIRT_BUILDING_SHARED)
+  if(WHISPER_ROOT)
+    find_path(UAIRT_WHISPER_INCLUDE whisper.h HINTS ${WHISPER_ROOT}/include NO_DEFAULT_PATH)
+    find_library(UAIRT_WHISPER_LIBRARY NAMES whisper HINTS ${WHISPER_ROOT}/lib ${WHISPER_ROOT}/lib64 NO_DEFAULT_PATH)
+    if(NOT UAIRT_WHISPER_INCLUDE OR NOT UAIRT_WHISPER_LIBRARY)
+      message(FATAL_ERROR
+        "whisper.cpp not found. Set WHISPER_ROOT to an install prefix containing include/whisper.h and lib/libwhisper "
+        "(configure whisper.cpp with -DBUILD_SHARED_LIBS=ON and run cmake --install), or unset it to use the submodule.")
+    endif()
+    get_filename_component(UAIRT_WHISPER_LIBRARY_DIR ${UAIRT_WHISPER_LIBRARY} DIRECTORY)
+    target_include_directories(uairt_backend_whispercpp SYSTEM PRIVATE ${UAIRT_WHISPER_INCLUDE})
+    target_link_libraries(uairt_backend_whispercpp PRIVATE ${UAIRT_WHISPER_LIBRARY})
+    set_target_properties(uairt_backend_whispercpp PROPERTIES
+      PREFIX "lib" C_VISIBILITY_PRESET hidden BUILD_RPATH ${UAIRT_WHISPER_LIBRARY_DIR})
+  else()
+    if(NOT EXISTS "${UAIRT_WHISPERCPP_SOURCE}/CMakeLists.txt")
+      message(FATAL_ERROR
+        "whisper.cpp not found at ${UAIRT_WHISPERCPP_SOURCE}. Run: git submodule update --init third_party/whisper.cpp "
+        "(or set WHISPER_ROOT to an install, or UAIRT_WHISPERCPP_SOURCE to a checkout).")
+    endif()
+    # The comparison test runs whisper.cpp's own whisper-cli, so examples are built only when that test is enabled.
+    if(DEFINED ENV{UAIRT_WHISPERCPP_TEST_MODEL})
+      set(UAIRT_WHISPERCPP_TOOLS ON)
+    else()
+      set(UAIRT_WHISPERCPP_TOOLS OFF)
+    endif()
+    # whisper.cpp declares BUILD_SHARED_LIBS with option(), which overwrites a normal variable; force the cache value instead.
+    set(UAIRT_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    set(WHISPER_BUILD_EXAMPLES ${UAIRT_WHISPERCPP_TOOLS} CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+    if(APPLE)
+      set(GGML_METAL ON CACHE BOOL "" FORCE)
+      set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)
+    endif()
+    # whisper.cpp and llama.cpp both add their ggml only if no `ggml` target exists. The llama.cpp block above runs first, so
+    # when both backends are built they compile against one ggml (llama.cpp's), and the build fails if the two drift apart.
+    add_subdirectory(${UAIRT_WHISPERCPP_SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/whisper.cpp EXCLUDE_FROM_ALL)
+    set(BUILD_SHARED_LIBS ${UAIRT_SAVED_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
+    target_link_libraries(uairt_backend_whispercpp PRIVATE whisper Threads::Threads)
+    set_target_properties(uairt_backend_whispercpp PROPERTIES PREFIX "lib" C_VISIBILITY_PRESET hidden LINKER_LANGUAGE CXX)
+    # Statically linked: only uairt_backend_get_api may be visible, so whisper.cpp and ggml cannot clash with another ggml.
+    if(APPLE)
+      target_link_options(uairt_backend_whispercpp PRIVATE -Wl,-exported_symbol,_uairt_backend_get_api)
+    elseif(NOT WIN32)
+      target_link_options(uairt_backend_whispercpp PRIVATE -Wl,--exclude-libs,ALL)
+    endif()
+  endif()
+  install(TARGETS uairt_backend_whispercpp LIBRARY DESTINATION lib/uairt)
+endif()
+
 if(UAIRT_BUILD_TESTS)
   enable_testing()
 
@@ -461,13 +531,22 @@ if(UAIRT_BUILD_TESTS)
     target_link_libraries(test_whispercpp PRIVATE uairt)
     add_test(NAME whispercpp_errors COMMAND test_whispercpp $<TARGET_FILE:uairt_backend_whispercpp>
       ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
-    if(DEFINED ENV{UAIRT_WHISPERCPP_TEST_MODEL} AND DEFINED ENV{UAIRT_WHISPERCPP_TEST_AUDIO}
-       AND DEFINED ENV{UAIRT_WHISPERCPP_CLI})
+    if(DEFINED ENV{UAIRT_WHISPERCPP_TEST_MODEL} AND DEFINED ENV{UAIRT_WHISPERCPP_TEST_AUDIO})
+      if(TARGET whisper-cli)
+        set(UAIRT_WHISPER_CLI $<TARGET_FILE:whisper-cli>)
+      elseif(DEFINED ENV{UAIRT_WHISPERCPP_CLI})
+        set(UAIRT_WHISPER_CLI $ENV{UAIRT_WHISPERCPP_CLI})
+      endif()
+    endif()
+    if(UAIRT_WHISPER_CLI)
       find_package(Python3 REQUIRED COMPONENTS Interpreter)
       add_test(NAME whispercpp_vs_whisper_cli COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_whisper_cli.py
         $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_whispercpp>
-        $ENV{UAIRT_WHISPERCPP_CLI} $ENV{UAIRT_WHISPERCPP_TEST_MODEL} $ENV{UAIRT_WHISPERCPP_TEST_AUDIO})
+        ${UAIRT_WHISPER_CLI} $ENV{UAIRT_WHISPERCPP_TEST_MODEL} $ENV{UAIRT_WHISPERCPP_TEST_AUDIO})
+      if(TARGET whisper-cli)
+        add_dependencies(test_whispercpp whisper-cli)
+      endif()
     endif()
   endif()
 

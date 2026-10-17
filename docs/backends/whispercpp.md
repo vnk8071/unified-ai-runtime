@@ -5,10 +5,16 @@ Source: `src/backends/whispercpp.c`, a C plugin over whisper.cpp's C API (`whisp
 
 ## You install
 
-whisper.cpp (MIT), built from https://github.com/ggml-org/whisper.cpp as **shared libraries** and installed to a prefix. It is
-not a submodule: it bundles its own ggml, and linking that next to llama.cpp's inside this repository would define the same
-CMake targets twice. The plugin links the installed `libwhisper`; whisper.cpp carries the ggml backends (Metal, CUDA, ...) you
-built it with.
+Nothing but a model: whisper.cpp (MIT) is a pinned git submodule, built into the plugin and linked statically with its symbols
+hidden. When llama.cpp is built too, both compile against llama.cpp's ggml (each plugin still carries its own hidden copy of the
+code), so a bump of one that breaks the other's build means bumping both.
+
+```bash
+git submodule update --init third_party/whisper.cpp
+```
+
+To use your own build instead, install whisper.cpp as shared libraries and set `WHISPER_ROOT`; that takes priority over the
+submodule:
 
 ```bash
 git clone --depth 1 https://github.com/ggml-org/whisper.cpp.git && cd whisper.cpp
@@ -22,7 +28,8 @@ https://huggingface.co/ggerganov/whisper.cpp) gives a ggml `.bin`. Do not commit
 ## Build
 
 ```bash
-export WHISPER_ROOT=$HOME/whisper-install     # contains include/whisper.h and lib/libwhisper
+cmake -S . -B build -DUAIRT_BUILD_WHISPERCPP=ON && cmake --build build     # the pinned submodule
+export WHISPER_ROOT=$HOME/whisper-install     # or your own install: include/whisper.h and lib/libwhisper
 cmake -S . -B build -DUAIRT_BUILD_WHISPERCPP=ON && cmake --build build
 ```
 
@@ -64,12 +71,13 @@ Inputs under 100 ms are rejected by whisper.cpp.
 ## Check
 
 `ctest` runs `whispercpp_errors`. For the comparison with `whisper-cli` (CPU, greedy, `-bs 1`, whisper's default timestamp
-tokens) set `UAIRT_WHISPERCPP_CLI`, `UAIRT_WHISPERCPP_TEST_MODEL` and `UAIRT_WHISPERCPP_TEST_AUDIO` (a 16 kHz mono 16-bit WAV, for
-example whisper.cpp's `samples/jfk.wav`) before cmake; it needs `numpy`.
+tokens) set `UAIRT_WHISPERCPP_TEST_MODEL` and `UAIRT_WHISPERCPP_TEST_AUDIO` (a 16 kHz mono 16-bit WAV, for
+example `third_party/whisper.cpp/samples/jfk.wav`) before cmake and the submodule's own `whisper-cli` is built and used; with
+`WHISPER_ROOT` also set `UAIRT_WHISPERCPP_CLI`. It needs `numpy`.
 
 ## Result
 
-Apple M5, macOS 26.6.2, whisper.cpp 1.9.5-dev (commit 0c7be69, built shared with Metal and Accelerate), model `ggml-tiny.en.bin`
+Apple M5, macOS 26.6.2, whisper.cpp 1.9.5-dev (commit 0c7be69; first built shared with Metal and Accelerate, then re-run as the pinned submodule, statically), model `ggml-tiny.en.bin`
 (`c78c86eb...`, matches whisper.cpp's published hash), whisper.cpp's `samples/jfk.wav` (11 s):
 
 | Run | Result |

@@ -214,8 +214,14 @@ if [[ -n "${NCNN_ROOT:-}" ]]; then
     vendor_hint ncnn
   fi
 else
-  report skip "ncnn: set NCNN_ROOT (an NCNN install built with NCNN_VULKAN=ON)"
-  vendor_hint ncnn
+  ncnn_src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/third_party/ncnn"
+  if [[ -f "$ncnn_src/CMakeLists.txt" ]]; then
+    report ok "ncnn: $ncnn_src (pinned submodule, built with -DUAIRT_BUILD_NCNN=ON; set NCNN_ROOT to use an install instead)"
+    ncnn_commit="$(git -C "$ncnn_src" describe --tags --always 2>/dev/null || true)"
+    [[ -n "$ncnn_commit" ]] && report info "ncnn: version $ncnn_commit (a pinned submodule; bumping it needs ctest and a model run, see docs/vendors.md)"
+  else
+    report skip "ncnn: run git submodule update --init third_party/ncnn (or set NCNN_ROOT to an install)"
+  fi
 fi
 
 if [[ -n "${WHISPER_ROOT:-}" ]]; then
@@ -227,8 +233,14 @@ if [[ -n "${WHISPER_ROOT:-}" ]]; then
     vendor_hint whispercpp
   fi
 else
-  report skip "whispercpp: set WHISPER_ROOT (a whisper.cpp install built with -DBUILD_SHARED_LIBS=ON)"
-  vendor_hint whispercpp
+  whisper_src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/third_party/whisper.cpp"
+  if [[ -f "$whisper_src/CMakeLists.txt" ]]; then
+    report ok "whispercpp: $whisper_src (pinned submodule, built with -DUAIRT_BUILD_WHISPERCPP=ON; set WHISPER_ROOT to use an install instead)"
+    whisper_commit="$(git -C "$whisper_src" describe --tags --always 2>/dev/null || true)"
+    [[ -n "$whisper_commit" ]] && report info "whispercpp: version $whisper_commit (a pinned submodule; bumping it needs ctest and a model run, see docs/vendors.md)"
+  else
+    report skip "whispercpp: run git submodule update --init third_party/whisper.cpp (or set WHISPER_ROOT to a shared install)"
+  fi
 fi
 
 if [[ -n "${EXECUTORCH_ROOT:-}" ]]; then
