@@ -55,6 +55,14 @@ First public version. Pre-1.0: the API and ABI may change.
 - `.gitattributes` keeps text files, and shell scripts in particular, LF in every checkout.
 - The docs and `AGENTS.md` separate "core verified" from "backend verified".
 
+### Added (notebooks)
+
+- `examples/notebooks/uairt_backends_tour.ipynb`: builds UAIRT and runs a tiny model through each backend it can; a section whose runtime is missing
+  skips itself with the reason. Executed end to end on an Apple M5: `reference`, `onnxruntime`, `ncnn`, `executorch`, `whispercpp`, `coreml` and
+  `openvino` ran and matched a NumPy, PyTorch or Whisper reference; `llamacpp`, `tflite`, `qnn` and `tensorrt` skipped (no runtime or model here).
+- `examples/notebooks/uairt_tensorrt_colab.ipynb`: TensorRT 10.9 on a Colab GPU (install, build the plugin, ResNet-18 engine, comparison with PyTorch,
+  timing). **Not run on a GPU**; checked for syntax, the header fetch, and the plugin against TensorRT 10.9.0's headers with a CUDA stub.
+
 ### Added (submodules)
 
 - NCNN and whisper.cpp are pinned git submodules like llama.cpp (`third_party/ncnn`, `third_party/whisper.cpp`), built statically into

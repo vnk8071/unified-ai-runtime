@@ -50,6 +50,10 @@ before running cmake; the outputs must be identical.
 
 ## Example
 
+[`examples/notebooks/uairt_tensorrt_colab.ipynb`](../../examples/notebooks/uairt_tensorrt_colab.ipynb) does everything below on a free Colab GPU: it installs TensorRT 10.9 and
+its headers, builds the plugin, makes an engine from ResNet-18 and compares UAIRT's output with PyTorch's. It has not been run on a GPU yet.
+
+
 `bindings/python/examples/detect_tensorrt.py` runs a YOLOv8 engine on an image through the Python binding with pinned
 buffers and prints the detections (it needs numpy and Pillow only):
 

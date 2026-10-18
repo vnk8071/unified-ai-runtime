@@ -253,6 +253,7 @@ ONNX Runtime plugin is on PyPI (`pip install "uairt[onnxruntime]"`; see [docs/re
 
 - [docs/api.md](docs/api.md): every function, status codes, options, tested configurations
 - [docs/writing-a-backend.md](docs/writing-a-backend.md): the plugin ABI and how to add a backend
+- [examples/notebooks/](examples/notebooks/README.md): a notebook with one runnable example per backend, and a Google Colab notebook that runs TensorRT on a GPU
 - [docs/design.md](docs/design.md): design decisions, per-backend notes, measurements
 - [docs/LICENSING.md](docs/LICENSING.md): how vendor licenses shape this repository
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md)
