@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
+import codecs
 import ctypes
 import weakref
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -62,6 +63,29 @@ def load_backend_library(path: str) -> None:
 
 
 @dataclass(frozen=True)
+class RunStats:
+    """Wall-clock time of the backend's run call over the successful runs since the model was created or the stats were
+    reset, in nanoseconds. It is host time around the backend, not device time. `min_ns` is 0 while `runs` is 0."""
+    runs: int
+    last_ns: int
+    total_ns: int
+    min_ns: int
+    max_ns: int
+
+    @property
+    def mean_ns(self) -> float:
+        return self.total_ns / self.runs if self.runs else 0.0
+
+    @property
+    def last_ms(self) -> float:
+        return self.last_ns / 1e6
+
+    @property
+    def mean_ms(self) -> float:
+        return self.mean_ns / 1e6
+
+
+@dataclass(frozen=True)
 class TensorInfo:
     name: str
     dtype: np.dtype
@@ -99,6 +123,11 @@ def _new_tensor() -> _lib.Tensor:
 def _need_sessions():
     if _lib.session_create is None:
         raise Unsupported(3, "this libuairt has no session API; upgrade the uairt package")
+
+
+def _need_complete():
+    if _lib.model_complete is None:
+        raise Unsupported(3, "this libuairt has no text completion API; upgrade the uairt package")
 
 
 def _token_array(tokens) -> np.ndarray:
@@ -247,6 +276,22 @@ class Model:
                 _check(getter(handle, i, ctypes.byref(tensor)))
                 target.append(_info(tensor))
 
+    def run_stats(self) -> RunStats:
+        """Timing of the runs so far; see RunStats."""
+        if _lib.model_run_stats is None:
+            raise Unsupported(3, "this libuairt has no run statistics; upgrade the uairt package")
+        self._ensure_open()
+        stats = _lib.RunStats()
+        stats.struct_size = ctypes.sizeof(stats)
+        _check(_lib.model_run_stats(self._handle, ctypes.byref(stats)))
+        return RunStats(stats.runs, stats.last_ns, stats.total_ns, stats.min_ns, stats.max_ns)
+
+    def reset_run_stats(self) -> None:
+        if _lib.model_reset_run_stats is None:
+            raise Unsupported(3, "this libuairt has no run statistics; upgrade the uairt package")
+        self._ensure_open()
+        _lib.model_reset_run_stats(self._handle)
+
     def run(self, *inputs: np.ndarray, out: Optional[Sequence[np.ndarray]] = None) -> Tuple[np.ndarray, ...]:
         """Runs the model. Inputs must match the model's dtype and shape exactly. Returns the outputs."""
         self._ensure_open()
@@ -354,6 +399,50 @@ class Model:
     def session(self, options: Optional[Dict[str, object]] = None, **kwargs) -> Session:
         """A new session on this model. Option: n_ctx, the tokens of context."""
         return Session(self, options, **kwargs)
+
+    def complete(self, prompt: str, options: Optional[Dict[str, object]] = None, *,
+                 on_text: Optional[Callable[[str], object]] = None, **kwargs) -> str:
+        """The model's answer to `prompt` as text (backends llamacpp and llmserver; others raise Unsupported).
+
+        Options: max_tokens, temperature, top_p, seed, system. `on_text(piece)` is called with each piece of text as it
+        arrives; return a true value from it to stop early (the text so far is returned). An exception from `on_text`
+        stops the generation and is raised here. Each call is independent: there is no history between calls.
+        """
+        _need_complete()
+        self._ensure_open()
+        try:
+            data = prompt.encode()
+        except UnicodeEncodeError:
+            raise InvalidArgument(1, "prompt is not valid Unicode (lone surrogate)") from None
+        merged = dict(options or {})
+        merged.update(kwargs)
+        array, keep = _option_array(merged)
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        pieces: List[str] = []
+        failure: List[BaseException] = []
+
+        def deliver(address, length, _user_data):
+            try:
+                piece = decoder.decode(ctypes.string_at(address, length))
+                if piece:
+                    pieces.append(piece)
+                    if on_text is not None and on_text(piece):
+                        return 1
+                return 0
+            except BaseException as error:  # never let an exception unwind through C
+                failure.append(error)
+                return 1
+
+        callback = _lib.text_callback(deliver)  # kept alive until the call returns
+        _check(_lib.model_complete(self._handle, data, array, len(merged), callback, None))
+        if failure:
+            raise failure[0]
+        tail = decoder.decode(b"", final=True)
+        if tail:
+            pieces.append(tail)
+            if on_text is not None:
+                on_text(tail)
+        return "".join(pieces)
 
     def _ensure_open(self):
         if not self._handle:

@@ -90,6 +90,11 @@ lib = load()
 c_void_pp = ctypes.POINTER(ctypes.c_void_p)
 
 
+class RunStats(ctypes.Structure):
+    _fields_ = [("struct_size", ctypes.c_uint32), ("runs", ctypes.c_uint64), ("last_ns", ctypes.c_uint64),
+                ("total_ns", ctypes.c_uint64), ("min_ns", ctypes.c_uint64), ("max_ns", ctypes.c_uint64)]
+
+
 def _declare(name, restype, *argtypes):
     function = getattr(lib, name)
     function.restype = restype
@@ -153,3 +158,12 @@ session_logits = _declare_optional("uairt_session_logits", ctypes.c_int32, ctype
                                    ctypes.c_size_t, c_size_p)
 session_position = _declare_optional("uairt_session_position", ctypes.c_int32, ctypes.c_void_p, c_size_p)
 session_reset = _declare_optional("uairt_session_reset", ctypes.c_int32, ctypes.c_void_p)
+
+model_run_stats = _declare_optional("uairt_model_run_stats", ctypes.c_int32, ctypes.c_void_p,
+                                    ctypes.POINTER(RunStats))
+model_reset_run_stats = _declare_optional("uairt_model_reset_run_stats", None, ctypes.c_void_p)
+
+# int callback(const char* text, size_t len, void* user_data); the text is not NUL terminated, so it comes as an address.
+text_callback = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p)
+model_complete = _declare_optional("uairt_model_complete", ctypes.c_int32, ctypes.c_void_p, ctypes.c_char_p,
+                                   ctypes.POINTER(Option), ctypes.c_size_t, text_callback, ctypes.c_void_p)

@@ -102,3 +102,20 @@ which yields text pieces and samples in NumPy, or your own loop over `model.toke
 mid-stream with "context full" (`InvalidArgument`). Different sessions of one model may be used from different threads; one
 session must not be. `tokenize` and `generate` may parse special-token text such as `<|eot_id|>` into control tokens (llamacpp
 does), so do not pass untrusted text if that matters.
+
+## Text completion
+
+`model.complete(prompt, max_tokens=..., temperature=..., top_p=..., seed=..., system=..., on_text=None)` returns the answer as a
+string, for the `llamacpp` and `llmserver` backends (others raise `Unsupported`). `on_text(piece)` is called with each piece as it
+arrives; return a true value to stop early, and an exception from it is raised from `complete`. Each call is independent (no
+history). It uses the model's chat template and, with no `temperature`, is greedy; see
+[../../docs/backends/llmserver.md](../../docs/backends/llmserver.md) and [../../docs/backends/llamacpp.md](../../docs/backends/llamacpp.md).
+
+```python
+with uairt.Engine("llmserver", preset="ollama") as engine, engine.load_model("llama3.2:1b") as model:
+    print(model.complete("Name three colors.", max_tokens=40, on_text=lambda piece: print(piece, end="", flush=True)))
+```
+
+`AutoModel` picks a backend from a file, so for a server use `Engine` as above. The tests are `tests/test_complete.py`; the
+`llmserver` ones need `UAIRT_TEST_LLMSERVER_PLUGIN` (the `python_sessions` ctest sets it) and run against the fake server of
+`tests/test_llmserver.py`.

@@ -376,7 +376,7 @@ const uairt_backend_api* api() {
 
 }  // namespace
 
-extern "C" UAIRT_API const uairt_backend_api* uairt_backend_get_api(const uairt_host_api* host) {
+extern "C" UAIRT_API const uairt_backend_api* UAIRT_BACKEND_ENTRY(const uairt_host_api* host) {
   g_host = host;
   return api();
 }

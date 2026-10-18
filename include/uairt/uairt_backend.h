@@ -12,6 +12,16 @@ extern "C" {
 #define UAIRT_BACKEND_ENTRY_SYMBOL "uairt_backend_get_api"
 
 /*
+ * The name a backend source gives its entry function. A plugin keeps the default, so the loader finds
+ * UAIRT_BACKEND_ENTRY_SYMBOL. A backend linked into an application is compiled with
+ * -DUAIRT_BACKEND_ENTRY=uairt_backend_get_api_<name> (see uairt/uairt_static.h), because every plugin would otherwise
+ * define the same symbol.
+ */
+#ifndef UAIRT_BACKEND_ENTRY
+#define UAIRT_BACKEND_ENTRY uairt_backend_get_api
+#endif
+
+/*
  * Optional, POSIX only. A plugin that exports this symbol (any non-NULL data symbol) is opened with RTLD_GLOBAL, so
  * libraries it loads later (for example a compiled library inside a model) can resolve symbols from the plugin. Leave it
  * out unless needed: global symbols can clash with those of other plugins. Ignored on Windows.
@@ -62,6 +72,25 @@ typedef struct uairt_session_api {
   uairt_status (*reset)(void* session);
 } uairt_session_api;
 
+#define UAIRT_TEXT_ABI_VERSION 1
+
+/*
+ * Optional text completion for backends that take text and return text (language model servers). `prompt` is NUL
+ * terminated. The backend calls `callback` once per piece of generated text, in order, and stops when it returns
+ * non-zero; stopping is not an error. The backend must not retain `prompt`, `options` or the callback.
+ */
+typedef struct uairt_text_api {
+  uint32_t struct_size;
+  uint32_t abi_version;
+  uairt_status (*complete)(
+      void* model,
+      const char* prompt,
+      const uairt_option* options,
+      size_t num_options,
+      uairt_text_callback callback,
+      void* user_data);
+} uairt_text_api;
+
 /*
  * Handles are opaque to the host. Backends must not throw across this boundary
  * and must not retain pointers from `uairt_tensor` or `uairt_model_source` after
@@ -107,6 +136,8 @@ typedef struct uairt_backend_api {
    * and the host never reads past struct_size. NULL means the backend has no sessions.
    */
   const uairt_session_api* session;
+  /* Optional, appended after `session` under the same rule: read only when struct_size covers it. NULL: no text API. */
+  const uairt_text_api* text;
 } uairt_backend_api;
 
 typedef const uairt_backend_api* (*uairt_backend_get_api_fn)(

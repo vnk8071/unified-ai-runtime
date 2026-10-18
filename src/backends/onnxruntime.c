@@ -706,7 +706,7 @@ static const OrtApiBase* load_ort(char* tried, size_t capacity) {
   return NULL;
 }
 
-UAIRT_API const uairt_backend_api* uairt_backend_get_api(
+UAIRT_API const uairt_backend_api* UAIRT_BACKEND_ENTRY(
     const uairt_host_api* host) {
   g_host = host;
   char tried[2048];

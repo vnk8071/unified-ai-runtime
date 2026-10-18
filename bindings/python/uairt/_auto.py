@@ -269,6 +269,12 @@ class AutoModel:
     def run(self, *inputs: np.ndarray, out: Optional[Sequence[np.ndarray]] = None) -> Tuple[np.ndarray, ...]:
         return self.model.run(*inputs, out=out)
 
+    def run_stats(self):
+        return self.model.run_stats()
+
+    def reset_run_stats(self) -> None:
+        self.model.reset_run_stats()
+
     def run_buffers(self, inputs: Sequence[Buffer], outputs: Sequence[Buffer]) -> None:
         self.model.run_buffers(inputs, outputs)
 
@@ -290,6 +296,9 @@ class AutoModel:
 
     def session(self, options: Optional[Dict[str, object]] = None, **kwargs) -> Session:
         return self.model.session(options, **kwargs)
+
+    def complete(self, prompt: str, options: Optional[Dict[str, object]] = None, **kwargs) -> str:
+        return self.model.complete(prompt, options, **kwargs)
 
     def generate(self, prompt: str, **kwargs):
         """Yields text pieces; see uairt.generate."""

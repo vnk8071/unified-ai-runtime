@@ -27,6 +27,7 @@ The host passes a small function table (`set_error`). The plugin returns a stati
 | `run` | execute; blocking |
 | `alloc_buffer`, `free_buffer` | optional, both or neither: zero-copy buffers |
 | `session` | optional, appended at the end: a `uairt_session_api` table (vocabulary, tokenizing, sessions) for language models; see `include/uairt/uairt_backend.h` |
+| `text` | optional, appended after `session`: a `uairt_text_api` table (`complete`, text in and streamed text out) for backends that talk to a language model server; see `include/uairt/uairt_backend.h` |
 
 Return `uairt_status` codes (see `docs/api.md`) and call `host->set_error(message)` before
 returning an error so users get a useful `uairt_last_error()`.
@@ -68,7 +69,9 @@ It is ignored on Windows. `tests/test_global_symbols.c` covers both cases.
 
 ## Steps
 
-1. Copy `src/backends/reference.c` and rename the entry points.
+1. Copy `src/backends/reference.c` and rename the entry points. Define your entry function with `UAIRT_BACKEND_ENTRY` (from
+   `uairt_backend.h`) instead of the literal name `uairt_backend_get_api`: plugins keep the default, and a backend linked into an app
+   is compiled with `-DUAIRT_BACKEND_ENTRY=uairt_backend_get_api_<name>` so several can coexist (see `uairt/uairt_static.h`).
 2. Add the build option and module target to `CMakeLists.txt` next to the existing
    backends (an `UAIRT_BUILD_<NAME>` option, find the SDK from a `<NAME>_ROOT` variable).
 3. Write a test that loads the plugin, runs a small model and checks outputs against the

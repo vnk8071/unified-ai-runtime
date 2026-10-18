@@ -104,6 +104,68 @@ static void run_roundtrip(const char* backend) {
   uairt_engine_destroy(engine);
 }
 
+static void test_run_stats(void) {
+  uairt_engine* engine = NULL;
+  uairt_option delay = {"delay_ms", "5"};
+  CHECK(uairt_engine_create("reference", &delay, 1, &engine) == UAIRT_OK);
+  uairt_model_source source = {.struct_size = sizeof(source), .path = "unused"};
+  uairt_model* model = NULL;
+  CHECK(uairt_model_load(engine, &source, &model) == UAIRT_OK);
+  if (!model) {
+    uairt_engine_destroy(engine);
+    return;
+  }
+  uairt_run_stats stats = {.struct_size = sizeof(stats)};
+  CHECK(uairt_model_run_stats(model, &stats) == UAIRT_OK);
+  CHECK(stats.runs == 0 && stats.total_ns == 0 && stats.min_ns == 0 && stats.max_ns == 0);
+
+  uairt_tensor in, out;
+  CHECK(uairt_model_input_info(model, 0, &in) == UAIRT_OK);
+  CHECK(uairt_model_output_info(model, 0, &out) == UAIRT_OK);
+  float input[4] = {1.f, 2.f, 3.f, 4.f};
+  float output[4] = {0};
+  in.data = input;
+  in.nbytes = sizeof(input);
+  out.data = output;
+  out.nbytes = sizeof(output);
+  for (int i = 0; i < 3; ++i) {
+    CHECK(uairt_model_run(model, &in, 1, &out, 1) == UAIRT_OK);
+  }
+  /* A run the core rejects never reaches the backend and is not counted. */
+  out.nbytes = 8;
+  CHECK(uairt_model_run(model, &in, 1, &out, 1) == UAIRT_ERR_INVALID_ARGUMENT);
+  out.nbytes = sizeof(output);
+
+  CHECK(uairt_model_run_stats(model, &stats) == UAIRT_OK);
+  CHECK(stats.runs == 3);
+  CHECK(stats.min_ns >= 5000000 && stats.min_ns <= stats.last_ns && stats.last_ns <= stats.max_ns);
+  CHECK(stats.max_ns < 2000000000ull);
+  CHECK(stats.total_ns >= 3 * stats.min_ns && stats.total_ns <= 3 * stats.max_ns);
+
+  /* A caller with a shorter struct gets the fields that fit and nothing is written past it. */
+  struct {
+    uint32_t struct_size;
+    uint64_t runs;
+    unsigned char guard[16];
+  } shorter;
+  memset(&shorter, 0xAB, sizeof(shorter));
+  shorter.struct_size = offsetof(uairt_run_stats, last_ns);
+  CHECK(uairt_model_run_stats(model, (uairt_run_stats*)&shorter) == UAIRT_OK);
+  CHECK(shorter.runs == 3 && shorter.guard[0] == 0xAB && shorter.guard[15] == 0xAB);
+  uairt_run_stats too_small = {.struct_size = 4};
+  CHECK(uairt_model_run_stats(model, &too_small) == UAIRT_ERR_INVALID_ARGUMENT);
+  CHECK(uairt_model_run_stats(NULL, &stats) == UAIRT_ERR_INVALID_ARGUMENT);
+  CHECK(uairt_model_run_stats(model, NULL) == UAIRT_ERR_INVALID_ARGUMENT);
+
+  uairt_model_reset_run_stats(model);
+  CHECK(uairt_model_run_stats(model, &stats) == UAIRT_OK);
+  CHECK(stats.runs == 0 && stats.total_ns == 0 && stats.last_ns == 0 && stats.min_ns == 0 && stats.max_ns == 0);
+  uairt_model_reset_run_stats(NULL);
+
+  uairt_model_destroy(model);
+  uairt_engine_destroy(engine);
+}
+
 int main(int argc, char** argv) {
   CHECK(strcmp(uairt_version_string(), UAIRT_VERSION_STRING) == 0);
   CHECK(strcmp(uairt_status_string(UAIRT_ERR_NOT_FOUND), "not found") == 0);
@@ -126,6 +188,7 @@ int main(int argc, char** argv) {
 
   test_buffers();
   run_roundtrip("reference");
+  test_run_stats();
 
   if (argc > 1) {
     CHECK(uairt_load_backend_library(argv[1]) == UAIRT_OK);

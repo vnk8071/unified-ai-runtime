@@ -6,6 +6,7 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "../internal.h"
 
@@ -27,14 +28,22 @@ static void fail(const char* message) {
   }
 }
 
+/* Option `delay_ms` makes every run busy-wait that long, so tests can check that run timing measures something. */
 static uairt_status create_engine(
     const uairt_option* options,
     size_t num_options,
     void** out_engine) {
-  (void)options;
-  (void)num_options;
-  *out_engine = malloc(1);
-  return *out_engine ? UAIRT_OK : UAIRT_ERR_OUT_OF_MEMORY;
+  long* delay_ms = calloc(1, sizeof(*delay_ms));
+  if (!delay_ms) {
+    return UAIRT_ERR_OUT_OF_MEMORY;
+  }
+  for (size_t i = 0; i < num_options; ++i) {
+    if (strcmp(options[i].key, "delay_ms") == 0 && options[i].value) {
+      *delay_ms = strtol(options[i].value, NULL, 10);
+    }
+  }
+  *out_engine = delay_ms;
+  return UAIRT_OK;
 }
 
 static void destroy_engine(void* engine) {
@@ -43,10 +52,14 @@ static void destroy_engine(void* engine) {
 
 static uairt_status
 load_model(void* engine, const uairt_model_source* source, void** out_model) {
-  (void)engine;
   (void)source;
-  *out_model = malloc(1);
-  return *out_model ? UAIRT_OK : UAIRT_ERR_OUT_OF_MEMORY;
+  long* delay_ms = malloc(sizeof(*delay_ms));
+  if (!delay_ms) {
+    return UAIRT_ERR_OUT_OF_MEMORY;
+  }
+  *delay_ms = *(const long*)engine;
+  *out_model = delay_ms;
+  return UAIRT_OK;
 }
 
 static void destroy_model(void* model) {
@@ -77,9 +90,16 @@ static uairt_status run(
     size_t num_inputs,
     uairt_tensor* outputs,
     size_t num_outputs) {
-  (void)model;
   (void)num_inputs;
   (void)num_outputs;
+  long delay_ms = *(const long*)model;
+  if (delay_ms > 0) {
+    struct timespec start, now;
+    timespec_get(&start, TIME_UTC);
+    do {
+      timespec_get(&now, TIME_UTC);
+    } while ((now.tv_sec - start.tv_sec) * 1000 + (now.tv_nsec - start.tv_nsec) / 1000000 < delay_ms);
+  }
   memcpy(outputs[0].data, inputs[0].data, REFERENCE_ELEMENTS * sizeof(float));
   return UAIRT_OK;
 }

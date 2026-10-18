@@ -282,7 +282,7 @@ static const uairt_backend_api g_api = {
     .run = run,
 };
 
-UAIRT_API const uairt_backend_api* uairt_backend_get_api(const uairt_host_api* host) {
+UAIRT_API const uairt_backend_api* UAIRT_BACKEND_ENTRY(const uairt_host_api* host) {
   g_host = host;
   return &g_api;
 }

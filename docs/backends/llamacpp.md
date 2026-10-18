@@ -75,6 +75,26 @@ uairt_session_logits(session, logits, vocab, &n);        /* pick a token, append
 device="gpu")`, then `model.generate(prompt, max_tokens=..., temperature=..., top_k=..., top_p=..., seed=...)`, or
 `model.tokenize`, `model.session()` and `session.logits()` for your own loop (`bindings/python/examples/llm_generate.py`).
 
+### Text completion
+
+`uairt_model_complete` takes a prompt and streams the answer to a callback, with the same options as the [llmserver](llmserver.md)
+backend (`max_tokens`, `temperature`, `top_p`, `seed`, `system`), so a program can switch between this backend and a server by
+changing the backend name. `examples/llm_complete.c` runs it: `llm_complete libuairt_backend_llamacpp.so llamacpp model.gguf "Name three colors." max_tokens=40`.
+
+- The prompt goes in as a user message (plus `system`, if given) through the model's own chat template; a model without one gets the
+  plain prompt. A template that llama.cpp's `llama_chat_apply_template` cannot apply returns `UAIRT_ERR_UNSUPPORTED`; use sessions
+  and format the prompt yourself.
+- With no `temperature`, or `temperature=0`, decoding is greedy. Above 0 it samples (`top_p`, then temperature, with `seed`; no seed
+  means a random one). Generation stops at an end-of-generation token, at `max_tokens`, or when the 2048-token context is full. A prompt
+  that does not fit the context returns `UAIRT_ERR_INVALID_ARGUMENT` before any work.
+- Each call builds its own context, so it keeps no history between calls and loads the prompt again every time. It does not touch
+  sessions you have open. Pieces handed to the callback never end inside a UTF-8 character.
+- Verified: `ctest` with `UAIRT_LLAMACPP_TEST_MODEL` set (Llama 3.2 1B Instruct Q4_0, Metal build): deterministic greedy output, seeded
+  sampling repeatable, the stop callback, option errors, the context limit, and no split multi-byte characters. Against Ollama serving
+  the same model through the `llmserver` backend (`max_tokens=40 temperature=0`): the text was identical for two of three prompts and
+  differed for a haiku prompt. The cause was not investigated; the two stacks may format the chat prompt differently or differ in
+  numerics. Other models, CUDA, Vulkan and the NPU paths were not run for this call.
+
 - `uairt_model_run` returns `UAIRT_ERR_UNSUPPORTED`: the backend is session-only.
 - `generate()` and `examples/llm_generate.c` do not stop at an end-of-generation token by themselves (the C API exposes no special-token ids); pass `stop_tokens` in Python, or limit the token count.
 - `uairt_model_tokenize` parses special tokens in the text (`<|eot_id|>` becomes a control token), as llama.cpp's own
@@ -90,6 +110,30 @@ device="gpu")`, then `model.generate(prompt, max_tokens=..., temperature=..., to
 - llama.cpp's logging is silenced except errors.
 - Sessions are independent: each has its own KV cache and context memory (about `n_ctx` times the model's per-token cache).
 
+## Chat models (for example Gemma 4)
+
+UAIRT does not apply chat templates: the application builds the prompt the way the model expects and stops on its end-of-turn
+token. Gemma 4 marks turns with `<|turn>` and `<turn|>` (token ids 105 and 106 in the Gemma 4 E2B vocabulary):
+
+```python
+import uairt
+
+prompt = "<|turn>user\nExplain in two sentences why the sky is blue.<turn|>\n<|turn>model\n"
+with uairt.AutoModel.from_file("gemma-4-E2B_q4_0-it.gguf", device="gpu") as model:
+    stop = model.tokenize("<turn|>", add_special=False).tolist()      # one id: the end of the model's turn
+    print("".join(model.generate(prompt, max_tokens=200, stop_tokens=stop)))
+```
+
+- **Where the template is.** Google's GGUF carries its chat template in the file (`tokenizer.chat_template`); llama.cpp's own
+  CLI applies it with `llama-completion --jinja -cnv`. With that template Gemma 4 first writes a reasoning phase
+  (`<|channel>thought ... <channel|>`) and then the answer, so allow enough tokens. The short prompt above has no system turn and
+  gets a direct answer. UAIRT has no Jinja engine: copy the layout from the model card or from the template.
+- **Use a text-only GGUF.** The loader rejects a file that holds tensors the text model does not use. A single-file multimodal
+  bundle, for example Ollama's `gemma4:e2b`, carries the vision and audio towers (`v.*`, `a.*`, `mm.*`) next to the text weights
+  and fails with `wrong number of tensors; expected 2012, got 601`. Use the model vendor's text GGUF, which ships the image and audio
+  parts as a separate `mmproj` file, for example Google's `google/gemma-4-E2B-it-qat-q4_0-gguf` on Hugging Face. UAIRT loads
+  the text model only; images and audio are not supported.
+
 ## Check
 
 `ctest --test-dir build --output-on-failure` runs the error-path tests and the symbol check. Set
@@ -97,6 +141,8 @@ device="gpu")`, then `model.generate(prompt, max_tokens=..., temperature=..., to
 `tests/compare_with_llamacpp.py`, which checks that greedy output equals llama.cpp's own `llama-completion` for the same
 model (it needs `UAIRT_BUILD_EXAMPLES=ON`, the default), on the CPU and with all layers offloaded (Metal on a Mac). `UAIRT_LLAMACPP_TEST_MODEL` is read when `cmake` configures, so set it before configuring (and reconfigure after changing it).
 Verified on macOS with an Apple M5 (Metal and the CPU path) with Llama 3.2 1B Q4.
+
+Also verified on the Apple M5 (Metal, 36 of 36 layers offloaded) with Google's `gemma-4-E2B_q4_0-it.gguf` (Gemma 4 E2B, Q4_0): UAIRT's `generate()` and `llama-completion` give the same text for the same prompt tokens. The Ollama bundle of the same model does not load (see above). Images and audio were not tested.
 
 Verified on Windows 11 ARM64 (Snapdragon X Elite) with Qwen3-0.6B Q8_0: the CPU build passes `ctest` including the comparison with
 `llama-completion`. The OpenCL build ran the model on the Adreno GPU (the process showed GPU engine use, none with `n_gpu_layers=0`)

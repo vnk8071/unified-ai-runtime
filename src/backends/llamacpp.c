@@ -377,6 +377,286 @@ static uairt_status reset(void* handle) {
   return UAIRT_OK;
 }
 
+#define OPTION_MAX_TOKENS "max_tokens"
+#define OPTION_TEMPERATURE "temperature"
+#define OPTION_TOP_P "top_p"
+#define OPTION_SEED "seed"
+#define OPTION_SYSTEM "system"
+#define COMPLETE_N_CTX 2048
+
+typedef struct {
+  const char* system;
+  long max_tokens; /* 0: until the context is full */
+  float temperature;
+  float top_p; /* 1: off */
+  uint32_t seed;
+  bool has_seed;
+} complete_options_t;
+
+static bool parse_number(const char* text, double min, double max, double* out) {
+  char* end = NULL;
+  errno = 0;
+  double value = strtod(text, &end);
+  if (end == text || *end || errno || !(value >= min && value <= max)) {
+    return false;
+  }
+  *out = value;
+  return true;
+}
+
+static uairt_status parse_complete_options(const uairt_option* options, size_t num_options, complete_options_t* out) {
+  *out = (complete_options_t){.top_p = 1.0f};
+  for (size_t i = 0; i < num_options; ++i) {
+    const char* key = options[i].key;
+    const char* value = options[i].value ? options[i].value : "";
+    double number = 0;
+    bool ok = true;
+    if (strcmp(key, OPTION_SYSTEM) == 0) {
+      out->system = value;
+    } else if (strcmp(key, OPTION_MAX_TOKENS) == 0) {
+      ok = parse_number(value, 1, INT_MAX, &number) && number == (long)number;
+      out->max_tokens = (long)number;
+    } else if (strcmp(key, OPTION_SEED) == 0) {
+      ok = parse_number(value, 0, INT_MAX, &number) && number == (long)number;
+      out->seed = (uint32_t)number;
+      out->has_seed = ok;
+    } else if (strcmp(key, OPTION_TEMPERATURE) == 0) {
+      ok = parse_number(value, 0, 2, &number);
+      out->temperature = (float)number;
+    } else if (strcmp(key, OPTION_TOP_P) == 0) {
+      ok = parse_number(value, 0, 1, &number) && number > 0;
+      out->top_p = (float)number;
+    } else {
+      fail("unknown option '%s'", key);
+      return UAIRT_ERR_INVALID_ARGUMENT;
+    }
+    if (!ok) {
+      fail("invalid value '%s' for option '%s'", value, key);
+      return UAIRT_ERR_INVALID_ARGUMENT;
+    }
+  }
+  return UAIRT_OK;
+}
+
+/*
+ * The text the model sees: the system and user messages through the model's own chat template, or the plain prompt for
+ * a model that has none (a base model). A template that llama.cpp cannot apply is an error, not a silent fallback.
+ * `*templated` tells the caller whether the text already carries its special tokens.
+ */
+static uairt_status build_prompt(
+    const model_t* model,
+    const char* prompt,
+    const char* system,
+    char** out_text,
+    bool* templated) {
+  const char* tmpl = llama_model_chat_template(model->model, NULL);
+  if (!tmpl) {
+    size_t system_len = system && *system ? strlen(system) + 2 : 0;
+    char* text = malloc(system_len + strlen(prompt) + 1);
+    if (!text) {
+      return UAIRT_ERR_OUT_OF_MEMORY;
+    }
+    text[0] = '\0';
+    if (system_len) {
+      strcpy(text, system);
+      strcat(text, "\n\n");
+    }
+    strcat(text, prompt);
+    *out_text = text;
+    *templated = false;
+    return UAIRT_OK;
+  }
+  struct llama_chat_message messages[2];
+  size_t count = 0;
+  if (system && *system) {
+    messages[count++] = (struct llama_chat_message){"system", system};
+  }
+  messages[count++] = (struct llama_chat_message){"user", prompt};
+  size_t capacity = 2 * (strlen(prompt) + (system ? strlen(system) : 0)) + 1024;
+  char* text = malloc(capacity);
+  if (!text) {
+    return UAIRT_ERR_OUT_OF_MEMORY;
+  }
+  int32_t n = llama_chat_apply_template(tmpl, messages, count, true, text, (int32_t)capacity);
+  if (n > (int32_t)capacity) {
+    char* grown = realloc(text, (size_t)n + 1);
+    if (!grown) {
+      free(text);
+      return UAIRT_ERR_OUT_OF_MEMORY;
+    }
+    text = grown;
+    n = llama_chat_apply_template(tmpl, messages, count, true, text, n + 1);
+  }
+  if (n < 0) {
+    free(text);
+    fail("llama.cpp cannot apply this model's chat template; use sessions with a prompt you format yourself");
+    return UAIRT_ERR_UNSUPPORTED;
+  }
+  text[n] = '\0';
+  *out_text = text;
+  *templated = true;
+  return UAIRT_OK;
+}
+
+/* Length of the longest prefix of `bytes` that does not end inside a UTF-8 character. */
+static size_t utf8_complete_prefix(const char* bytes, size_t len) {
+  size_t back = 0;
+  while (back < len && back < 3 && ((unsigned char)bytes[len - 1 - back] & 0xC0) == 0x80) {
+    ++back;
+  }
+  if (back == len) {
+    return len;
+  }
+  unsigned char lead = (unsigned char)bytes[len - 1 - back];
+  size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+  return back + 1 < need ? len - 1 - back : len;
+}
+
+static uairt_status complete(
+    void* handle,
+    const char* prompt,
+    const uairt_option* options,
+    size_t num_options,
+    uairt_text_callback callback,
+    void* user_data) {
+  const model_t* model = handle;
+  complete_options_t opts;
+  uairt_status status = parse_complete_options(options, num_options, &opts);
+  if (status != UAIRT_OK) {
+    return status;
+  }
+  char* text = NULL;
+  bool templated = false;
+  status = build_prompt(model, prompt, opts.system, &text, &templated);
+  if (status != UAIRT_OK) {
+    return status;
+  }
+  size_t text_len = strlen(text);
+  int32_t* tokens = NULL;
+  void* session_handle = NULL;
+  struct llama_sampler* sampler = NULL;
+  char* pending = NULL;
+
+  if (text_len > INT32_MAX) {
+    fail("prompt is too large");
+    status = UAIRT_ERR_INVALID_ARGUMENT;
+    goto done;
+  }
+  int32_t needed = -llama_tokenize(model->vocab, text, (int32_t)text_len, NULL, 0, !templated, true);
+  if (needed <= 0) {
+    fail("cannot tokenize the prompt");
+    status = UAIRT_ERR_INVALID_ARGUMENT;
+    goto done;
+  }
+  tokens = malloc((size_t)needed * sizeof(*tokens));
+  if (!tokens || llama_tokenize(model->vocab, text, (int32_t)text_len, tokens, needed, !templated, true) != needed) {
+    fail("cannot tokenize the prompt");
+    status = tokens ? UAIRT_ERR_RUNTIME : UAIRT_ERR_OUT_OF_MEMORY;
+    goto done;
+  }
+
+  uairt_option n_ctx_option = {"n_ctx", "2048"};
+  status = create_session((void*)model, &n_ctx_option, 1, &session_handle);
+  if (status != UAIRT_OK) {
+    goto done;
+  }
+  session_t* session = session_handle;
+  if ((size_t)needed >= session->n_ctx) {
+    fail("the prompt is %d tokens and the context holds %u; shorten it", needed, session->n_ctx);
+    status = UAIRT_ERR_INVALID_ARGUMENT;
+    goto done;
+  }
+  size_t budget = session->n_ctx - (size_t)needed;
+  if (opts.max_tokens && (size_t)opts.max_tokens < budget) {
+    budget = (size_t)opts.max_tokens;
+  }
+
+  struct llama_sampler_chain_params chain_params = llama_sampler_chain_default_params();
+  chain_params.no_perf = true;
+  sampler = llama_sampler_chain_init(chain_params);
+  if (!sampler) {
+    status = UAIRT_ERR_OUT_OF_MEMORY;
+    goto done;
+  }
+  if (opts.temperature > 0) {
+    if (opts.top_p < 1.0f) {
+      llama_sampler_chain_add(sampler, llama_sampler_init_top_p(opts.top_p, 1));
+    }
+    llama_sampler_chain_add(sampler, llama_sampler_init_temp(opts.temperature));
+    llama_sampler_chain_add(sampler, llama_sampler_init_dist(opts.has_seed ? opts.seed : LLAMA_DEFAULT_SEED));
+  } else {
+    llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
+  }
+
+  status = append(session, tokens, (size_t)needed);
+  if (status != UAIRT_OK) {
+    goto done;
+  }
+  size_t pending_len = 0;
+  size_t pending_cap = 64;
+  pending = malloc(pending_cap);
+  if (!pending) {
+    status = UAIRT_ERR_OUT_OF_MEMORY;
+    goto done;
+  }
+  for (size_t produced = 0; produced < budget; ++produced) {
+    llama_token token = llama_sampler_sample(sampler, session->ctx, -1);
+    if (llama_vocab_is_eog(model->vocab, token)) {
+      break;
+    }
+    char piece[256];
+    int32_t n = llama_token_to_piece(model->vocab, token, piece, sizeof(piece), 0, false);
+    if (n < 0) {
+      fail("a token is longer than %zu bytes", sizeof(piece));
+      status = UAIRT_ERR_RUNTIME;
+      goto done;
+    }
+    if (pending_len + (size_t)n > pending_cap) {
+      pending_cap = (pending_len + (size_t)n) * 2;
+      char* grown = realloc(pending, pending_cap);
+      if (!grown) {
+        status = UAIRT_ERR_OUT_OF_MEMORY;
+        goto done;
+      }
+      pending = grown;
+    }
+    memcpy(pending + pending_len, piece, (size_t)n);
+    pending_len += (size_t)n;
+    size_t ready = utf8_complete_prefix(pending, pending_len);
+    if (ready && callback(pending, ready, user_data) != 0) {
+      goto done;
+    }
+    memmove(pending, pending + ready, pending_len - ready);
+    pending_len -= ready;
+    llama_token next = token;
+    status = append(session, &next, 1);
+    if (status != UAIRT_OK) {
+      goto done;
+    }
+  }
+  if (pending_len) {
+    callback(pending, pending_len, user_data);
+  }
+
+done:
+  free(pending);
+  if (sampler) {
+    llama_sampler_free(sampler);
+  }
+  if (session_handle) {
+    destroy_session(session_handle);
+  }
+  free(tokens);
+  free(text);
+  return status;
+}
+
+static const uairt_text_api kText = {
+    .struct_size = sizeof(uairt_text_api),
+    .abi_version = UAIRT_TEXT_ABI_VERSION,
+    .complete = complete,
+};
+
 static const uairt_session_api kSession = {
     .struct_size = sizeof(uairt_session_api),
     .abi_version = UAIRT_SESSION_ABI_VERSION,
@@ -406,9 +686,10 @@ static const uairt_backend_api kApi = {
     .output_info = io_info,
     .run = run,
     .session = &kSession,
+    .text = &kText,
 };
 
-UAIRT_API const uairt_backend_api* uairt_backend_get_api(const uairt_host_api* host) {
+UAIRT_API const uairt_backend_api* UAIRT_BACKEND_ENTRY(const uairt_host_api* host) {
   g_host = host;
   return &kApi;
 }

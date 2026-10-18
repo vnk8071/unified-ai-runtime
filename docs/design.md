@@ -263,6 +263,15 @@ reports larger gains there), quantized models, models with dynamic shapes, and a
 CoreML backend on the same model (there is no ONNX to CoreML conversion path here). The README
 figures for the provider are the authors' own and were not reproduced.
 
+## Language model servers
+
+The `llmserver` backend (Ollama, LM Studio, SGLang) does not fit the session API: those servers take text and return text, and
+none of them offers per-step logits or a tokenizer that is stable across the three. Faking logits would be wrong, so the plugin ABI
+got a second optional capability, `uairt_text_api` (`complete`, streamed text through a callback), appended after `session` and read
+only when `struct_size` covers it, so older plugins still load. `llamacpp` provides the same call, so a local GGUF model and a server can be used through one API. The `llmserver` backend only attaches to a server that is already running; it
+never starts or installs one. It uses libcurl and a small JSON reader in the plugin. Models are names on the server, so the
+"verify against the vendor tool" step compares with a direct request to the same server, not with a device run.
+
 ## Not in v1
 
 Asynchronous execution, dynamic shapes, per-channel quantization, profiling hooks,
@@ -283,6 +292,18 @@ clear message instead of falling back silently.
 | M2 | QNN backend, CPU backend, DLC models | A 9.9 MB uint8 detection DLC on a QCS6490 gives byte-identical outputs to `qnn-net-run` (done). Context binaries come with M3 |
 | M3 | QNN HTP on a Snapdragon device, ORT QNN EP | HTP context binary on a QCS6490 NPU: 49/49 outputs byte-identical to `qnn-net-run`, latency within noise of it, and ~5% faster with DMABUF zero-copy (done for QNN). ORT QNN EP not done |
 | M4 | CoreML, TensorRT, docs, public release | CoreML: outputs identical to `MLModel.predict` on three models, ANE ~1.8x faster than CPU on a small net (done). TensorRT needs an NVIDIA device (todo). Docs and release (todo) |
+
+## Proposed, not started: mobile and edge
+
+None of this is built or scheduled; it records gaps found by reading the code, so the next person does not repeat the search.
+Out of scope here: quantization (done at export time by the vendor tool; UAIRT runs the dtype the model declares) and
+detokenizing language model output (`uairt_model_tokenize` and `uairt_model_detokenize` exist).
+
+| Candidate | Today | Gap | First step, and the evidence it needs |
+|---|---|---|---|
+| iOS and Android apps | Backends are `MODULE` plugins loaded with `dlopen` at run time, or, for CoreML, a static library (`-DUAIRT_BUILD_STATIC_BACKENDS=ON` or `-DUAIRT_STATIC_BACKENDS_ONLY=ON`) registered with `uairt_register_backend(uairt_backend_get_api_coreml)`; every backend source defines its entry as `UAIRT_BACKEND_ENTRY`, so the same can be done for the others. The CoreML static build compiles and links for iPhoneOS and the iOS simulator and passes its registration test on macOS. QNN is built on the target device (see above), and there is no NDK build | Running it in an iOS app on a device (a simulator does not use the Neural Engine), a static target for the other backends (llama.cpp is the one an app most wants; it needs its ggml libraries linked too), and an Android build with the NDK | Run a CoreML model through the static build in an iOS app on a device. Then a static llama.cpp target, and an NDK build of the core with a static backend. No vendor SDK in the repository |
+| Latency and power reporting | Per-run wall-clock timing is done: `uairt_model_run_stats`, measured by the core around the backend run call, so the plugin ABI is unchanged (see `docs/api.md`). `run_model` still prints `init_ms` and `latency_ms` from its own loop | Device-side time (a vendor profiler: QNN profile handles, CUDA events, Core ML performance reports) and power. Timing of the text calls and of sessions | A vendor figure would be an optional appended plugin field, and only for a backend where a run shows it agrees with the vendor tool. Power needs a measured source per device, otherwise report nothing |
+| Post-processing helpers (detection box decode and NMS) | Only `bindings/python/examples/detect_tensorrt.py` does it, in Python | UAIRT's scope is running artifacts, and models differ in output layout | Keep it outside the core ABI, as an example or a separate optional library, and only for layouts that a tested model produces |
 
 ## Prior art to read
 

@@ -1,9 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 200809L /* clock_gettime under -std=c11 */
+#endif
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "internal.h"
 
@@ -35,7 +39,22 @@ struct uairt_model {
   void* handle;
   size_t num_inputs;
   size_t num_outputs;
+  uairt_run_stats stats;
 };
+
+static uint64_t now_ns(void) {
+#if defined(_WIN32)
+  LARGE_INTEGER freq, now;
+  QueryPerformanceFrequency(&freq);
+  QueryPerformanceCounter(&now);
+  return (uint64_t)(now.QuadPart / freq.QuadPart) * 1000000000ull +
+         (uint64_t)(now.QuadPart % freq.QuadPart) * 1000000000ull / (uint64_t)freq.QuadPart;
+#else
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+#endif
+}
 
 struct uairt_buffer {
   uairt_engine* engine;
@@ -150,6 +169,10 @@ static const uairt_session_api* session_of(const uairt_backend_api* api) {
   return api->struct_size >= offsetof(uairt_backend_api, session) + sizeof(api->session) ? api->session : NULL;
 }
 
+static const uairt_text_api* text_of(const uairt_backend_api* api) {
+  return api->struct_size >= offsetof(uairt_backend_api, text) + sizeof(api->text) ? api->text : NULL;
+}
+
 static const char* missing_session_entry(const uairt_session_api* sessions) {
   if (sessions->struct_size < sizeof(*sessions)) {
     return "struct_size";
@@ -220,6 +243,11 @@ static uairt_status register_locked(uairt_backend_get_api_fn get_api) {
       uairt_set_error("backend '%s': session API is incomplete (%s)", api->name, missing);
       return UAIRT_ERR_INCOMPATIBLE_MODEL;
     }
+  }
+  const uairt_text_api* text = text_of(api);
+  if (text && (text->struct_size < sizeof(*text) || text->abi_version != UAIRT_TEXT_ABI_VERSION || !text->complete)) {
+    uairt_set_error("backend '%s': text API is incomplete", api->name);
+    return UAIRT_ERR_INCOMPATIBLE_MODEL;
   }
   for (size_t i = 0; i < g_backend_count; ++i) {
     if (strcmp(g_backends[i]->name, api->name) == 0) {
@@ -512,7 +540,35 @@ uairt_status uairt_model_run(
       return status;
     }
   }
-  return model->api->run(model->handle, inputs, num_inputs, outputs, num_outputs);
+  uint64_t start = now_ns();
+  uairt_status status = model->api->run(model->handle, inputs, num_inputs, outputs, num_outputs);
+  if (status == UAIRT_OK) {
+    uairt_run_stats* stats = &model->stats;
+    uint64_t elapsed = now_ns() - start;
+    stats->last_ns = elapsed;
+    stats->total_ns += elapsed;
+    stats->min_ns = stats->runs == 0 || elapsed < stats->min_ns ? elapsed : stats->min_ns;
+    stats->max_ns = elapsed > stats->max_ns ? elapsed : stats->max_ns;
+    ++stats->runs;
+  }
+  return status;
+}
+
+uairt_status uairt_model_run_stats(const uairt_model* model, uairt_run_stats* out) {
+  if (!model || !out || out->struct_size < offsetof(uairt_run_stats, runs) + sizeof(out->runs)) {
+    uairt_set_error("invalid argument to uairt_model_run_stats");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  uairt_run_stats full = model->stats;
+  full.struct_size = out->struct_size < sizeof(full) ? out->struct_size : (uint32_t)sizeof(full);
+  memcpy(out, &full, full.struct_size);
+  return UAIRT_OK;
+}
+
+void uairt_model_reset_run_stats(uairt_model* model) {
+  if (model) {
+    memset(&model->stats, 0, sizeof(model->stats));
+  }
 }
 
 uairt_status uairt_buffer_alloc(
@@ -725,4 +781,23 @@ uairt_status uairt_session_reset(uairt_session* session) {
     return UAIRT_ERR_INVALID_ARGUMENT;
   }
   return session->sessions->reset(session->handle);
+}
+
+uairt_status uairt_model_complete(
+    uairt_model* model,
+    const char* prompt,
+    const uairt_option* options,
+    size_t num_options,
+    uairt_text_callback callback,
+    void* user_data) {
+  if (!model || !prompt || !callback || (num_options && !options)) {
+    uairt_set_error("invalid argument to uairt_model_complete");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  const uairt_text_api* text = text_of(model->api);
+  if (!text) {
+    uairt_set_error("backend '%s' has no text completion support", model->api->name);
+    return UAIRT_ERR_UNSUPPORTED;
+  }
+  return text->complete(model->handle, prompt, options, num_options, callback, user_data);
 }

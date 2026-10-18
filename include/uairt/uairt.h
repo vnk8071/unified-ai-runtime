@@ -169,6 +169,27 @@ UAIRT_API uairt_status uairt_model_run(
     size_t num_outputs);
 
 /*
+ * Wall-clock time of the backend's run call, measured by the core around every successful uairt_model_run on this
+ * model, from a monotonic clock, in nanoseconds. It excludes the core's argument checks, and with it any time the
+ * backend spends before or after its own run call; it includes everything the backend does inside it (copies in and
+ * out, and the wait for an NPU or GPU). Failed runs are not counted. It is not device time: whether a device-side
+ * figure exists depends on the vendor, and none is reported here. `struct_size` is set by the caller; only fields
+ * that fit in it are written.
+ */
+typedef struct uairt_run_stats {
+  uint32_t struct_size;
+  uint64_t runs;
+  uint64_t last_ns;
+  uint64_t total_ns;
+  uint64_t min_ns; /* 0 while runs is 0 */
+  uint64_t max_ns;
+} uairt_run_stats;
+
+/* Same threading rule as uairt_model_run: do not call these while another thread runs the model. */
+UAIRT_API uairt_status uairt_model_run_stats(const uairt_model* model, uairt_run_stats* out);
+UAIRT_API void uairt_model_reset_run_stats(uairt_model* model);
+
+/*
  * Language models: the vocabulary calls and sessions work on models whose backend supports them (llamacpp) and return
  * UAIRT_ERR_UNSUPPORTED otherwise. Where a call fills a buffer, a `capacity` that is too small returns
  * UAIRT_ERR_INVALID_ARGUMENT and still sets the out count to the size needed, so capacity 0 sizes a buffer.
@@ -214,6 +235,22 @@ UAIRT_API uairt_status
 uairt_session_logits(const uairt_session* session, float* out, size_t capacity, size_t* out_count);
 UAIRT_API uairt_status uairt_session_position(const uairt_session* session, size_t* out_position);
 UAIRT_API uairt_status uairt_session_reset(uairt_session* session);
+
+/*
+ * Text completion for backends that serve a language model over text (llmserver) and return UAIRT_ERR_UNSUPPORTED
+ * for the others. `callback` receives each piece of generated text (UTF-8, not NUL terminated, `len` bytes) in order;
+ * returning non-zero stops the generation and the call still returns UAIRT_OK. Options are the backend's own (see its
+ * page); unknown keys return UAIRT_ERR_INVALID_ARGUMENT. Not tied to a session: each call is independent.
+ */
+typedef int (*uairt_text_callback)(const char* text, size_t len, void* user_data);
+
+UAIRT_API uairt_status uairt_model_complete(
+    uairt_model* model,
+    const char* prompt,
+    const uairt_option* options,
+    size_t num_options,
+    uairt_text_callback callback,
+    void* user_data);
 
 #ifdef __cplusplus
 }

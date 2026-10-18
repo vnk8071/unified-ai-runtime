@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Unified AI Runtime (UAIRT)
 
-One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML, llama.cpp (GGUF language models), TensorRT (NVIDIA GPUs), OpenVINO (Intel) and NCNN (CPU and Vulkan GPUs).
+One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML, llama.cpp (GGUF language models), TensorRT (NVIDIA GPUs), OpenVINO (Intel), NCNN (CPU and Vulkan GPUs), and language model servers (Ollama, LM Studio, SGLang).
 Write the application code once; choose the backend by name when you create an engine.
 
 ```c
@@ -76,7 +76,8 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 | QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy; compiled-context cache | Qualcomm QCS6490 and QCS8550, and Windows 11 ARM64 on a Snapdragon X Elite NPU; byte-identical to `qnn-net-run` |
 | TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench` |
 | CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O, image inputs | Apple M5; identical to CoreML itself |
-| llama.cpp | `.gguf`; sessions (tokenize, append, logits); `device` picks a llama.cpp device (`CUDA0`, `Vulkan0`, `GPUOpenCL`, `HTP0`) | Apple M5 (Metal); Ubuntu 24.04 x86_64 RTX 3060 (CUDA and Vulkan); Windows 11 ARM64 Snapdragon X Elite (CPU, OpenCL on the Adreno GPU, Hexagon NPU as `HTP0`). `ctest` compares with llama.cpp's own greedy output; some GPU and NPU outputs differ from the CPU's after a few tokens (see [docs/backends/llamacpp.md](docs/backends/llamacpp.md)) |
+| llama.cpp | `.gguf`; sessions (tokenize, append, logits); text completion (`uairt_model_complete`); `device` picks a llama.cpp device (`CUDA0`, `Vulkan0`, `GPUOpenCL`, `HTP0`) | Apple M5 (Metal); Ubuntu 24.04 x86_64 RTX 3060 (CUDA and Vulkan); Windows 11 ARM64 Snapdragon X Elite (CPU, OpenCL on the Adreno GPU, Hexagon NPU as `HTP0`). `ctest` compares with llama.cpp's own greedy output; some GPU and NPU outputs differ from the CPU's after a few tokens (see [docs/backends/llamacpp.md](docs/backends/llamacpp.md)) |
+| LLM servers | Ollama, LM Studio, SGLang through one `llmserver` backend (attach to a running server over HTTP; text in, streamed text out; no tensors or sessions) | macOS arm64 with Ollama only: output identical to a direct request to the server. LM Studio and SGLang untested (see [docs/backends/llmserver.md](docs/backends/llmserver.md)) |
 | OpenVINO | IR (`.xml` + `.bin`) and `.onnx`, static shapes; any OpenVINO device | an Intel Core CPU, and an x64 build under emulation on a Snapdragon X Elite laptop (there is no Windows ARM64 OpenVINO); bit-identical to OpenVINO's Python API. GPU and NPU devices untested |
 | NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan (matches NCNN's Python API); a Snapdragon X Elite laptop, CPU and Adreno GPU through Vulkan, same detections |
 | whisper.cpp | ggml `.bin` Whisper models; audio in (float32 PCM, 16 kHz), UTF-8 text out; CPU and Metal | Apple M5, `tiny.en`: transcript equal to `whisper-cli` on both CPU and Metal. Other models, CUDA and Vulkan untested |
@@ -252,8 +253,8 @@ ONNX Runtime plugin is on PyPI (`pip install "uairt[onnxruntime]"`; see [docs/re
 ## Documentation
 
 - [docs/api.md](docs/api.md): every function, status codes, options, tested configurations
-- [docs/writing-a-backend.md](docs/writing-a-backend.md): the plugin ABI and how to add a backend
 - [examples/notebooks/](examples/notebooks/README.md): a notebook with one runnable example per backend, and a Google Colab notebook that runs TensorRT on a GPU
+- [docs/writing-a-backend.md](docs/writing-a-backend.md): the plugin ABI and how to add a backend
 - [docs/design.md](docs/design.md): design decisions, per-backend notes, measurements
 - [docs/LICENSING.md](docs/LICENSING.md): how vendor licenses shape this repository
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md)

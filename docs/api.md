@@ -114,7 +114,9 @@ such order, so its inputs and outputs are sorted by name.
 | ExecuTorch | `executorch` | `.pte` (path only), tensor I/O, static shapes, contiguous | `method` (default `forward`), `num_threads` | host |
 | TensorRT | `tensorrt` | serialized engine `.engine` / `.plan` (ultralytics exports load as is), static shapes | `device` (CUDA device index) | host, pinned |
 | CoreML | `coreml` | `.mlmodelc`, `.mlpackage`, `.mlmodel` (path only), multi-array I/O and fixed-size image inputs (uint8 `[1,H,W,C]`), static shapes | `compute_units`: `all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne` | host |
-| llama.cpp | `llamacpp` | `.gguf` (path only), session API instead of `run` | `n_gpu_layers`, `device` (a llama.cpp device name such as `CUDA0`, `Vulkan0`, `GPUOpenCL` or `HTP0`; an unknown name fails at model load) | host |
+| llama.cpp | `llamacpp` | `.gguf` (path only), session API and text completion instead of `run` | `n_gpu_layers`, `device` (a llama.cpp device name such as `CUDA0`, `Vulkan0`, `GPUOpenCL` or `HTP0`; an unknown name fails at model load) | host |
+| LLM server | `llmserver` | a model name on a running Ollama, LM Studio or SGLang server (`path` only), text API instead of `run` | `preset` or `base_url` (one required), `api_key`, `timeout_s` | host |
+| LLM server | `llmserver` | a model name on a running Ollama, LM Studio or SGLang server (`path` only), text API instead of `run` | `preset` or `base_url` (one required), `api_key`, `timeout_s` | host |
 
 \* required. Backends other than `reference` are separate plugins: load
 `libuairt_backend_<name>` with `uairt_load_backend_library` first.
@@ -166,3 +168,22 @@ logits, position, reset, destroy) are in `uairt/uairt.h`. They work on models wh
 (`llamacpp`) and return `UAIRT_ERR_UNSUPPORTED` for the others. A too-small buffer returns
 `UAIRT_ERR_INVALID_ARGUMENT` with the size needed in the out count. Backends provide the table through the optional
 `session` field at the end of `uairt_backend_api` (see `uairt/uairt_backend.h`).
+
+## Text completion (language model servers)
+
+`uairt_model_complete(model, prompt, options, num_options, callback, user_data)` sends one prompt and calls `callback` with each
+piece of generated text as it arrives; a non-zero return stops the generation and the call still returns `UAIRT_OK`. It works on
+models whose backend has a text table (`llmserver`, `llamacpp`) and returns `UAIRT_ERR_UNSUPPORTED` for the others. The options are the
+backend's (`max_tokens`, `temperature`, `top_p`, `seed`, `system` for `llmserver` and `llamacpp`); an unknown key is `UAIRT_ERR_INVALID_ARGUMENT`.
+Backends provide the table through the optional `text` field at the end of `uairt_backend_api`, after `session`.
+
+## Run timing
+
+`uairt_model_run_stats(model, &stats)` (set `stats.struct_size = sizeof(stats)`) returns, for the successful `uairt_model_run`
+calls since the model was created or `uairt_model_reset_run_stats` was called: `runs`, `last_ns`, `total_ns`, `min_ns` and
+`max_ns`. The core measures them with a monotonic clock around the backend's own run call, so the figure is host wall-clock time:
+it includes the copies the backend makes and the wait for the NPU or GPU, and excludes the core's argument checks and any time
+before or after the call. It is not device time and it is not power; no backend reports either. Runs the core rejects, and failed
+runs, are not counted. Use the calls under the same rule as `uairt_model_run` (not while another thread runs the model). Python:
+`model.run_stats()` (a `RunStats` with `runs`, `last_ns`, `total_ns`, `min_ns`, `max_ns`, `mean_ms`) and `model.reset_run_stats()`.
+The text calls and sessions are not timed.

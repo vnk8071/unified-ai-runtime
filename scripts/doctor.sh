@@ -293,6 +293,14 @@ else
   report skip "llamacpp: run git submodule update --init third_party/llama.cpp (or set UAIRT_LLAMACPP_ROOT)"
 fi
 
+if have pkg-config && pkg-config --exists libcurl 2>/dev/null; then
+  report ok "llmserver: libcurl $(pkg-config --modversion libcurl); the servers (Ollama, LM Studio, SGLang) are yours to start"
+elif have curl-config; then
+  report ok "llmserver: libcurl $(curl-config --version | awk '{print $2}'); the servers (Ollama, LM Studio, SGLang) are yours to start"
+else
+  report skip "llmserver: libcurl development files not found (libcurl4-openssl-dev on Debian and Ubuntu)"
+fi
+
 if [[ "$(uname -s)" == "Darwin" ]]; then
   if have xcrun; then
     sdk="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"

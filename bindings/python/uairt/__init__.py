@@ -12,7 +12,7 @@ Backend plugins are found on UAIRT_PLUGIN_PATH, in the package's plugins/ direct
 when an engine asks for them; uairt.load_backend_library(path) still loads one by path.
 """
 from ._core import (  # noqa: F401
-    Buffer, Engine, Model, Session, TensorInfo, UairtError, backends, load_backend_library, version,
+    Buffer, Engine, Model, RunStats, Session, TensorInfo, UairtError, backends, load_backend_library, version,
     InvalidArgument, NotFound, Unsupported, BackendUnavailable, IncompatibleModel, OutOfMemory, RuntimeFailure,
     VersionMismatch, IoFailure,
 )
@@ -21,7 +21,7 @@ from ._generate import generate  # noqa: F401
 from ._plugins import discover_plugins, ensure_backend, find_plugin, plugin_dirs  # noqa: F401
 
 __all__ = [
-    "Buffer", "Engine", "Model", "Session", "generate", "TensorInfo", "UairtError", "backends", "load_backend_library", "version",
+    "Buffer", "Engine", "Model", "RunStats", "Session", "generate", "TensorInfo", "UairtError", "backends", "load_backend_library", "version",
     "AutoModel", "Plan", "available_backends", "load", "resolve", "discover_plugins", "ensure_backend", "find_plugin",
     "plugin_dirs",
 ]

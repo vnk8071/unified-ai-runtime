@@ -74,6 +74,92 @@ static char* detokenize_all(const uairt_model* model, const int32_t* tokens, siz
   return text;
 }
 
+typedef struct {
+  char text[8192];
+  size_t pieces;
+  size_t stop_after; /* 0: never */
+} collector_t;
+
+static int collect(const char* text, size_t len, void* user_data) {
+  collector_t* c = user_data;
+  size_t used = strlen(c->text);
+  if (used + len < sizeof(c->text)) {
+    memcpy(c->text + used, text, len);
+    c->text[used + len] = '\0';
+  }
+  ++c->pieces;
+  return c->stop_after && c->pieces >= c->stop_after;
+}
+
+static uairt_status complete_with(uairt_model* model, const char* prompt, const uairt_option* options, size_t n,
+                                  collector_t* out, size_t stop_after) {
+  memset(out, 0, sizeof(*out));
+  out->stop_after = stop_after;
+  return uairt_model_complete(model, prompt, options, n, collect, out);
+}
+
+static void test_complete(uairt_model* model) {
+  collector_t a, b;
+  uairt_option greedy[] = {{"max_tokens", "24"}, {"temperature", "0"}};
+  CHECK(complete_with(model, "Name three colors.", greedy, 2, &a, 0) == UAIRT_OK);
+  CHECK(a.text[0] != '\0' && a.pieces >= 1 && a.pieces <= 24);
+  CHECK(complete_with(model, "Name three colors.", greedy, 2, &b, 0) == UAIRT_OK);
+  CHECK(strcmp(a.text, b.text) == 0);
+
+  /* No options is greedy, the same as temperature 0. */
+  uairt_option cap[] = {{"max_tokens", "24"}};
+  CHECK(complete_with(model, "Name three colors.", cap, 1, &b, 0) == UAIRT_OK);
+  CHECK(strcmp(a.text, b.text) == 0);
+
+  uairt_option seeded[] = {{"max_tokens", "16"}, {"temperature", "0.8"}, {"top_p", "0.9"}, {"seed", "3"}};
+  CHECK(complete_with(model, "Tell me a story.", seeded, 4, &a, 0) == UAIRT_OK);
+  CHECK(complete_with(model, "Tell me a story.", seeded, 4, &b, 0) == UAIRT_OK);
+  CHECK(a.text[0] != '\0' && strcmp(a.text, b.text) == 0);
+
+  uairt_option system[] = {{"max_tokens", "16"}, {"system", "Answer in French."}};
+  CHECK(complete_with(model, "Hello!", system, 2, &a, 0) == UAIRT_OK && a.text[0] != '\0');
+
+  uairt_option longer[] = {{"max_tokens", "40"}};
+  CHECK(complete_with(model, "Write a long story about a dragon.", longer, 1, &a, 2) == UAIRT_OK);
+  CHECK(a.pieces == 2);
+
+  /* A multi-byte character is never split between two pieces. */
+  uairt_option unicode[] = {{"max_tokens", "40"}};
+  CHECK(complete_with(model, "Say hello in Japanese and Chinese.", unicode, 1, &a, 0) == UAIRT_OK);
+  size_t i = 0, len = strlen(a.text);
+  while (i < len) {
+    unsigned char c = (unsigned char)a.text[i];
+    size_t n = c < 0x80 ? 1 : c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 0;
+    CHECK(n != 0 && i + n <= len);
+    i += n ? n : 1;
+  }
+
+  uairt_option zero[] = {{"max_tokens", "0"}};
+  uairt_option hot[] = {{"temperature", "3"}};
+  uairt_option word[] = {{"temperature", "warm"}};
+  uairt_option no_top_p[] = {{"top_p", "0"}};
+  uairt_option negative[] = {{"seed", "-1"}};
+  uairt_option unknown[] = {{"mirostat", "1"}};
+  const uairt_option* invalid[] = {zero, hot, word, no_top_p, negative, unknown};
+  for (size_t k = 0; k < sizeof(invalid) / sizeof(invalid[0]); ++k) {
+    CHECK(complete_with(model, "hi", invalid[k], 1, &a, 0) == UAIRT_ERR_INVALID_ARGUMENT);
+    CHECK(a.pieces == 0);
+  }
+  CHECK(uairt_model_complete(model, NULL, NULL, 0, collect, &a) == UAIRT_ERR_INVALID_ARGUMENT);
+  CHECK(uairt_model_complete(model, "hi", NULL, 0, NULL, &a) == UAIRT_ERR_INVALID_ARGUMENT);
+
+  /* A prompt that does not fit the 2048-token context is refused before any work. */
+  size_t big_len = 20000;
+  char* big = malloc(big_len + 1);
+  for (size_t k = 0; k < big_len; ++k) {
+    big[k] = k % 2 ? ' ' : 'a';
+  }
+  big[big_len] = '\0';
+  CHECK(complete_with(model, big, NULL, 0, &a, 0) == UAIRT_ERR_INVALID_ARGUMENT);
+  CHECK(strstr(uairt_last_error(), "context") != NULL);
+  free(big);
+}
+
 static void test_model(const char* model_path) {
   uairt_engine* engine = NULL;
   uairt_option cpu = {"n_gpu_layers", "0"};
@@ -87,6 +173,7 @@ static void test_model(const char* model_path) {
   }
   CHECK(uairt_model_num_inputs(model) == 0 && uairt_model_num_outputs(model) == 0);
   CHECK(uairt_model_run(model, NULL, 0, NULL, 0) == UAIRT_ERR_UNSUPPORTED);
+  test_complete(model);
 
   size_t vocab = 0;
   CHECK(uairt_model_vocab_size(model, &vocab) == UAIRT_OK && vocab > 1000);
