@@ -1,43 +1,87 @@
 {
   "version": 3,
-  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "windows-base",
       "hidden": true,
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/build-${presetName}",
-      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     },
     {
       "name": "windows-arm64-debug",
       "displayName": "Windows ARM64, Debug",
       "inherits": "windows-base",
-      "architecture": { "value": "ARM64", "strategy": "set" }
+      "architecture": {
+        "value": "ARM64",
+        "strategy": "set"
+      }
     },
     {
       "name": "windows-x64-debug",
       "displayName": "Windows x64, Debug",
       "inherits": "windows-base",
-      "architecture": { "value": "x64", "strategy": "set" }
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      }
+    },
+    {
+      "name": "android-arm64",
+      "displayName": "Android arm64-v8a (NDK), Release",
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "toolchainFile": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
+      "cacheVariables": {
+        "ANDROID_ABI": "arm64-v8a",
+        "ANDROID_PLATFORM": "android-29",
+        "ANDROID_STL": "none",
+        "BUILD_SHARED_LIBS": "ON",
+        "CMAKE_BUILD_TYPE": "Release",
+        "UAIRT_BUILD_EXAMPLES": "ON"
+      }
     }
   ],
   "buildPresets": [
-    { "name": "windows-arm64-debug", "configurePreset": "windows-arm64-debug", "configuration": "Debug" },
-    { "name": "windows-x64-debug", "configurePreset": "windows-x64-debug", "configuration": "Debug" }
+    {
+      "name": "windows-arm64-debug",
+      "configurePreset": "windows-arm64-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-x64-debug",
+      "configurePreset": "windows-x64-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "android-arm64",
+      "configurePreset": "android-arm64"
+    }
   ],
   "testPresets": [
     {
       "name": "windows-arm64-debug",
       "configurePreset": "windows-arm64-debug",
       "configuration": "Debug",
-      "output": { "outputOnFailure": true }
+      "output": {
+        "outputOnFailure": true
+      }
     },
     {
       "name": "windows-x64-debug",
       "configurePreset": "windows-x64-debug",
       "configuration": "Debug",
-      "output": { "outputOnFailure": true }
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

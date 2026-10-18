@@ -43,11 +43,24 @@ uairt_status uairt_loader_open(const char* path, uairt_backend_get_api_fn* out) 
     dlclose(handle);
     return UAIRT_ERR_INCOMPATIBLE_MODEL;
   }
-  /* Opt-in: reopening an already loaded library with RTLD_GLOBAL promotes it. */
-  if (dlsym(handle, UAIRT_BACKEND_GLOBAL_SYMBOLS_SYMBOL) && !dlopen(path, RTLD_NOW | RTLD_GLOBAL)) {
-    uairt_set_error("dlopen with RTLD_GLOBAL failed: %s", dlerror());
+  if (dlsym(handle, UAIRT_BACKEND_GLOBAL_SYMBOLS_SYMBOL)) {
+    /* Opt-in: reopening an already loaded library with RTLD_GLOBAL promotes it. Android's linker applies RTLD_GLOBAL only to
+     * the first load, so there the library is unloaded and loaded again (its constructors run twice). */
+#if defined(__ANDROID__)
     dlclose(handle);
-    return UAIRT_ERR_IO;
+    handle = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
+    symbol = handle ? dlsym(handle, UAIRT_BACKEND_ENTRY_SYMBOL) : NULL;
+    if (!symbol) {
+      uairt_set_error("dlopen with RTLD_GLOBAL failed: %s", dlerror());
+      return UAIRT_ERR_IO;
+    }
+#else
+    if (!dlopen(path, RTLD_NOW | RTLD_GLOBAL)) {
+      uairt_set_error("dlopen with RTLD_GLOBAL failed: %s", dlerror());
+      dlclose(handle);
+      return UAIRT_ERR_IO;
+    }
+#endif
   }
   memcpy(out, &symbol, sizeof(symbol));
   return UAIRT_OK;

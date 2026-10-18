@@ -150,6 +150,11 @@ First public version. Pre-1.0: the API and ABI may change.
   provider. Verified with the MLX provider on an Apple M5: ResNet50 at batch 8 ran 3.1 to 3.2 times faster than
   the CPU EP with the same outputs; MobileNetV2 at batch 1 showed no gain.
 
+### Added (Android)
+- NDK build (`cmake --preset android-arm64`) for `arm64-v8a`; checked on a Qualcomm device, including llama.cpp against `llama-completion`.
+- The plugin loader reloads an opt-in (`uairt_backend_global_symbols`) plugin with `RTLD_GLOBAL` on Android, whose linker ignores `RTLD_GLOBAL` when
+  reopening a loaded library.
+
 ### Added (generation)
 - `libuairt_llm` (`uairt/uairt_llm.h`): sampling (temperature, top-k, top-p, seed) and a streaming generation loop over the session
   API, for any backend that has sessions, stopping where the model ends its text. `examples/llm_stream.c`, and C++, Python and Rust

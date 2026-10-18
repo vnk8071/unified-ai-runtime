@@ -24,6 +24,13 @@ option(UAIRT_BUILD_REFERENCE_BACKEND "Build the test-only reference backend" ON)
 
 find_package(Threads REQUIRED)
 
+# The C++ binding test and the C++ examples use the standard library; an Android build with ANDROID_STL=none has none.
+if(ANDROID AND ANDROID_STL STREQUAL "none")
+  set(UAIRT_HAVE_CXX_STDLIB OFF)
+else()
+  set(UAIRT_HAVE_CXX_STDLIB ON)
+endif()
+
 # The core is C++17 behind a C11 API: the public headers, the plugin ABI and every symbol the library exports stay C. It uses no exceptions, RTTI,
 # STL or operator new, so it needs no C++ runtime library, and it is linked with the C driver so none is added: C callers and plugins see the same
 # dependencies as before. The reference backend stays C, as it is also the template for writing a plugin.
@@ -729,7 +736,7 @@ if(UAIRT_BUILD_TESTS)
 
   include(CheckLanguage)
   check_language(CXX)
-  if(CMAKE_CXX_COMPILER)
+  if(CMAKE_CXX_COMPILER AND UAIRT_HAVE_CXX_STDLIB)
     enable_language(CXX)
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -794,6 +801,6 @@ if(SKBUILD)
   endif()
 endif()
 
-if(UAIRT_BUILD_EXAMPLES)
+if(UAIRT_BUILD_EXAMPLES AND UAIRT_HAVE_CXX_STDLIB)
   add_subdirectory(examples/cpp)
 endif()

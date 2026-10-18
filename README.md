@@ -221,6 +221,24 @@ cmake --build --preset windows-arm64-debug
 ctest --preset windows-arm64-debug
 ```
 
+### Android (NDK)
+
+The core, the plugin loader and the C tests cross-compile with the Android NDK (r30 tested) for `arm64-v8a`; plugins are ordinary shared
+libraries, so `dlopen` works as on Linux. With `ANDROID_STL=none` (the preset) `libuairt.so` depends only on `libdl`, `libm` and `libc`.
+
+```bash
+export ANDROID_NDK_HOME=/opt/homebrew/share/android-ndk       # wherever the NDK is
+cmake --preset android-arm64 && cmake --build --preset android-arm64
+adb push build-android-arm64/{libuairt.so,libuairt_llm.so,test_core,uairt_reference_plugin.so} /data/local/tmp/uairt/
+adb shell 'cd /data/local/tmp/uairt && LD_LIBRARY_PATH=. ./test_core uairt_reference_plugin.so'
+```
+
+The C++ binding and examples need the C++ library: build with `-DANDROID_STL=c++_static` and push the NDK's `libc++_shared.so` next to them (the core then
+depends on it too). For llama.cpp add `-DUAIRT_BUILD_LLAMACPP=ON -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_CPU_ARM_ARCH=armv8.6-a+dotprod+i8mm`
+(drop the `+i8mm` part on a CPU without it; check `Features` in `/proc/cpuinfo`). Checked on a Qualcomm "canoe" board (Android 16): the core and C/C++ tests pass,
+and llama.cpp (CPU) generates text identical to llama.cpp's own `llama-completion` on the same model. Not done: Android CI, GPU (Vulkan/OpenCL) and Hexagon NPU
+runs, the QNN backend on Android, and an app packaged as an APK.
+
 ### ONNX Runtime
 
 Download a release from https://github.com/microsoft/onnxruntime/releases and unpack it.
