@@ -7,7 +7,7 @@ through llama.cpp, which is a pinned git submodule at `third_party/llama.cpp` (M
 
 ## You install
 
-Nothing beyond a C and C++ toolchain. Fetch the pinned llama.cpp once: `git submodule update --init third_party/llama.cpp`
+Nothing beyond a C and C++ toolchain. Fetch the pinned llama.cpp once: `git submodule update --init --depth 1 third_party/llama.cpp`
 (or point `UAIRT_LLAMACPP_ROOT` at another checkout, at your own risk: `llama.h` changes often).
 
 ## Build

@@ -9,7 +9,7 @@ Nothing for the CPU: NCNN (BSD-3-Clause, with some third-party parts under zlib 
 plugin and linked statically with its symbols hidden, so it cannot clash with another NCNN in your application.
 
 ```bash
-git submodule update --init third_party/ncnn                 # CPU
+git submodule update --init --depth 1 third_party/ncnn                 # CPU
 git submodule update --init --recursive third_party/ncnn     # also glslang, needed for Vulkan
 ```
 

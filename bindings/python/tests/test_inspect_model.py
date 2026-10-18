@@ -103,3 +103,74 @@ def test_unknown_pattern_falls_back_to_reading_the_model_card():
 def test_describe_shows_quantization_only_when_present():
     assert "quantized" not in inspect_model.describe(t("x", (1, 4)))
     assert "scale=0.5 zero_point=3" in inspect_model.describe(t("q", (1, 4), "int8", 0.5, 3))
+
+
+# ---- what happens when the binding or the model cannot be loaded (found when an agent ran the script in a fresh checkout) ----
+
+import os
+import subprocess
+import time
+
+SCRIPT = EXAMPLES / "inspect_model.py"
+
+
+def _touch(path, age):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"")
+    stamp = time.time() - age
+    os.utime(path, (stamp, stamp))
+
+
+def test_setup_help_points_at_the_newest_shared_build(tmp_path):
+    _touch(tmp_path / "build-old" / "libuairt.dylib", 1000)
+    _touch(tmp_path / "build-new" / "libuairt.dylib", 10)
+    text = inspect_model.setup_help(tmp_path, ImportError("No module named 'uairt'"))
+    assert "cannot load the uairt Python binding: No module named 'uairt'" in text
+    assert f"UAIRT_LIBRARY={tmp_path / 'build-new' / 'libuairt.dylib'}" in text and "build-old" not in text
+    assert f"PYTHONPATH={tmp_path}/bindings/python" in text and "run_model --info" in text
+
+
+def test_setup_help_gives_the_build_commands_when_there_is_no_shared_build(tmp_path):
+    (tmp_path / "build").mkdir()                                            # a static build has no libuairt shared library
+    text = inspect_model.setup_help(tmp_path)
+    assert "-DBUILD_SHARED_LIBS=ON" in text and "-DUAIRT_BUILD_<BACKEND>=ON" in text and "UAIRT_LIBRARY=" in text
+    assert "cannot load" not in text
+
+
+def test_a_missing_dependency_is_named_and_not_blamed_on_the_build(tmp_path):
+    _touch(tmp_path / "build" / "libuairt.dylib", 10)                       # a build exists, so the old text would have said "point at it"
+    error = ModuleNotFoundError("No module named 'numpy'", name="numpy")
+    text = inspect_model.setup_help(tmp_path, error)
+    assert "needs the Python package 'numpy'" in text and "pip install numpy" in text and "throwaway virtual environment" in text
+    assert "A shared build exists" not in text and "cmake" not in text
+    # the binding module itself missing still gets the build instructions
+    assert "A shared build exists" in inspect_model.setup_help(tmp_path, ModuleNotFoundError("No module named 'uairt'", name="uairt"))
+
+
+def _run_script(*args, env=None):
+    return subprocess.run([sys.executable, "-I", str(SCRIPT), *args], capture_output=True, text=True, env=env)
+
+
+def test_missing_binding_prints_setup_steps_not_a_traceback():
+    probe = subprocess.run([sys.executable, "-I", "-c", "import uairt"], capture_output=True)
+    if probe.returncode == 0:
+        pytest.skip("uairt is installed in this interpreter, so the import cannot be made to fail")
+    result = _run_script("model.onnx")
+    assert result.returncode == 2
+    assert "cannot load the uairt Python binding" in result.stderr and "Traceback" not in result.stderr
+    assert "UAIRT_LIBRARY" in result.stderr
+
+
+def test_a_model_that_cannot_be_loaded_gets_a_clear_message_and_a_hint(tmp_path):
+    fake = tmp_path / "uairt"
+    fake.mkdir()
+    (fake / "__init__.py").write_text(
+        "class UairtError(Exception):\n    pass\n\n"
+        "class AutoModel:\n    @staticmethod\n    def from_file(path, **kwargs):\n        raise UairtError('no usable plugin for qnn')\n")
+    # -I ignores PYTHONPATH, so put the stand-in next to a copy of the script instead
+    copy = tmp_path / "inspect_copy.py"
+    copy.write_text(SCRIPT.read_text())
+    result = subprocess.run([sys.executable, str(copy), "weights.bin"], capture_output=True, text=True, cwd=tmp_path)
+    assert result.returncode == 1 and "Traceback" not in result.stderr
+    assert "cannot load weights.bin: no usable plugin for qnn" in result.stderr
+    assert "--backend" in result.stderr and "input_shapes" in result.stderr

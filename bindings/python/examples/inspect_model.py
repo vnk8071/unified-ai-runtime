@@ -11,7 +11,9 @@ original framework before relying on it. Needs the native library and the backen
 """
 import argparse
 import sys
+from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
 GUIDE = "docs/agents/pre-post-processing.md"
 TEXT_INPUT_NAMES = ("input_ids", "input_id", "token_ids", "tokens", "ids")
 
@@ -124,6 +126,38 @@ def guess(inputs, outputs, backend=None) -> list:
     return notes or [f"no known pattern: read the model card and the original framework's pipeline ({GUIDE} section 2)"]
 
 
+def find_shared_builds(root: Path) -> list:
+    """Shared builds of libuairt under root (build*/libuairt.dylib, .so, or uairt.dll), newest first."""
+    patterns = ("build*/libuairt.dylib", "build*/libuairt.so", "build*/Release/uairt.dll", "build*/Debug/uairt.dll")
+    found = [path for pattern in patterns for path in root.glob(pattern)]
+    return sorted(found, key=lambda path: path.stat().st_mtime, reverse=True)
+
+
+def setup_help(root: Path, error=None) -> str:
+    """What to do when the Python binding cannot be loaded: the exact commands, using an existing shared build when there is one."""
+    lines = []
+    if error is not None:
+        lines.append(f"cannot load the uairt Python binding: {error}")
+    missing = getattr(error, "name", None) if isinstance(error, ModuleNotFoundError) else None
+    if missing and missing != "uairt" and not missing.startswith("uairt."):
+        # the binding was found; one of its own dependencies is not installed, which more build steps cannot fix
+        lines += [f"The binding itself was found; it needs the Python package '{missing}', which this interpreter ({sys.executable}) does not have:",
+                  f"  {sys.executable} -m pip install {missing}      # or: uv pip install --python {sys.executable} {missing}",
+                  "Ask before installing into the user's own environment; a throwaway virtual environment is fine."]
+        return "\n".join(lines)
+    shared = find_shared_builds(root)
+    if shared:
+        lines += ["A shared build exists. Point the binding at it, then run this script again (the plugins next to libuairt are found by themselves):",
+                  f"  export PYTHONPATH={root}/bindings/python UAIRT_LIBRARY={shared[0]}"]
+    else:
+        lines += ["The binding needs a shared build of the library plus the plugin for your backend. From the repository root:",
+                  "  cmake -S . -B build-shared -DBUILD_SHARED_LIBS=ON -DUAIRT_BUILD_<BACKEND>=ON && cmake --build build-shared",
+                  "  export PYTHONPATH=$PWD/bindings/python UAIRT_LIBRARY=$PWD/build-shared/libuairt.dylib   # libuairt.so on Linux, uairt.dll on Windows",
+                  "(<BACKEND> is ONNXRUNTIME, LLAMACPP, NCNN, ...: see docs/backends/.)"]
+    lines.append("For a quick look without Python: build/run_model --info <plugin> <backend> <model>   (a language model shows no tensors)")
+    return "\n".join(lines)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("model")
@@ -133,8 +167,19 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     options = dict(item.split("=", 1) for item in args.option)
 
-    import uairt
-    with uairt.AutoModel.from_file(args.model, device=args.device, backend=args.backend, options=options or None) as model:
+    try:
+        import uairt
+    except (ImportError, OSError) as error:        # no PYTHONPATH, or the shared library was not found
+        print(setup_help(REPO_ROOT, error), file=sys.stderr)
+        return 2
+    try:
+        model = uairt.AutoModel.from_file(args.model, device=args.device, backend=args.backend, options=options or None)
+    except uairt.UairtError as error:
+        print(f"cannot load {args.model}: {error}", file=sys.stderr)
+        print("If it says no usable plugin was found, build that backend (-DUAIRT_BUILD_<BACKEND>=ON, see docs/backends/) and keep it next to libuairt;\n"
+              "a .bin file goes to QNN unless you pass --backend, and NCNN needs --option input_shapes=....", file=sys.stderr)
+        return 1
+    with model:
         print(f"backend: {model.backend}   options: {model.options}")
         print("inputs:")
         for tensor in model.inputs:

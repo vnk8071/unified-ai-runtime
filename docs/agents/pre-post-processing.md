@@ -36,6 +36,9 @@ python bindings/python/examples/inspect_model.py ggml-tiny.en.bin --backend whis
 build/run_model --info <plugin> <backend> <model>                                  # the same table from C, without Python
 ```
 
+The Python script needs the binding set up (a shared build of the library, `PYTHONPATH`, `UAIRT_LIBRARY`, NumPy); if it is not, the script says so and prints the exact
+commands, using an existing shared build when it finds one. `run_model --info` needs none of that.
+
 The table (name, dtype, shape, scale and zero point when quantized) is what the backend reports for the loaded model. The "Looks like"
 lines are a heuristic from names and shapes (section 3): use them to know what to look for, not as an answer. A GGUF or a server model
 prints no tensors; that means a language model (sections 6 and 7). `vocab_size` is a property, not a method.

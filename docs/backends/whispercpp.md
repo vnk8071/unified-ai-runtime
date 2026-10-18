@@ -10,7 +10,7 @@ hidden. When llama.cpp is built too, both compile against llama.cpp's ggml (each
 code), so a bump of one that breaks the other's build means bumping both.
 
 ```bash
-git submodule update --init third_party/whisper.cpp
+git submodule update --init --depth 1 third_party/whisper.cpp
 ```
 
 To use your own build instead, install whisper.cpp as shared libraries and set `WHISPER_ROOT`; that takes priority over the

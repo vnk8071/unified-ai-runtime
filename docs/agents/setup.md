@@ -58,7 +58,9 @@ Goal: get a requested backend building and passing tests. Logic lives in
 
 ## llama.cpp
 
-- Run `git submodule update --init third_party/llama.cpp` once (about 100 MB; no SDK or licence step, llama.cpp is MIT).
+- Run `git submodule update --init --depth 1 third_party/llama.cpp` once (about 100 MB; no SDK or licence step, llama.cpp is MIT).
+  `--depth 1` fetches only the pinned commit; a plain fetch of llama.cpp's whole history is a much larger download and can time out on a slow connection.
+  The same goes for `third_party/ncnn` and `third_party/whisper.cpp`.
 - Configure with `-DUAIRT_BUILD_LLAMACPP=ON`. Engines take `n_gpu_layers` (default 99, 0 for CPU only) and `device` (a llama.cpp device name such as `CUDA0`, `Vulkan0`, `GPUOpenCL`, `HTP0`); sessions take `n_ctx`.
 - NVIDIA on Linux: `-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=<cc>` with the CUDA toolkit installed by the user. Vulkan: `-DGGML_VULKAN=ON`
   with `libvulkan-dev`, `glslc` and `spirv-headers` (apt packages: ask before installing). The Python binding needs `-DBUILD_SHARED_LIBS=ON`.
@@ -88,7 +90,7 @@ Goal: get a requested backend building and passing tests. Logic lives in
 
 ## NCNN
 
-- Run `git submodule update --init third_party/ncnn` (NCNN is BSD-3-Clause, so no licence step) and configure with `-DUAIRT_BUILD_NCNN=ON`:
+- Run `git submodule update --init --depth 1 third_party/ncnn` (NCNN is BSD-3-Clause, so no licence step) and configure with `-DUAIRT_BUILD_NCNN=ON`:
   it builds the pinned NCNN for the CPU. For Vulkan add `-DUAIRT_NCNN_VULKAN=ON` and use `--init --recursive` (it needs glslang), or
   build NCNN yourself and set `NCNN_ROOT` to the install prefix; see `docs/backends/ncnn.md`.
 - `.param` files record no input shapes: pass `input_shapes`. Vulkan needs a working driver: in a container, `vulkaninfo
@@ -96,7 +98,7 @@ Goal: get a requested backend building and passing tests. Logic lives in
 
 ## whisper.cpp
 
-- Run `git submodule update --init third_party/whisper.cpp` (MIT, no licence step) and configure with `-DUAIRT_BUILD_WHISPERCPP=ON`; or
+- Run `git submodule update --init --depth 1 third_party/whisper.cpp` (MIT, no licence step) and configure with `-DUAIRT_BUILD_WHISPERCPP=ON`; or
   build whisper.cpp yourself with `-DBUILD_SHARED_LIBS=ON` and set `WHISPER_ROOT` to the install prefix. See `docs/backends/whispercpp.md`.
   With `UAIRT_BUILD_LLAMACPP=ON` as well, both compile against llama.cpp's ggml.
 - A Whisper ggml model is a user download (a model, not an SDK, but it is large): ask before fetching one, and keep it out of the

@@ -104,7 +104,7 @@ That conversion path has not been run in this repository yet, so expect the agen
 
    ```bash
    scripts/doctor.sh
-   cmake -S . -B build -DUAIRT_BUILD_<BACKEND>=ON && cmake --build build     # llama.cpp, whisper.cpp and NCNN are submodules: git submodule update --init third_party/<name> first
+   cmake -S . -B build -DUAIRT_BUILD_<BACKEND>=ON && cmake --build build     # llama.cpp, whisper.cpp and NCNN are submodules: git submodule update --init --depth 1 third_party/<name> first
    ```
 
    Each backend's page in [docs/backends/](docs/backends/README.md) lists what to install and the build flag.
@@ -256,12 +256,12 @@ build/run_model --repeat 50 --option device=CPU build/libuairt_backend_openvino.
 
 ### NCNN (CPU and Vulkan GPUs)
 
-NCNN is a pinned submodule: `git submodule update --init third_party/ncnn`, then build it into the plugin with
+NCNN is a pinned submodule: `git submodule update --init --depth 1 third_party/ncnn`, then build it into the plugin with
 `-DUAIRT_BUILD_NCNN=ON` (CPU; add `-DUAIRT_NCNN_VULKAN=ON` and `--init --recursive` for Vulkan). Or build NCNN yourself and set
 `NCNN_ROOT` to its install prefix. NCNN's `.param` records no input shapes, so pass them:
 
 ```bash
-git submodule update --init third_party/ncnn
+git submodule update --init --depth 1 third_party/ncnn
 cmake -S . -B build -DUAIRT_BUILD_NCNN=ON -DUAIRT_NCNN_VULKAN=ON && cmake --build build
 build/run_model --repeat 100 --option input_shapes=3x640x640 --option device=vulkan --option fp16=false \
   build/libuairt_backend_ncnn.so ncnn yolov8n_ncnn_model out in0.bin
@@ -276,7 +276,7 @@ llama.cpp is a pinned submodule (MIT), so there is nothing to install; Metal is 
 (`HTP0`) take their own flags and are described on the backend page.
 
 ```bash
-git submodule update --init third_party/llama.cpp
+git submodule update --init --depth 1 third_party/llama.cpp
 cmake -S . -B build -DUAIRT_BUILD_LLAMACPP=ON && cmake --build build
 build/llm_generate build/libuairt_backend_llamacpp.so model.gguf "The capital of France is" 40
 ```
@@ -300,7 +300,7 @@ whisper.cpp is a pinned submodule (MIT). You need a ggml Whisper model (for exam
 strings, so the model takes `audio` (float32 `[n_samples]`, mono 16 kHz) and returns `text` (UTF-8 bytes) and `text_length`:
 
 ```bash
-git submodule update --init third_party/whisper.cpp
+git submodule update --init --depth 1 third_party/whisper.cpp
 cmake -S . -B build -DUAIRT_BUILD_WHISPERCPP=ON && cmake --build build
 build/run_model --option n_samples=176000 build/libuairt_backend_whispercpp.so whispercpp ggml-tiny.en.bin out audio.f32
 ```

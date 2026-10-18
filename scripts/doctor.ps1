@@ -204,7 +204,7 @@ if (Test-Path (Join-Path $llamaRoot 'include\llama.h')) {
     $llamaVersion = git -C $llamaRoot describe --tags --always
     if ($llamaVersion) { Report 'info' ('llamacpp: version {0} (a pinned submodule; bumping it needs ctest and a model run, see docs/vendors.md)' -f $llamaVersion) }
 } else {
-    Report 'skip' 'llamacpp: run git submodule update --init third_party/llama.cpp (or set UAIRT_LLAMACPP_ROOT)'
+    Report 'skip' 'llamacpp: run git submodule update --init --depth 1 third_party/llama.cpp (or set UAIRT_LLAMACPP_ROOT)'
 }
 Report 'skip' 'coreml: requires macOS'
 

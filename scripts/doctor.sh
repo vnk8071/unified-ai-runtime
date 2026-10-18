@@ -270,7 +270,7 @@ else
     ncnn_commit="$(git -C "$ncnn_src" describe --tags --always 2>/dev/null || true)"
     [[ -n "$ncnn_commit" ]] && report info "ncnn: version $ncnn_commit (a pinned submodule; bumping it needs ctest and a model run, see docs/vendors.md)"
   else
-    report skip "ncnn: run git submodule update --init third_party/ncnn (or set NCNN_ROOT to an install)"
+    report skip "ncnn: run git submodule update --init --depth 1 third_party/ncnn (or set NCNN_ROOT to an install)"
   fi
 fi
 
@@ -289,7 +289,7 @@ else
     whisper_commit="$(git -C "$whisper_src" describe --tags --always 2>/dev/null || true)"
     [[ -n "$whisper_commit" ]] && report info "whispercpp: version $whisper_commit (a pinned submodule; bumping it needs ctest and a model run, see docs/vendors.md)"
   else
-    report skip "whispercpp: run git submodule update --init third_party/whisper.cpp (or set WHISPER_ROOT to a shared install)"
+    report skip "whispercpp: run git submodule update --init --depth 1 third_party/whisper.cpp (or set WHISPER_ROOT to a shared install)"
   fi
 fi
 
@@ -340,7 +340,7 @@ if [[ -f "$llama_root/include/llama.h" ]]; then
   llama_commit="$(git -C "$llama_root" describe --tags --always 2>/dev/null || true)"
   [[ -n "$llama_commit" ]] && report info "llamacpp: version $llama_commit (a pinned submodule; bumping it needs ctest and a model run, see docs/vendors.md)"
 else
-  report skip "llamacpp: run git submodule update --init third_party/llama.cpp (or set UAIRT_LLAMACPP_ROOT)"
+  report skip "llamacpp: run git submodule update --init --depth 1 third_party/llama.cpp (or set UAIRT_LLAMACPP_ROOT)"
 fi
 
 if have pkg-config && pkg-config --exists libcurl 2>/dev/null; then

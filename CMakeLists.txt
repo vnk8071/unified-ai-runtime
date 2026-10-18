@@ -248,7 +248,7 @@ if(UAIRT_BUILD_NCNN)
   else()
     if(NOT EXISTS "${UAIRT_NCNN_SOURCE}/CMakeLists.txt")
       message(FATAL_ERROR
-        "NCNN not found at ${UAIRT_NCNN_SOURCE}. Run: git submodule update --init third_party/ncnn "
+        "NCNN not found at ${UAIRT_NCNN_SOURCE}. Run: git submodule update --init --depth 1 third_party/ncnn "
         "(or set NCNN_ROOT to an NCNN install, or UAIRT_NCNN_SOURCE to a checkout).")
     endif()
     set(UAIRT_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
@@ -342,7 +342,7 @@ if(UAIRT_BUILD_LLAMACPP)
       "llama.cpp source tree; the default is the pinned submodule")
   if(NOT EXISTS "${UAIRT_LLAMACPP_ROOT}/CMakeLists.txt")
     message(FATAL_ERROR
-      "llama.cpp not found at ${UAIRT_LLAMACPP_ROOT}. Run: git submodule update --init third_party/llama.cpp "
+      "llama.cpp not found at ${UAIRT_LLAMACPP_ROOT}. Run: git submodule update --init --depth 1 third_party/llama.cpp "
       "(or set UAIRT_LLAMACPP_ROOT to a llama.cpp checkout).")
   endif()
 
@@ -419,7 +419,7 @@ if(UAIRT_BUILD_WHISPERCPP)
   else()
     if(NOT EXISTS "${UAIRT_WHISPERCPP_SOURCE}/CMakeLists.txt")
       message(FATAL_ERROR
-        "whisper.cpp not found at ${UAIRT_WHISPERCPP_SOURCE}. Run: git submodule update --init third_party/whisper.cpp "
+        "whisper.cpp not found at ${UAIRT_WHISPERCPP_SOURCE}. Run: git submodule update --init --depth 1 third_party/whisper.cpp "
         "(or set WHISPER_ROOT to an install, or UAIRT_WHISPERCPP_SOURCE to a checkout).")
     endif()
     # The comparison test runs whisper.cpp's own whisper-cli, so examples are built only when that test is enabled.
