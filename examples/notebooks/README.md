@@ -18,7 +18,8 @@ jupyter lab examples/notebooks/uairt_backends_tour.ipynb
 `ncnn`, `whispercpp` and `llamacpp` need nothing installed (they are pinned submodules the notebook fetches), but the last two need a model file. Put
 a ggml Whisper model (`ggml-*.bin`) and a small GGUF (`*.gguf`) in a `models/` folder **next to the notebook**: the setup cell finds them by a path relative to
 the notebook (`WHISPER_MODEL`, `LLAMACPP_MODEL`; an absolute path or the `UAIRT_WHISPER_MODEL` / `UAIRT_LLAMACPP_MODEL` variables work too). Git ignores
-`*.bin` and `*.gguf`, so a model there is never committed. `DOWNLOAD_WHISPER_MODEL = True` fetches the 78 MB Whisper `tiny.en` file into `models/`.
+`*.bin` and `*.gguf`, so a model there is never committed. Instead of finding the files yourself, set `DOWNLOAD_WHISPER_MODEL = True` and/or `DOWNLOAD_LLAMACPP_MODEL = True` in the setup cell: it fetches the
+78 MB Whisper `tiny.en` file and the 145 MB SmolLM2-135M-Instruct Q8 GGUF into `models/` when none is there, and checks each against its published hash (both off by default).
 A cell near the top installs the backends that have a wheel: `numpy`, `onnxruntime`, `openvino`, and `coremltools` on macOS. It uses `pip`, or `uv pip`
 when the environment has no pip, and installs only what is missing. The notebook fetches ONNX Runtime's header itself. The first build compiles NCNN and
 whisper.cpp and takes several minutes. Run from outside a checkout, the notebook clones the repository itself.
@@ -28,7 +29,7 @@ Vendor SDKs (QAIRT, TensorRT, Xcode) are never fetched for you except in the Col
 
 - The tour was executed end to end on an Apple M5 (macOS), including from outside a checkout, and in a fresh Python 3.12.13 venv with no pip and no packages (it installed numpy,
   onnxruntime, openvino and coremltools itself, then `reference`, `onnxruntime`, `ncnn`, `whispercpp`, `llamacpp`, `coreml` and `openvino` ran, the two
-  model sections from files in a `models/` folder next to the notebook). It has not been run on Linux or on Colab. Sections for hardware that machine does not have
+  model sections from files in a `models/` folder next to the notebook, which the notebook itself downloaded and hash-checked with both download flags on). It has not been run on Linux or on Colab. Sections for hardware that machine does not have
   (`qnn`, `tflite`, `tensorrt`, `llamacpp` without a model) are written from the documented procedures and have **not** been run.
 - The Colab notebook was run on a Colab T4 (Python 3.13, CUDA 13.0 toolkit) up to the model export: TensorRT 10.9.0.34 installed, its headers were
   fetched and **the UAIRT TensorRT plugin built**. The export then failed because Colab has no `onnx` package; that is fixed, and the engine build,
