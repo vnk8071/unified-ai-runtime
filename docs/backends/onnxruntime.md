@@ -24,6 +24,12 @@ cmake -S . -B build -DUAIRT_BUILD_ONNXRUNTIME=ON && cmake --build build
 The plugin is built against the header version and fails to load with a clear error if the
 installed library is older.
 
+**Lighter route, no release download.** The plugin needs only ONNX Runtime's header to build and loads the library at run time. So
+`pip install onnxruntime` plus `scripts/ci/fetch_onnxruntime_headers.sh` (header only, into the git-ignored `.ort/`, used when
+`ONNXRUNTIME_ROOT` is unset) is enough, with ONNX Runtime 1.22 or newer installed. The Python binding finds the pip library by itself;
+for `run_model` or your own C program, `export UAIRT_ONNXRUNTIME_LIBRARY=<site-packages>/onnxruntime/capi/libonnxruntime.<version>.dylib`
+(`.so` on Linux, `onnxruntime.dll` on Windows). `scripts/doctor.sh` reports this combination and prints that path.
+
 ## Engine options
 
 `intra_op_threads`, `execution_provider` (`cpu`, `cuda` or `tensorrt`), `log_level` (`verbose`, `info`, `warning`,

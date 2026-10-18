@@ -21,12 +21,13 @@ a Hexagon architecture hint (it is a hint: check it against the chip before rely
 | `.onnx` | `onnxruntime` | CPU; NVIDIA GPU with the `cuda` or `tensorrt` provider; NPU through a plugin execution provider | an ONNX Runtime release matching the headers (1.22+), a GPU release for the GPU providers |
 | `.tflite` | `tflite` | CPU; NPU through the QNN delegate (`libQnnTFLiteDelegate.so`, so Linux or Android) | a TFLite C library built for the target |
 | OpenVINO IR (`.xml` + `.bin`), also `.onnx` | `openvino` | Intel CPU, GPU, NPU | OpenVINO (pip or release), Intel GPU/NPU drivers for those devices |
-| NCNN `.param` + `.bin` | `ncnn` | CPU, any Vulkan GPU | NCNN built with Vulkan, a Vulkan driver; `input_shapes` option |
-| whisper ggml `.bin` | `whispercpp` | CPU, and any GPU your whisper.cpp was built for (Metal verified) | whisper.cpp built shared (`WHISPER_ROOT`); audio as float32 16 kHz, see `docs/backends/whispercpp.md` |
+| NCNN `.param` + `.bin` | `ncnn` | CPU, any Vulkan GPU | `git submodule update --init third_party/ncnn` (for Vulkan add `--recursive` and `-DUAIRT_NCNN_VULKAN=ON`) and a Vulkan driver for the GPU; `input_shapes` option |
+| whisper ggml `.bin` | `whispercpp` | CPU, and any GPU the build supports (Metal verified on a Mac) | `git submodule update --init third_party/whisper.cpp` and a ggml Whisper model file (ask before downloading one); audio as float32 16 kHz, see `docs/backends/whispercpp.md` |
 | `.pte` (ExecuTorch) | `executorch` | CPU (XNNPACK) and any delegate built into your ExecuTorch | ExecuTorch built from source with the Module and Tensor extensions; see `docs/backends/executorch.md` |
-| `.engine`, `.plan` (TensorRT) | `tensorrt` | NVIDIA GPU (CUDA) | TensorRT 8.5+ with headers, CUDA toolkit; build the engine on the GPU that runs it |
+| `.engine`, `.plan` (TensorRT) | `tensorrt` | NVIDIA GPU (CUDA) | TensorRT 8.5+ with headers and the CUDA toolkit, installed by the user (apt, NVIDIA's tarball, or `pip install tensorrt-cu12` plus NVIDIA's public headers: `docs/backends/tensorrt.md`); build the engine on the GPU that runs it |
 | `.mlmodel`, `.mlpackage` | `coreml` | Apple CPU, GPU, Neural Engine | Xcode (macOS) |
 | `.gguf` | `llamacpp` | CPU; Apple GPU (Metal); NVIDIA GPU (CUDA, Vulkan); Adreno GPU (OpenCL); Hexagon NPU (`device=HTP0`); pick with `device` | `git submodule update --init third_party/llama.cpp`; build with `-DUAIRT_BUILD_LLAMACPP=ON` plus `-DGGML_CUDA=ON`, `-DGGML_VULKAN=ON`, `-DGGML_OPENCL=ON` or `-DGGML_HEXAGON=ON` (see `docs/backends/llamacpp.md`) |
+| a model name on a running server (Ollama, LM Studio, SGLang) | `llmserver` | whatever the server uses | libcurl; the server and its model, started by the user (the backend never starts a server or downloads a model); see `docs/backends/llmserver.md` |
 | PyTorch (`.pt`, `.pth`) | none | | export to ONNX first, then use `onnxruntime` |
 
 - A PyTorch model has no backend of its own: `torch.onnx.export` it, then follow the `.onnx` row. `torch` has no
@@ -104,6 +105,8 @@ Windows need `ADSP_LIBRARY_PATH` set before the process starts for the NPU (see 
   below the CPU run (a small vision model went from about 790 ms on the CPU to under 1 ms on the NPU). A run on
   `QnnCpu` is not an NPU run.
 - Run with a second, different input and check the outputs are not constant.
+- When the input is a real image, recording or sentence, its preparation is part of what you are checking: compare raw outputs with the original
+  pipeline as in [pre-post-processing.md](pre-post-processing.md) section 8, not only the top class.
 
 ## Two levels of "verified"
 

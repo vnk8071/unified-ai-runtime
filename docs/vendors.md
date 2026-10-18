@@ -8,7 +8,9 @@ current. The data is in [`scripts/vendors.tsv`](../scripts/vendors.tsv); `script
 ## What `doctor` tells you
 
 For each backend it detects the installed version (from the directory name for QAIRT, `VERSION_NUMBER` for ONNX Runtime,
-`NvInferVersion.h` for TensorRT, `platform.h` for NCNN, `git describe` for the llama.cpp submodule) and compares it with the file:
+`NvInferVersion.h` for TensorRT, `platform.h` for NCNN, `git describe` for the llama.cpp submodule) and compares it with the file. ONNX Runtime
+and OpenVINO installed with `pip` are found from their package metadata (the first `python3` or `python` on `PATH`, so an active virtualenv counts)
+without importing them, and `doctor` prints the `OPENVINO_ROOT` or `UAIRT_ONNXRUNTIME_LIBRARY` to use:
 
 | Line | Meaning |
 |---|---|

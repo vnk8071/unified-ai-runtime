@@ -16,9 +16,13 @@ Goal: get a requested backend building and passing tests. Logic lives in
 
 ## ONNX Runtime
 
-- Needs a release directory with `include/onnxruntime_c_api.h` and `lib/libonnxruntime`.
-  The user downloads and unpacks it (MIT licensed); export it as `ONNXRUNTIME_ROOT`.
-- The pip wheel is not enough: it has the library but no headers.
+- Either a release directory with `include/onnxruntime_c_api.h` and `lib/libonnxruntime` (the user downloads and unpacks
+  it, MIT licensed; export it as `ONNXRUNTIME_ROOT`), or the lighter route: the plugin needs only the header to build and
+  loads the library at run time, so `pip install onnxruntime` plus `scripts/ci/fetch_onnxruntime_headers.sh` (the header
+  only, into the git-ignored `.ort/`) is enough. Ask before installing into the user's own environment; a throwaway
+  virtualenv is fine. `scripts/doctor.sh` recognises that combination and prints the `UAIRT_ONNXRUNTIME_LIBRARY` to export for
+  C programs such as `run_model` (the Python binding finds the pip library by itself).
+- The pip wheel alone is not enough to build: it has the library but no header.
 - Configure with `-DUAIRT_BUILD_ONNXRUNTIME=ON`. The plugin is built against the
   header version; it fails to load with a clear error if the installed library is older.
 - `tests/data/make_models.py` regenerates the test models and checks them against

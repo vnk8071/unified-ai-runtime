@@ -55,6 +55,28 @@ dir_version() {
   [[ "$d" =~ ^[0-9]+(\.[0-9]+)+ ]] && echo "${BASH_REMATCH[0]}"
   return 0
 }
+# A pip-installed package, found from its metadata without importing it (importing openvino starts a telemetry subprocess):
+# prints "<version> <package directory>", or returns 1. Uses the first python3 or python on PATH, so an active virtualenv counts.
+pip_package() {
+  local py
+  for py in python3 python; do have "$py" && break; done
+  have "$py" || return 1
+  "$py" - "$1" <<'PY' 2>/dev/null
+import importlib.metadata as metadata
+import importlib.util as util
+import sys
+
+name = sys.argv[1]
+try:
+    version = metadata.version(name)
+except metadata.PackageNotFoundError:
+    sys.exit(1)
+spec = util.find_spec(name)
+directory = spec.submodule_search_locations[0] if spec and spec.submodule_search_locations else ""
+print(version, directory)
+PY
+}
+
 # Compares a detected version with the manifest. Older than the minimum is reported as missing; a version other than
 # the tested one is information, not an error, and means "not verified here".
 vendor_check() {
@@ -187,8 +209,25 @@ if [[ -n "${ONNXRUNTIME_ROOT:-}" ]]; then
     vendor_hint onnxruntime
   fi
 else
-  report skip "onnxruntime: set ONNXRUNTIME_ROOT"
-  vendor_hint onnxruntime
+  # No release directory: the plugin needs only ONNX Runtime's header to build (scripts/ci/fetch_onnxruntime_headers.sh puts it in
+  # .ort/) and loads the library at run time, which a pip install provides.
+  ort_header="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.ort/include/onnxruntime_c_api.h"
+  ort_pip="$(pip_package onnxruntime || true)"
+  ort_version="${ort_pip%% *}"
+  ort_dir="${ort_pip#* }"
+  if [[ -f "$ort_header" && -n "$ort_pip" ]]; then
+    report ok "onnxruntime: header in .ort/ and pip onnxruntime $ort_version; build with -DUAIRT_BUILD_ONNXRUNTIME=ON"
+    ort_library="$(ls "$ort_dir"/capi/libonnxruntime.*dylib "$ort_dir"/capi/libonnxruntime.so* "$ort_dir"/capi/onnxruntime.dll 2>/dev/null | head -n1)"
+    [[ -n "$ort_library" ]] && report info "onnxruntime: the Python binding finds that library by itself; for run_model or C programs, export UAIRT_ONNXRUNTIME_LIBRARY=$ort_library"
+    vendor_check onnxruntime "$ort_version"
+  elif [[ -n "$ort_pip" ]]; then
+    report skip "onnxruntime: pip onnxruntime $ort_version is installed; run scripts/ci/fetch_onnxruntime_headers.sh for the header (or set ONNXRUNTIME_ROOT to a release)"
+  elif [[ -f "$ort_header" ]]; then
+    report skip "onnxruntime: the header is in .ort/ but no pip onnxruntime is installed; pip install onnxruntime (or set ONNXRUNTIME_ROOT to a release)"
+  else
+    report skip "onnxruntime: pip install onnxruntime and run scripts/ci/fetch_onnxruntime_headers.sh (or set ONNXRUNTIME_ROOT to a release)"
+    vendor_hint onnxruntime
+  fi
 fi
 
 if [[ -n "${OPENVINO_ROOT:-}" ]]; then
@@ -201,8 +240,19 @@ if [[ -n "${OPENVINO_ROOT:-}" ]]; then
     vendor_hint openvino
   fi
 else
-  report skip "openvino: set OPENVINO_ROOT (pip install openvino, then its site-packages/openvino)"
-  vendor_hint openvino
+  ov_pip="$(pip_package openvino || true)"
+  ov_version="${ov_pip%% *}"
+  ov_dir="${ov_pip#* }"
+  if [[ -n "$ov_pip" && -f "$ov_dir/include/openvino/c/openvino.h" ]]; then
+    report ok "openvino: pip openvino $ov_version at $ov_dir; build with OPENVINO_ROOT=$ov_dir"
+    vendor_check openvino "$ov_version"
+  elif [[ -n "$ov_pip" ]]; then
+    report skip "openvino: pip openvino $ov_version is installed but $ov_dir has no C headers; use a release and set OPENVINO_ROOT"
+    vendor_hint openvino
+  else
+    report skip "openvino: pip install openvino (it ships the C headers), then run this script again: it prints the OPENVINO_ROOT to use"
+    vendor_hint openvino
+  fi
 fi
 
 if [[ -n "${NCNN_ROOT:-}" ]]; then

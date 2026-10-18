@@ -30,6 +30,10 @@ What the model does not do is yours to write, and it comes from the model's own 
 - **Language models:** the chat template. UAIRT tokenizes text but does not apply a template: build the prompt the way the
   model's card says, and stop on its end-of-turn token (see below).
 
+The full procedure, from the printed inputs and outputs to a verified result, with tested helpers for images, boxes, tokenizers, chat
+templates, stop tokens and sampling, is [pre-post-processing.md](pre-post-processing.md). Run
+`python bindings/python/examples/inspect_model.py <model>` first.
+
 ## 3. The pattern
 
 Python, any non-language model:

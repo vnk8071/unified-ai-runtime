@@ -55,6 +55,17 @@ First public version. Pre-1.0: the API and ABI may change.
 - `.gitattributes` keeps text files, and shell scripts in particular, LF in every checkout.
 - The docs and `AGENTS.md` separate "core verified" from "backend verified".
 
+### Added (agent guide for pre- and post-processing)
+
+- `docs/agents/pre-post-processing.md`: how an agent goes from a model's printed inputs and outputs to a verified result: images (resize, crop, letterbox, colour
+  order, range, normalization, quantized inputs), audio, box decoding with NMS, classification, embeddings, CTC, tokenizers (GGUF and Hugging Face `tokenizers`), chat
+  templates read from the GGUF, stop tokens, sampling, and how to verify against the original pipeline. Linked from `AGENTS.md`, `write-app.md`, `run-model.md`, the
+  `run-model-on-device` skill and the README.
+- `bindings/python/examples/inspect_model.py` prints a model's inputs and outputs and a heuristic guess of what it is; `prepost.py` holds the tested NumPy helpers.
+  `tests/test_prepost.py` and `tests/test_inspect_model.py` need no native library. Checked on an Apple M5: NMS equals `torchvision.ops.nms` (150 random cases), the ImageNet
+  recipe equals torchvision's (7e-7, 8 image shapes), a ResNet-18 through UAIRT equals PyTorch (2e-6), UAIRT's GGUF tokenizer ids equal Hugging Face's, and the hand-built chat
+  prompt equals the GGUF's own template. Not run: log-mel features, CTC with a real model, segmentation, quantized models, a trained detector.
+
 ### Changed (core language)
 
 - The core (`src/uairt.cpp`, `src/loader.cpp`) is now C++17 instead of C11; the public headers, the plugin ABI and every exported symbol are unchanged (38 before and
