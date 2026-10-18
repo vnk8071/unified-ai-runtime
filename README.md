@@ -82,7 +82,7 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 | NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan (matches NCNN's Python API); a Snapdragon X Elite laptop, CPU and Adreno GPU through Vulkan, same detections |
 | whisper.cpp | ggml `.bin` Whisper models; audio in (float32 PCM, 16 kHz), UTF-8 text out; CPU and Metal | Apple M5, `tiny.en`: transcript equal to `whisper-cli` on both CPU and Metal. Other models, CUDA and Vulkan untested |
 | ExecuTorch | `.pte`, tensor I/O, static shapes; CPU (XNNPACK) or whatever delegates your ExecuTorch build has | Apple M5 CPU only; equal to ExecuTorch's Python runtime on a small synthetic net. No NPU or GPU delegate tested |
-| TensorRT | serialized `.engine` / `.plan` (ultralytics exports load as is), static shapes; host and pinned buffers | NVIDIA GTX 1650, TensorRT 10.9; bit-identical to TensorRT's Python API |
+| TensorRT | serialized `.engine` / `.plan` (ultralytics exports load as is), static shapes; host and pinned buffers | NVIDIA GTX 1650, TensorRT 10.9; bit-identical to TensorRT's Python API. Also a Colab Tesla T4 (TensorRT 10.9.0.34 from pip): a ResNet-18 engine matched PyTorch to 1.5e-6 (FP32) and 2.6e-3 (FP16) |
 
 "Verified" in this table and in the docs means a real model ran through that backend on the listed hardware and matched the
 vendor's own tool. A passing `ctest` with only the reference backend proves the core, loader and bindings, not a vendor runtime;
@@ -199,6 +199,24 @@ quietly using the CPU when no GPU is usable. See [docs/backends/ncnn.md](docs/ba
 Install an NVIDIA driver, the CUDA toolkit and TensorRT 8.5+ with its headers yourself (the apt packages
 `libnvinfer-dev` or NVIDIA's tarball). An engine is built for one GPU and one TensorRT version, so build it on the GPU
 that runs it, with `trtexec` or ultralytics (`YOLO("yolov8n.pt").export(format="engine")`).
+
+**Without apt or a tarball** (for example on Google Colab): `pip install tensorrt-cu12==10.9.0.34` supplies the libraries, and the headers come from
+NVIDIA's public repository (the `include/` directory of its `v10.9.0` tag). Tell CMake where both are:
+
+```bash
+cmake -S . -B build -DUAIRT_BUILD_TENSORRT=ON \
+  -DUAIRT_TRT_INCLUDE=/path/to/TensorRT/include \
+  -DUAIRT_TRT_LIBRARY=$(python -c "import tensorrt_libs, pathlib; print(next(pathlib.Path(tensorrt_libs.__file__).parent.glob('libnvinfer.so.10')))") \
+  -DCMAKE_MODULE_LINKER_FLAGS=-Wl,-rpath,$(python -c "import tensorrt_libs, pathlib; print(pathlib.Path(tensorrt_libs.__file__).parent)")
+```
+
+[examples/notebooks/uairt_tensorrt_colab.ipynb](examples/notebooks/uairt_tensorrt_colab.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/vnk8071/unified-ai-runtime/blob/main/examples/notebooks/uairt_tensorrt_colab.ipynb)
+does all of it on a free GPU runtime: install, build, export ResNet-18, build FP32 and FP16 engines, run them through the Python binding and compare with
+PyTorch. Its saved run, on a Colab Tesla T4 (driver 580.82.07, CUDA 13.0 toolkit, Python 3.13), gave outputs within 1.5e-6 (FP32) and 2.6e-3 (FP16) of PyTorch,
+the same top-1 class, and per-run times of 1.79 ms (1.54 ms with pinned buffers) for FP32 and 0.76 ms (0.60 ms) for FP16, against 3.32 ms for eager PyTorch.
+That is one GPU and a random-weight model, and PyTorch was not given TensorRT: it shows the engine is faster than eager PyTorch, not UAIRT's overhead over
+TensorRT used directly (the yolov8n measurement below does compare with it).
 
 ```bash
 export TENSORRT_ROOT=/path/to/TensorRT            # not needed for a system install

@@ -2,14 +2,30 @@
 # TensorRT backend (NVIDIA GPUs)
 
 Source: `src/backends/tensorrt.cpp`, a C++ plugin behind the C backend ABI. Plugin: `libuairt_backend_tensorrt.so`.
-Verified on a GTX 1650 with TensorRT 10.9.0.34 and CUDA 12.8 (see the last section).
+Verified on a GTX 1650 with TensorRT 10.9.0.34 and CUDA 12.8, and on a Google Colab Tesla T4 with TensorRT 10.9.0.34 installed from pip (see the last section).
 
 ## You install
 
 An NVIDIA GPU with its driver, the CUDA toolkit, and TensorRT 8.5 or newer with its headers
 (`NvInfer.h`) and libraries (`libnvinfer`), under NVIDIA's licence. Set `TENSORRT_ROOT` to the directory that
 contains `include/NvInfer.h` and `lib/libnvinfer.so`; a system install under `/usr/include/<arch>-linux-gnu` is also
-found. The Python `tensorrt` wheel has the libraries but not the headers, so it is not enough to build.
+found. The Python wheel (`pip install tensorrt-cu12==10.9.0.34`) has the libraries but not the headers, so on its own it is not enough to build; with the
+headers from NVIDIA's public repository (the `include/` directory of the `v10.9.0` tag) it is, see "Without apt or a tarball" below.
+
+## Without apt or a tarball
+
+On a machine where you can only `pip install` (Google Colab), install `tensorrt-cu12==10.9.0.34`, fetch the headers (`git clone --depth 1 --filter=blob:none --sparse
+--branch v10.9.0 https://github.com/NVIDIA/TensorRT.git` then `git sparse-checkout set include`), and point CMake at them. `find_library` accepts a full path, and
+the wheel's library is `tensorrt_libs/libnvinfer.so.10`:
+
+```bash
+cmake -S . -B build -DUAIRT_BUILD_TENSORRT=ON -DUAIRT_TRT_INCLUDE=<headers>/include \
+  -DUAIRT_TRT_LIBRARY=<site-packages>/tensorrt_libs/libnvinfer.so.10 \
+  -DCMAKE_MODULE_LINKER_FLAGS=-Wl,-rpath,<site-packages>/tensorrt_libs
+```
+
+Import `tensorrt` before `uairt` so `libnvinfer` is already loaded. The Colab image had a CUDA 13.0 toolkit while this TensorRT is the CUDA 12 build; the plugin
+built against the toolkit and ran with it. [`examples/notebooks/uairt_tensorrt_colab.ipynb`](../../examples/notebooks/uairt_tensorrt_colab.ipynb) automates all of this.
 
 ## Build
 
@@ -72,6 +88,13 @@ for ultralytics' engine call, 8.1 ms through this backend with plain host buffer
 The 1.7 ms gap is the pageable transfers (about 2.5 ms of copies against 1.3 ms pinned). Copying through a pinned staging
 buffer inside the backend was tried and measured 8.9 ms, so it was dropped: the single-threaded host copy cost more than
 the faster DMA saved.
+
+On a Google Colab Tesla T4 (driver 580.82.07, CUDA 13.0 toolkit, Python 3.13, TensorRT 10.9.0.34 from pip), a torchvision ResNet-18 with random weights exported to ONNX
+and built into FP32 and FP16 engines (static batch 1, 224x224), run through the Python binding. Against PyTorch on the same GPU the FP32 engine's logits differ by at
+most 1.5e-6 (TF32 off in both) and the FP16 engine's by 2.6e-3; the top-1 class is identical. Median time per run over 200 runs: 1.79 ms FP32 and 0.76 ms FP16 with plain
+arrays, 1.54 ms and 0.60 ms with pinned buffers, against 3.32 ms for eager PyTorch. Those UAIRT times include the host-to-GPU and GPU-to-host copies and PyTorch's does not,
+and no native TensorRT baseline was run here, so this shows the engine against eager PyTorch and not this backend's overhead (the yolov8n numbers above are that comparison).
+One GPU, one run.
 
 ## References
 
