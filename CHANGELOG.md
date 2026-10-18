@@ -61,7 +61,8 @@ First public version. Pre-1.0: the API and ABI may change.
   skips itself with the reason. Executed end to end on an Apple M5: `reference`, `onnxruntime`, `ncnn`, `executorch`, `whispercpp`, `coreml` and
   `openvino` ran and matched a NumPy, PyTorch or Whisper reference; `llamacpp`, `tflite`, `qnn` and `tensorrt` skipped (no runtime or model here).
 - `examples/notebooks/uairt_tensorrt_colab.ipynb`: TensorRT 10.9 on a Colab GPU (install, build the plugin, ResNet-18 engine, comparison with PyTorch,
-  timing). **Not run on a GPU**; checked for syntax, the header fetch, and the plugin against TensorRT 10.9.0's headers with a CUDA stub.
+  timing). Run on a Colab T4 up to the export (Python 3.13, CUDA 13.0 toolkit): TensorRT 10.9.0.34 installed and the plugin built; the engine build, the
+  UAIRT run and the PyTorch comparison have not run yet.
 
 ### Added (submodules)
 

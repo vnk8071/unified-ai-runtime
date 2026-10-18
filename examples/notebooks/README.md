@@ -22,6 +22,7 @@ Vendor SDKs (QAIRT, TensorRT, Xcode) are never fetched for you except in the Col
 
 - The tour was executed end to end on an Apple M5 (macOS); see `CHANGELOG.md` for which sections ran there. Sections for hardware that machine does not have
   (`qnn`, `tflite`, `tensorrt`, `llamacpp` without a model) are written from the documented procedures and have **not** been run.
-- The Colab notebook has **not been run on a GPU**: it was written from TensorRT's documented API and the backend's tested procedure, and
-  checked for syntax only. Expect to fix a small thing on its first run, and please report it.
+- The Colab notebook was run on a Colab T4 (Python 3.13, CUDA 13.0 toolkit) up to the model export: TensorRT 10.9.0.34 installed, its headers were
+  fetched and **the UAIRT TensorRT plugin built**. The export then failed because Colab has no `onnx` package; that is fixed, and the engine build,
+  the UAIRT run and the comparison with PyTorch have **not run yet**. Please report what the next run shows.
 - The notebooks are committed without outputs.
