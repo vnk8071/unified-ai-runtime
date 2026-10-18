@@ -32,22 +32,38 @@ def main(run_model, plugin, model_path):
     arrays = [rng.random(shape).astype(dtype) if np.issubdtype(dtype, np.floating)
               else rng.integers(0, 4, shape).astype(dtype) for dtype, shape in inputs]
 
+    def uairt_outputs(options):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            paths = []
+            for i, array in enumerate(arrays):
+                array.tofile(tmp / f"in{i}.bin")
+                paths.append(str(tmp / f"in{i}.bin"))
+            flags = [x for k, v in options.items() for x in ("--option", f"{k}={v}")]
+            subprocess.run([run_model, *flags, plugin, "openvino", model_path, str(tmp / "out"), *paths], check=True)
+            return [np.fromfile(tmp / f"out{i}.bin", dtype=want.dtype).reshape(want.shape) for i, want in enumerate(expected)]
+
     compiled = ov.Core().compile_model(model_path, "CPU")
     expected = [np.asarray(v) for v in compiled(arrays).values()]
+    informative = 0
+    for i, (want, got) in enumerate(zip(expected, uairt_outputs({}))):
+        np.testing.assert_array_equal(got, want)
+        informative += np.unique(want).size > 1
+        print(f"output {i}: {want.shape} {want.dtype} identical to OpenVINO ({np.unique(want).size} distinct values)")
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        paths = []
-        for i, array in enumerate(arrays):
-            array.tofile(tmp / f"in{i}.bin")
-            paths.append(str(tmp / f"in{i}.bin"))
-        subprocess.run([run_model, plugin, "openvino", model_path, str(tmp / "out"), *paths], check=True)
-        informative = 0
-        for i, want in enumerate(expected):
-            got = np.fromfile(tmp / f"out{i}.bin", dtype=want.dtype).reshape(want.shape)
+    # Each engine option, alone and together, must load and match OpenVINO compiled with the same properties. (A bug once passed the
+    # property count where the C API wants an argument count: a single option failed to load and only the first of several applied.)
+    cases = [({"performance_hint": "latency"}, {"PERFORMANCE_HINT": "LATENCY"}),
+             ({"num_threads": "2"}, {"INFERENCE_NUM_THREADS": 2}),
+             ({"inference_precision": "f32"}, {"INFERENCE_PRECISION_HINT": "f32"}),
+             ({"inference_precision": "f16"}, {"INFERENCE_PRECISION_HINT": "f16"}),
+             ({"performance_hint": "throughput", "num_threads": "2", "inference_precision": "f32"},
+              {"PERFORMANCE_HINT": "THROUGHPUT", "INFERENCE_NUM_THREADS": 2, "INFERENCE_PRECISION_HINT": "f32"})]
+    for options, properties in cases:
+        reference = [np.asarray(v) for v in ov.Core().compile_model(model_path, "CPU", properties)(arrays).values()]
+        for i, (want, got) in enumerate(zip(reference, uairt_outputs(options))):
             np.testing.assert_array_equal(got, want)
-            informative += np.unique(want).size > 1
-            print(f"output {i}: {want.shape} {want.dtype} identical to OpenVINO ({np.unique(want).size} distinct values)")
+        print(f"options {options}: loads and matches OpenVINO with {properties}")
     assert informative, "every output is constant; the comparison proves nothing"
     print("UAIRT OpenVINO backend matches OpenVINO")
 

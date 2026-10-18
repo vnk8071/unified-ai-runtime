@@ -43,7 +43,7 @@ build/run_model --repeat 50 --option device=GPU build/libuairt_backend_openvino.
 ```
 
 Engine options: `device` (default `CPU`; also `GPU`, `NPU`, `GPU.1`, `AUTO`, `HETERO:...`), `performance_hint`
-(`latency` or `throughput`), `num_threads` and `cache_dir` (keeps compiled models, which makes GPU startup much faster).
+(`latency` or `throughput`), `num_threads`, `cache_dir` (keeps compiled models, which makes GPU startup much faster) and `inference_precision` (`f32`, `f16` or `bf16`). Without it OpenVINO picks the device's default, which on an Arm CPU is half precision: a ResNet-18 then differs from PyTorch by 0.05 on logits of size 6, and by 4e-6 with `f32`. Choose `f16` or `bf16` deliberately, after checking accuracy.
 A device OpenVINO does not list on this machine fails at engine creation with `UAIRT_ERR_BACKEND_UNAVAILABLE` and the
 list of devices that are available.
 

@@ -31,6 +31,7 @@
 #define OPTION_HINT "performance_hint"
 #define OPTION_THREADS "num_threads"
 #define OPTION_CACHE_DIR "cache_dir"
+#define OPTION_PRECISION "inference_precision"
 
 typedef struct {
   ov_core_t* core;
@@ -38,6 +39,7 @@ typedef struct {
   const char* hint; /* "LATENCY" or "THROUGHPUT", or NULL */
   char* threads;
   char* cache_dir;
+  const char* precision; /* "f32", "f16" or "bf16", or NULL for the device's default */
 } engine_t;
 
 typedef struct {
@@ -162,6 +164,14 @@ static uairt_status create_engine(const uairt_option* options, size_t num_option
     } else if (strcmp(key, OPTION_CACHE_DIR) == 0) {
       free(engine->cache_dir);
       engine->cache_dir = strdup(value);
+    } else if (strcmp(key, OPTION_PRECISION) == 0) {
+      if (strcmp(value, "f32") == 0 || strcmp(value, "f16") == 0 || strcmp(value, "bf16") == 0) {
+        engine->precision = strcmp(value, "f32") == 0 ? "f32" : strcmp(value, "f16") == 0 ? "f16" : "bf16";
+      } else {
+        fail("%s must be f32, f16 or bf16", OPTION_PRECISION);
+        status = UAIRT_ERR_INVALID_ARGUMENT;
+        goto cleanup;
+      }
     } else {
       fail("unknown option '%s'", key);
       status = UAIRT_ERR_INVALID_ARGUMENT;
@@ -346,8 +356,8 @@ static bool is_directory(const char* path) {
 }
 
 static uairt_status compile(engine_t* engine, ov_model_t* model, ov_compiled_model_t** compiled) {
-  const char* keys[3];
-  const char* values[3];
+  const char* keys[4];
+  const char* values[4];
   size_t count = 0;
   if (engine->hint) {
     keys[count] = ov_property_key_hint_performance_mode;
@@ -361,21 +371,31 @@ static uairt_status compile(engine_t* engine, ov_model_t* model, ov_compiled_mod
     keys[count] = ov_property_key_cache_dir;
     values[count++] = engine->cache_dir;
   }
+  if (engine->precision) {
+    keys[count] = ov_property_key_hint_inference_precision;
+    values[count++] = engine->precision;
+  }
+  /* The size argument counts arguments, two per property (key and value): passing the number of properties fails for an odd count and
+   * silently drops all but the first property for an even one. */
   ov_status_e status;
   switch (count) {
     case 0:
       status = ov_core_compile_model(engine->core, model, engine->device, 0, compiled);
       break;
     case 1:
-      status = ov_core_compile_model(engine->core, model, engine->device, 1, compiled, keys[0], values[0]);
+      status = ov_core_compile_model(engine->core, model, engine->device, 2, compiled, keys[0], values[0]);
       break;
     case 2:
-      status = ov_core_compile_model(engine->core, model, engine->device, 2, compiled, keys[0], values[0], keys[1],
+      status = ov_core_compile_model(engine->core, model, engine->device, 4, compiled, keys[0], values[0], keys[1],
                                      values[1]);
       break;
-    default:
-      status = ov_core_compile_model(engine->core, model, engine->device, 3, compiled, keys[0], values[0], keys[1],
+    case 3:
+      status = ov_core_compile_model(engine->core, model, engine->device, 6, compiled, keys[0], values[0], keys[1],
                                      values[1], keys[2], values[2]);
+      break;
+    default:
+      status = ov_core_compile_model(engine->core, model, engine->device, 8, compiled, keys[0], values[0], keys[1],
+                                     values[1], keys[2], values[2], keys[3], values[3]);
       break;
   }
   return check(status, "ov_core_compile_model");

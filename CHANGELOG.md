@@ -150,6 +150,16 @@ First public version. Pre-1.0: the API and ABI may change.
   provider. Verified with the MLX provider on an Apple M5: ResNet50 at batch 8 ran 3.1 to 3.2 times faster than
   the CPU EP with the same outputs; MobileNetV2 at batch 1 showed no gain.
 
+### Added (exporting models)
+- `scripts/export_model.py`: exports a PyTorch module or an ONNX file to ONNX Runtime, CoreML, ExecuTorch, OpenVINO or NCNN and checks each result through UAIRT against the
+  original (one process per target). `docs/agents/export-model.md` is rewritten around it: a source-by-target table, what was run here, and the traps found (half-precision defaults in
+  OpenVINO and `pnnx`, `qnn-net-run` needing native-file flags for quantized models).
+- OpenVINO backend: option `inference_precision` (`f32`, `f16`, `bf16`).
+
+### Fixed (OpenVINO)
+- Engine options of the OpenVINO backend (`performance_hint`, `num_threads`, `cache_dir`): any single option made the model fail to load ("invalid c input parameters"), and with several only
+  the first took effect, because the property count passed to OpenVINO's C API is an argument count (two per property). `tests/compare_with_openvino.py` now checks each option.
+
 ### Added (iOS and Android examples)
 - `examples/ios`: an app that links the core and the CoreML backend statically and runs bundled models on an iPhone, with a live camera detector (button, compute-unit switch); checked on an iPhone 12 against a Mac. `examples/android`: `run_on_device.sh`, and an app (built into an APK without Gradle, `app/build_apk.sh`) that detects objects in a picture through the TFLite backend; checked on a Qualcomm board.
 

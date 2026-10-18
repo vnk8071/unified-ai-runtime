@@ -98,7 +98,7 @@ That conversion path has not been run in this repository yet, so expect the agen
 ## Getting started
 
 1. **Bring a model in the format its runtime reads.** UAIRT does not convert or quantize: use an `.onnx`, `.dlc`, `.tflite`,
-   `.mlpackage`, `.gguf` and so on. [docs/agents/export-model.md](docs/agents/export-model.md) shows how to produce one.
+   `.mlpackage`, `.gguf` and so on. [docs/agents/export-model.md](docs/agents/export-model.md) shows how to produce one, and `scripts/export_model.py` does it for a PyTorch module or an ONNX file (ONNX Runtime, CoreML, ExecuTorch, OpenVINO, NCNN) and checks the result through UAIRT against the original.
 2. **Install.** For Python, `pip install "uairt[onnxruntime]"` (ONNX Runtime only; see [Install (Python)](#install-python)). For
    any other backend, build from source with that backend's option and its SDK, after checking what the machine supports:
 
