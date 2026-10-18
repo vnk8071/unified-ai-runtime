@@ -55,6 +55,13 @@ First public version. Pre-1.0: the API and ABI may change.
 - `.gitattributes` keeps text files, and shell scripts in particular, LF in every checkout.
 - The docs and `AGENTS.md` separate "core verified" from "backend verified".
 
+### Changed (core language)
+
+- The core (`src/uairt.cpp`, `src/loader.cpp`) is now C++17 instead of C11; the public headers, the plugin ABI and every exported symbol are unchanged (38 before and
+  after, same names, C linkage). It is built without exceptions or RTTI and uses no STL or `new`, so `libuairt` still depends only on the system C library and a
+  plain C program links the static archive with the C driver. The builtin reference backend and all plugins are unchanged. Verified on macOS arm64 (shared and static
+  builds, the C, C++ and Python binding tests, ASan and UBSan); not yet built with GCC, MSVC or on Windows.
+
 ### Added (notebooks)
 
 - `examples/notebooks/uairt_backends_tour.ipynb`: builds UAIRT and runs a tiny model through each backend it can; a section whose runtime is missing

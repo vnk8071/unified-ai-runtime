@@ -9,22 +9,38 @@ endforeach()
 
 project(unified_ai_runtime
   VERSION ${UAIRT_VERSION_MAJOR}.${UAIRT_VERSION_MINOR}.${UAIRT_VERSION_PATCH}
-  LANGUAGES C)
+  LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(UAIRT_BUILD_TESTS "Build tests" ON)
 option(UAIRT_BUILD_REFERENCE_BACKEND "Build the test-only reference backend" ON)
 
 find_package(Threads REQUIRED)
 
+# The core is C++17 behind a C11 API: the public headers, the plugin ABI and every symbol the library exports stay C. It uses no exceptions, RTTI,
+# STL or operator new, so it needs no C++ runtime library, and it is linked with the C driver so none is added: C callers and plugins see the same
+# dependencies as before. The reference backend stays C, as it is also the template for writing a plugin.
 add_library(uairt
-  src/uairt.c
-  src/loader.c
+  src/uairt.cpp
+  src/loader.cpp
 )
+target_compile_features(uairt PRIVATE cxx_std_17)
+target_compile_options(uairt PRIVATE
+  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-exceptions>
+  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-rtti>
+  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->)
+set_target_properties(uairt PROPERTIES LINKER_LANGUAGE C CXX_VISIBILITY_PRESET hidden)
+# CMake adds the C++ runtime (-lc++ / -lstdc++) to any target with C++ sources even though nothing here references it: let the linker drop it.
+target_link_options(uairt PRIVATE
+  $<$<PLATFORM_ID:Darwin>:-Wl,-dead_strip_dylibs>
+  $<$<PLATFORM_ID:Linux>:-Wl,--as-needed>)
 target_include_directories(uairt
   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
          $<INSTALL_INTERFACE:include>

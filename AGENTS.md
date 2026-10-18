@@ -1,6 +1,6 @@
 # Unified AI Runtime (UAIRT)
 
-C11 library: one C API over several inference runtimes, backends as plugins.
+A C++17 core behind a C11 API: one C API over several inference runtimes, backends as plugins.
 Read `docs/design.md` before changing any public header.
 
 ## Your job
@@ -26,6 +26,9 @@ with them.
 - Public headers (`include/uairt/`) are an ABI. Append only; never reorder or resize
   existing structs. Every struct starts with `struct_size` or `abi_version`.
 - No C++ types, exceptions or STL across the ABI boundary.
+- The core (`src/uairt.cpp`, `src/loader.cpp`) is C++17 built without exceptions or RTTI and uses no STL, `new` or `delete`, so `libuairt`
+  needs no C++ runtime and exports exactly the C API: after a change, `nm -gU libuairt` must list the same symbols as before. The builtin
+  reference backend (`src/backends/reference.c`) stays C because it is the template for plugins, and plugins never link the core.
 - Never commit vendor SDK files, headers or libraries (QNN/QAIRT, Apple, NVIDIA).
   `scripts/check_no_vendor_files.sh` enforces this; do not weaken it.
 - Never accept a vendor license on the user's behalf and never download SDKs.

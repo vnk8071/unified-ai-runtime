@@ -105,7 +105,7 @@ their plugins from this repository (below) and point `UAIRT_PLUGIN_PATH` at them
 
 ## Build
 
-Needs CMake 3.16+ and a C11 compiler.
+Needs CMake 3.16+ and a C11 and C++17 compiler (the core is C++17 behind the C API; nothing links a C++ runtime).
 
 ```bash
 scripts/doctor.sh                      # reports what is available on this machine

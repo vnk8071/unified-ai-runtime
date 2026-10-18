@@ -65,7 +65,7 @@ struct uairt_buffer {
   uairt_memory_domain domain;
 };
 
-static _Thread_local char g_error[ERROR_CAPACITY];
+static thread_local char g_error[ERROR_CAPACITY];
 static const uairt_backend_api* g_backends[MAX_BACKENDS];
 static size_t g_backend_count;
 
@@ -81,9 +81,9 @@ static void host_set_error(const char* message) {
 }
 
 static const uairt_host_api g_host = {
-    .struct_size = sizeof(uairt_host_api),
-    .abi_version = UAIRT_BACKEND_ABI_VERSION,
-    .set_error = host_set_error,
+    sizeof(uairt_host_api),
+    UAIRT_BACKEND_ABI_VERSION,
+    host_set_error,
 };
 
 const char* uairt_version_string(void) {
@@ -357,7 +357,7 @@ uairt_status uairt_engine_create(
     uairt_set_error("backend '%s' is not registered", backend);
     return UAIRT_ERR_NOT_FOUND;
   }
-  uairt_engine* engine = calloc(1, sizeof(*engine));
+  uairt_engine* engine = static_cast<uairt_engine*>(calloc(1, sizeof(*engine)));
   if (!engine) {
     uairt_set_error("out of memory");
     return UAIRT_ERR_OUT_OF_MEMORY;
@@ -396,7 +396,7 @@ uairt_status uairt_model_load(
     uairt_set_error("model source needs exactly one of path or data");
     return UAIRT_ERR_INVALID_ARGUMENT;
   }
-  uairt_model* model = calloc(1, sizeof(*model));
+  uairt_model* model = static_cast<uairt_model*>(calloc(1, sizeof(*model)));
   if (!model) {
     uairt_set_error("out of memory");
     return UAIRT_ERR_OUT_OF_MEMORY;
@@ -581,7 +581,7 @@ uairt_status uairt_buffer_alloc(
     return UAIRT_ERR_INVALID_ARGUMENT;
   }
   *out_buffer = NULL;
-  uairt_buffer* buffer = calloc(1, sizeof(*buffer));
+  uairt_buffer* buffer = static_cast<uairt_buffer*>(calloc(1, sizeof(*buffer)));
   if (!buffer) {
     uairt_set_error("out of memory");
     return UAIRT_ERR_OUT_OF_MEMORY;
@@ -724,7 +724,7 @@ uairt_status uairt_session_create(
   if (!sessions) {
     return UAIRT_ERR_UNSUPPORTED;
   }
-  uairt_session* session = calloc(1, sizeof(*session));
+  uairt_session* session = static_cast<uairt_session*>(calloc(1, sizeof(*session)));
   if (!session) {
     uairt_set_error("out of memory");
     return UAIRT_ERR_OUT_OF_MEMORY;

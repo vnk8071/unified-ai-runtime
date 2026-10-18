@@ -4,11 +4,19 @@
 
 #include <uairt/uairt_backend.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void uairt_set_error(const char* fmt, ...);
 
 uairt_status uairt_loader_open(const char* path, uairt_backend_get_api_fn* out);
 
 UAIRT_API const uairt_backend_api* uairt_reference_backend_get_api(
     const uairt_host_api* host);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

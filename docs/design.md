@@ -19,7 +19,8 @@ domains before a backend runs, so backends do not repeat it.
 
 ## ABI rules
 
-- Plain C11. No exceptions, no C++ types, no ownership transfer across the boundary.
+- Plain C11 at the boundary. No exceptions, no C++ types, no ownership transfer across it. Behind it the core is C++17 compiled without exceptions
+  or RTTI and with no STL or `new`, so the library needs no C++ runtime and its exported symbols are the C API and nothing else.
 - `struct_size` first in every caller-filled struct; backends expose `abi_version`
   and `struct_size`. Add fields at the end only.
 - Status codes are `int32_t` constants; details come from `uairt_last_error()`
