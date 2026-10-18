@@ -15,6 +15,8 @@ cmake -S . -B build-shared -DBUILD_SHARED_LIBS=ON -DUAIRT_BUILD_LLAMACPP=ON && c
 | `c` (this folder's `*.c`) | `quickstart.c`, `run_model.c` (any model), `llm_generate.c` (your own greedy loop), `llm_stream.c` (`uairt_llm`), `llm_complete.c` (text servers) | `build-shared/quickstart` |
 | [`cpp/`](cpp) | `uairt.hpp`, a header-only RAII wrapper with exceptions, and `quickstart.cpp`, `llm_stream.cpp` | `build-shared/examples/cpp/quickstart_cpp` |
 | [`python/`](python) | `quickstart.py`, `llm_stream.py`, `session_loop.py` (your own sampling loop over the logits, with NumPy); `auto_model.py` (any model), `llm_generate.py`, `run_qnn.py`, `detect_tensorrt.py`; `inspect_model.py` and `prepost.py`, the helpers behind [docs/agents/pre-post-processing.md](../docs/agents/pre-post-processing.md) | `PYTHONPATH=bindings/python UAIRT_LIBRARY=build-shared/libuairt.dylib python examples/python/quickstart.py` |
+| [`ios/`](ios) | A UIKit app that links the core and the CoreML backend statically, runs bundled CoreML models on an iPhone and detects objects live from the camera | see [ios/README.md](ios/README.md) |
+| [`android/`](android) | `run_on_device.sh` (NDK build, `adb push`, runs the checks and a model on a device) and an app that detects objects in a picture, built into an APK with the SDK tools (no Gradle) | `ANDROID_NDK_HOME=... examples/android/run_on_device.sh` |
 | [`rust/`](rust) | A crate with hand-written FFI declarations, a safe wrapper (`Engine`, `Model` that borrows its engine) and the two programs | `UAIRT_LIB_DIR=$PWD/build-shared cargo run --release --manifest-path examples/rust/Cargo.toml --bin quickstart` |
 
 The llm_stream programs take `<plugin> <model.gguf> "<prompt>" <max_tokens> [temperature [top_k [top_p [seed]]]]`, for example

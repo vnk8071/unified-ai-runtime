@@ -63,6 +63,12 @@ def test_nms_matches_a_brute_force_reference_on_random_boxes():
             assert prepost.nms(boxes, scores, threshold).tolist() == brute_force_nms(boxes, scores, threshold)
 
 
+def test_nms_of_no_boxes_is_empty_with_or_without_classes():
+    empty = np.zeros((0, 4))
+    assert prepost.nms(empty, np.zeros(0)).tolist() == []
+    assert prepost.nms(empty, np.zeros(0), classes=np.zeros(0, dtype=np.int64)).tolist() == []
+
+
 def test_class_aware_nms_keeps_overlapping_boxes_of_different_classes():
     boxes = np.array([[0, 0, 10, 10], [0, 0, 10, 10]], dtype=np.float64)
     assert prepost.nms(boxes, np.array([0.9, 0.8]), 0.5).tolist() == [0]

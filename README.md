@@ -125,6 +125,9 @@ To see it run before writing anything, open [examples/notebooks/uairt_backends_t
 each backend it can (a section whose runtime is missing skips itself and says why). A [Google Colab notebook](examples/notebooks/uairt_tensorrt_colab.ipynb) does the same for TensorRT on a GPU.
 Both are saved with the outputs of a real run; see [examples/notebooks/README.md](examples/notebooks/README.md).
 
+Language models: `libuairt_llm` (`uairt/uairt_llm.h`) adds sampling (temperature, top-k, top-p, seed) and a streaming generation loop over the session calls. It stops where the
+model ends its text, and its greedy output matches llama.cpp's own tool ([docs/api.md](docs/api.md#generation-uairtuairt_llmh-libuairt_llm)); [examples/](examples/README.md) has it in C, C++, Python and Rust.
+
 What you still write: pre- and post-processing (resize, layout, normalization, box decoding, chat templates; [docs/agents/pre-post-processing.md](docs/agents/pre-post-processing.md) walks through it, starting from `examples/python/inspect_model.py`). Inputs must match the
 model's dtype and shape exactly, because UAIRT never converts silently. If a backend cannot serve the device you ask for, the call fails
 instead of falling back to the CPU. [docs/agents/write-app.md](docs/agents/write-app.md) has the details and the pitfalls.
@@ -170,10 +173,10 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 | Backend | Models | Verified on |
 |---|---|---|
 | ONNX Runtime | `.onnx`, static shapes; CPU, and the CUDA and TensorRT providers on NVIDIA GPUs | macOS arm64 (CPU) and a GTX 1650 (CUDA provider); matches Python ONNX Runtime. Compiles on Windows ARM64, not run there |
-| QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy; compiled-context cache | Qualcomm QCS6490 and QCS8550, and Windows 11 ARM64 on a Snapdragon X Elite NPU; byte-identical to `qnn-net-run` |
-| TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench` |
-| CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O, image inputs | Apple M5; identical to CoreML itself |
-| llama.cpp | `.gguf`; sessions (tokenize, append, logits); text completion (`uairt_model_complete`); `device` picks a llama.cpp device (`CUDA0`, `Vulkan0`, `GPUOpenCL`, `HTP0`) | Apple M5 (Metal); Ubuntu 24.04 x86_64 RTX 3060 (CUDA and Vulkan); Windows 11 ARM64 Snapdragon X Elite (CPU, OpenCL on the Adreno GPU, Hexagon NPU as `HTP0`). `ctest` compares with llama.cpp's own greedy output; some GPU and NPU outputs differ from the CPU's after a few tokens (see [docs/backends/llamacpp.md](docs/backends/llamacpp.md)) |
+| QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy; compiled-context cache | Qualcomm QCS6490 and QCS8550, Windows 11 ARM64 on a Snapdragon X Elite NPU, and Android on an SM8850 board (HTP v81, a float context binary and a w8a8 `.dlc`); byte-identical to `qnn-net-run` |
+| TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench`. On an Android SM8850 board a w8a8 YOLOX ran on the CPU and through the QNN delegate, but there was no TFLite reference tool there to compare with, and the delegate was slower than the CPU for that model |
+| CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O, image inputs | Apple M5; identical to CoreML itself. On an iPhone 12 (iOS 18.1.1), linked statically into an app: a small model equals the Mac's result, and a YOLOv9t detector gives the Mac's detections (3.3 ms with the Neural Engine) |
+| llama.cpp | `.gguf`; sessions (tokenize, append, logits); text completion (`uairt_model_complete`); `device` picks a llama.cpp device (`CUDA0`, `Vulkan0`, `GPUOpenCL`, `HTP0`) | Apple M5 (Metal); Ubuntu 24.04 x86_64 RTX 3060 (CUDA and Vulkan); Windows 11 ARM64 Snapdragon X Elite (CPU, OpenCL on the Adreno GPU, Hexagon NPU as `HTP0`). `ctest` compares with llama.cpp's own greedy output; some GPU and NPU outputs differ from the CPU's after a few tokens (see [docs/backends/llamacpp.md](docs/backends/llamacpp.md)); an Android SM8850 board (CPU): text identical to `llama-completion` |
 | LLM servers | Ollama, LM Studio, SGLang through one `llmserver` backend (attach to a running server over HTTP; text in, streamed text out; no tensors or sessions) | macOS arm64 with Ollama only: output identical to a direct request to the server. LM Studio, SGLang and Modular MAX (`max serve`, via `base_url`) untested (see [docs/backends/llmserver.md](docs/backends/llmserver.md)) |
 | OpenVINO | IR (`.xml` + `.bin`) and `.onnx`, static shapes; any OpenVINO device | an Intel Core CPU, and an x64 build under emulation on a Snapdragon X Elite laptop (there is no Windows ARM64 OpenVINO); bit-identical to OpenVINO's Python API. GPU and NPU devices untested |
 | NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan (matches NCNN's Python API); a Snapdragon X Elite laptop, CPU and Adreno GPU through Vulkan, same detections |
@@ -187,6 +190,18 @@ the two are reported separately (see [docs/agents/run-model.md](docs/agents/run-
 
 Known issues and the exact configurations tested are in [docs/api.md](docs/api.md) and
 [docs/design.md](docs/design.md). Read them before relying on a backend.
+
+### Platforms
+
+The core is C++17 behind a C11 API with no C++ runtime dependency, so it builds wherever a C and C++ toolchain does. What runs where also depends on each backend's vendor runtime.
+
+| Platform | State |
+|---|---|
+| Linux (x86_64, aarch64) | CI builds and tests the core and builds wheels; QNN, TensorRT, OpenVINO, NCNN and llama.cpp have run on real machines (see the table above) |
+| macOS (arm64) | Everything in the table above that is Apple- or CPU-based, including Metal for llama.cpp and whisper.cpp |
+| Windows (x64, ARM64) | CI builds on both; QNN, NCNN and llama.cpp have run on a Snapdragon X Elite laptop |
+| Android (arm64-v8a) | Cross-compiles with the NDK (`cmake --preset android-arm64`); core and generation tests, llama.cpp, QNN and TFLite have run on a Qualcomm SM8850 board, and an example app runs a detector on a picture ([examples/android](examples/android/README.md)). No CI, and the GPU and the NPU through TFLite are untested |
+| iOS (arm64) | The CoreML backend links statically into an app (iOS cannot load plugins); an example app runs models and a live camera detector on an iPhone 12 ([examples/ios](examples/ios/README.md)). Other backends are untested on iOS |
 
 ## Install (Python)
 
@@ -442,6 +457,7 @@ ONNX Runtime plugin is on PyPI (`pip install "uairt[onnxruntime]"`; see [docs/re
 ## Documentation
 
 - [docs/api.md](docs/api.md): every function, status codes, options, tested configurations
+- [examples/](examples/README.md): the same programs in C, C++, Python and Rust, an Android app and script, and an iOS app with a live camera detector
 - [examples/notebooks/](examples/notebooks/README.md): a notebook with one runnable example per backend, and a Google Colab notebook that runs TensorRT on a GPU
 - [docs/writing-a-backend.md](docs/writing-a-backend.md): the plugin ABI and how to add a backend
 - [docs/design.md](docs/design.md): design decisions, per-backend notes, measurements

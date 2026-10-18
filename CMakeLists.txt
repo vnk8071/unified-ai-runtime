@@ -161,7 +161,7 @@ option(UAIRT_BUILD_QNN "Build the QNN (Qualcomm AI Runtime) backend plugin" OFF)
 if(UAIRT_BUILD_QNN)
   set(QNN_SDK_ROOT "$ENV{QNN_SDK_ROOT}" CACHE PATH "Directory of your QAIRT SDK")
   find_path(UAIRT_QNN_INCLUDE QnnInterface.h
-    HINTS ${QNN_SDK_ROOT}/include/QNN NO_DEFAULT_PATH)
+    HINTS ${QNN_SDK_ROOT}/include/QNN NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
   if(NOT UAIRT_QNN_INCLUDE)
     message(FATAL_ERROR
       "QNN headers not found. Set QNN_SDK_ROOT to your QAIRT SDK directory "
@@ -201,7 +201,7 @@ if(UAIRT_BUILD_TFLITE)
   # Optional QNN delegate support: needs QnnTFLiteDelegate.h from your QAIRT SDK.
   set(QNN_SDK_ROOT "$ENV{QNN_SDK_ROOT}" CACHE PATH "Directory of your QAIRT SDK")
   find_path(UAIRT_QNN_TFLITE_DELEGATE_INCLUDE QnnTFLiteDelegate.h
-    HINTS ${QNN_SDK_ROOT}/include/QNN/TFLiteDelegate NO_DEFAULT_PATH)
+    HINTS ${QNN_SDK_ROOT}/include/QNN/TFLiteDelegate NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
   if(UAIRT_QNN_TFLITE_DELEGATE_INCLUDE)
     target_compile_definitions(uairt_backend_tflite PRIVATE UAIRT_TFLITE_QNN_DELEGATE)
     target_include_directories(uairt_backend_tflite SYSTEM PRIVATE ${UAIRT_QNN_TFLITE_DELEGATE_INCLUDE})

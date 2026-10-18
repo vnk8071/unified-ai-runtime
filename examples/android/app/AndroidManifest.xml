@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.uairt.example">
+  <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35" />
+  <!-- extractNativeLibs: the UAIRT plugins are loaded by path from the app's native library directory, so they must be extracted -->
+  <application android:label="UAIRT example" android:extractNativeLibs="true" android:hasCode="true"
+      android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+    <activity android:name=".MainActivity" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

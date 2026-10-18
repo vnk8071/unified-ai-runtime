@@ -128,6 +128,8 @@ def nms(boxes: np.ndarray, scores: np.ndarray, iou_threshold: float = 0.45,
     """Greedy non-maximum suppression on xyxy boxes; returns the kept indices, best score first. With `classes`, boxes of
     different classes never suppress each other."""
     boxes = np.asarray(boxes, dtype=np.float64)
+    if len(boxes) == 0:
+        return np.zeros(0, dtype=np.int64)
     if classes is not None:
         boxes = boxes + (np.asarray(classes, dtype=np.float64) * (boxes.max() + 1.0))[:, None]
     order = np.argsort(-np.asarray(scores), kind="stable")

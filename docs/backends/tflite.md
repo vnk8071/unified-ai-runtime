@@ -47,6 +47,23 @@ For another architecture add a toolchain file (`-DCMAKE_TOOLCHAIN_FILE=...`) or 
 the device. Point `TFLITE_INCLUDE_DIR` at the TensorFlow source root and `TFLITE_LIBRARY` at the
 resulting `libtensorflowlite_c.so`. Check the TensorFlow docs for the flags of the version you use.
 
+## Android
+
+Build `libtensorflowlite_c.so` with the NDK from a TensorFlow release tag, not `master` (its CMake build was broken when tried). `v2.20.0` worked, with a host `flatc` of the matching
+version (24.3.25), XNNPACK on, and the version macros passed in by hand:
+
+```bash
+cmake -S tensorflow/tensorflow/lite/c -B tflite-android -DCMAKE_BUILD_TYPE=Release -DTFLITE_C_BUILD_SHARED_LIBS=ON \
+  -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 \
+  -DANDROID_STL=c++_static -DTFLITE_ENABLE_XNNPACK=ON -DTFLITE_HOST_TOOLS_DIR=/path/to/flatc-dir \
+  '-DCMAKE_CXX_FLAGS=-DTF_MAJOR_VERSION=2 -DTF_MINOR_VERSION=20 -DTF_PATCH_VERSION=0 -DTF_VERSION_SUFFIX=\"\"'
+```
+
+Then build UAIRT with `TFLITE_INCLUDE_DIR` (the TensorFlow source root) and `TFLITE_LIBRARY` set, push `libuairt_backend_tflite.so`, `libtensorflowlite_c.so` and, for `delegate=qnn`,
+`libQnnTFLiteDelegate.so` and the QNN libraries (see [qnn.md](qnn.md)). Checked on an SM8850 board with a w8a8 YOLOX `.tflite`: 38 ms on the CPU (4 threads); with `delegate=qnn` the
+delegate took 237 of 317 nodes in 111 partitions and ran in 122 ms, slower than the CPU, so check the partitioning before choosing it. The outputs of CPU, delegate and the same model as a
+`.dlc` agree on the scores to 1 to 2 quantization steps and differ on the boxes and class ids of near-zero-score anchors; there was no TFLite reference tool on the device to compare with.
+
 ## Check
 
 To compare with TFLite itself, build `tests/bench/tflite_bench.c` (see

@@ -40,6 +40,18 @@ after checking your SDK. Useful extras:
 graphs, `--repeat N` to time runs, `--dmabuf` for zero-copy on HTP (needs `libcdsprpc.so`
 (FastRPC) on the device).
 
+## Android
+
+Cross-compile the plugin with the NDK (`cmake --preset android-arm64 -DUAIRT_BUILD_QNN=ON`, `QNN_SDK_ROOT` set; headers only, the SDK has no macOS libraries), then push to the
+device: the plugin and `libuairt.so`, `lib/aarch64-android/{libQnnHtp,libQnnSystem}.so` plus `libQnnHtp<arch>Stub.so`, and `lib/hexagon-<arch>/unsigned/` (the skel) to a directory
+named in `adsp_library_path`. A `.dlc` also needs `lib/aarch64-android/libQnnHtpPrepare.so`. `getprop ro.soc.model` names the SoC; the HTP arch (`v73`, `v81`) follows from it.
+The plugin keeps `libQnnHtp.so` mapped at exit on Android: closing it crashes (SIGSEGV) in FastRPC code the stub leaves behind.
+
+Checked on a Qualcomm SM8850 board (Android 16, userdebug, HTP v81, QAIRT 2.46) against `qnn-net-run` from the same SDK:
+- a float YOLOv11 context binary built for a QCS8550 (`v73`) loaded and ran (8 images in about 105 ms), and its three outputs were byte-identical to `qnn-net-run`'s;
+- a w8a8 YOLOX `.dlc` (exported with QAIRT 2.50) compiled on the device in about 0.5 s and ran in 8 ms, byte-identical to `qnn-net-run` with `--use_native_input_files --use_native_output_files`
+  (without those flags `qnn-net-run` treats the raw input as float32 and the outputs differ).
+
 ## Check
 
 Set `UAIRT_QNN_TEST_DLC=/path/model.dlc` (or a `.bin` context binary), `UAIRT_QNN_TEST_BACKEND=cpu|htp`

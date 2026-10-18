@@ -341,12 +341,15 @@ static void destroy_engine(void* handle) {
   if (engine->rpcmem_library) {
     uairt_dlclose(engine->rpcmem_library);
   }
+#if !defined(__ANDROID__)
+  /* On Android the HTP stub leaves FastRPC callbacks that fire after the library is gone (SIGSEGV at exit): keep it mapped. */
   if (engine->system_library) {
     uairt_dlclose(engine->system_library);
   }
   if (engine->backend_library) {
     uairt_dlclose(engine->backend_library);
   }
+#endif
   free(engine);
 }
 

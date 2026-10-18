@@ -150,10 +150,17 @@ First public version. Pre-1.0: the API and ABI may change.
   provider. Verified with the MLX provider on an Apple M5: ResNet50 at batch 8 ran 3.1 to 3.2 times faster than
   the CPU EP with the same outputs; MobileNetV2 at batch 1 showed no gain.
 
+### Added (iOS and Android examples)
+- `examples/ios`: an app that links the core and the CoreML backend statically and runs bundled models on an iPhone, with a live camera detector (button, compute-unit switch); checked on an iPhone 12 against a Mac. `examples/android`: `run_on_device.sh`, and an app (built into an APK without Gradle, `app/build_apk.sh`) that detects objects in a picture through the TFLite backend; checked on a Qualcomm board.
+
 ### Added (Android)
+- QNN and TFLite backends cross-compile for Android; the QNN plugin keeps `libQnnHtp.so` mapped at exit there (closing it crashed). Checked on an SM8850 board against `qnn-net-run`.
 - NDK build (`cmake --preset android-arm64`) for `arm64-v8a`; checked on a Qualcomm device, including llama.cpp against `llama-completion`.
 - The plugin loader reloads an opt-in (`uairt_backend_global_symbols`) plugin with `RTLD_GLOBAL` on Android, whose linker ignores `RTLD_GLOBAL` when
   reopening a loaded library.
+
+### Fixed
+- `prepost.nms` returns no boxes for no boxes (it crashed when classes were passed).
 
 ### Added (generation)
 - `libuairt_llm` (`uairt/uairt_llm.h`): sampling (temperature, top-k, top-p, seed) and a streaming generation loop over the session

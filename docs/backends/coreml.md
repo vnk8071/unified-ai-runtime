@@ -44,6 +44,22 @@ errors). With Xcode's iPhoneOS and iPhoneSimulator SDKs both builds compile and 
 and IOSSIMULATOR). **Not run:** nothing was executed on an iPhone or in a simulator (no simulator runtime was installed), no model
 was run through the static build, and no app was built, signed or submitted.
 
+## Models with a built-in NMS stage
+
+A detector exported with Ultralytics' `nms=True` (for example `TheCluster/YOLOv9-CoreML` on Hugging Face) is a pipeline: the network plus a non-maximum-suppression stage
+that takes two scalar inputs (`iouThreshold`, `confidenceThreshold`) and returns a variable number of detections. This backend refuses it
+(`input 'confidenceThreshold' is not a multi-array`): outputs have static shapes here. Take the first stage out and do the NMS yourself:
+
+```python
+spec = ct.models.MLModel("yolov9t.mlpackage", skip_model_load=True).get_spec()
+ct.models.MLModel(spec.pipeline.models[0], weights_dir=model.weights_dir).save("yolov9t_net.mlpackage")
+```
+
+The network stage has one image input (640 x 640, passed as `1x640x640x4` BGRA bytes) and two outputs, class scores `[8400, 80]` and boxes `[8400, 4]` (centre x, centre y,
+width, height, as fractions of the image). Checked on a Mac, CPU: the outputs are identical to coremltools' for the same network, and `examples/python/prepost.py`'s `nms`
+on them (confidence 0.25, IoU 0.45) gives the same 5 detections as the pipeline's own NMS stage on the standard `bus.jpg` (a bus and four people). The model is AGPL-3.0:
+keep it out of this repository. The same model on an iPhone 12 (iOS 18.1.1): 21 ms on the CPU, 3.3 ms with the Neural Engine, the same five detections ([examples/ios](../../examples/ios/README.md)).
+
 ## Check
 
 `ctest --test-dir build --output-on-failure`. The comparison with CoreML itself needs Python with
