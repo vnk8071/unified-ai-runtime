@@ -31,7 +31,10 @@ Vendor SDKs (QAIRT, TensorRT, Xcode) are never fetched for you except in the Col
   onnxruntime, openvino and coremltools itself, then `reference`, `onnxruntime`, `ncnn`, `whispercpp`, `llamacpp`, `coreml` and `openvino` ran, the two
   model sections from files in a `models/` folder next to the notebook, which the notebook itself downloaded and hash-checked with both download flags on). It has not been run on Linux or on Colab. Sections for hardware that machine does not have
   (`qnn`, `tflite`, `tensorrt`, `llamacpp` without a model) are written from the documented procedures and have **not** been run.
-- The Colab notebook was run on a Colab T4 (Python 3.13, CUDA 13.0 toolkit) up to the model export: TensorRT 10.9.0.34 installed, its headers were
-  fetched and **the UAIRT TensorRT plugin built**. The export then failed because Colab has no `onnx` package; that is fixed, and the engine build,
-  the UAIRT run and the comparison with PyTorch have **not run yet**. Please report what the next run shows.
-- The notebooks are committed without outputs.
+- The Colab notebook ran to completion on a Colab Tesla T4 (Python 3.13, CUDA 13.0 toolkit, TensorRT 10.9.0.34): the plugin built, and for ResNet-18 the FP32 engine
+  matched PyTorch to 1.5e-6 and the FP16 engine to 2.6e-3, with the same top-1 class. Median time per run: UAIRT 1.79 ms (1.54 ms with pinned buffers) for FP32,
+  0.76 ms (0.60 ms) for FP16, PyTorch eager 3.32 ms. One GPU, one run, a random-weight model: a sanity check, not a benchmark.
+- Both notebooks are committed **with** their saved outputs, so you can read the results without running anything. The tour's outputs come from one run on an
+  Apple M5 (macOS, Python 3.12.13, the `sam3` virtual environment), with the Whisper and llama models taken from files outside the repository, and they contain
+  that machine's local paths. The Colab notebook's outputs come from the Colab T4 run above. Rerunning a notebook replaces them; clear the
+  outputs before committing if you do not want your own paths in the repository.

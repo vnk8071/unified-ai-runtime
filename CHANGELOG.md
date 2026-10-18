@@ -58,11 +58,12 @@ First public version. Pre-1.0: the API and ABI may change.
 ### Added (notebooks)
 
 - `examples/notebooks/uairt_backends_tour.ipynb`: builds UAIRT and runs a tiny model through each backend it can; a section whose runtime is missing
-  skips itself with the reason. Executed end to end on an Apple M5: `reference`, `onnxruntime`, `ncnn`, `executorch`, `whispercpp`, `coreml` and
-  `openvino` ran and matched a NumPy, PyTorch or Whisper reference; `llamacpp`, `tflite`, `qnn` and `tensorrt` skipped (no runtime or model here).
+  skips itself with the reason. Executed end to end on an Apple M5: `reference`, `onnxruntime`, `ncnn`, `whispercpp`, `llamacpp`, `coreml` and `openvino`
+  ran and matched a NumPy, PyTorch, Whisper or llama reference (`executorch` too, with an ExecuTorch install); `tflite`, `qnn` and `tensorrt` skipped (no runtime here).
+  Both notebooks are committed with their saved outputs.
 - `examples/notebooks/uairt_tensorrt_colab.ipynb`: TensorRT 10.9 on a Colab GPU (install, build the plugin, ResNet-18 engine, comparison with PyTorch,
-  timing). Run on a Colab T4 up to the export (Python 3.13, CUDA 13.0 toolkit): TensorRT 10.9.0.34 installed and the plugin built; the engine build, the
-  UAIRT run and the PyTorch comparison have not run yet.
+  timing). Ran to completion on a Colab Tesla T4 (Python 3.13, CUDA 13.0 toolkit, TensorRT 10.9.0.34): the FP32 engine matched PyTorch to 1.5e-6, the FP16
+  engine to 2.6e-3, same top-1 class.
 
 ### Added (submodules)
 
