@@ -30,9 +30,9 @@ TFLite or QNN models, a trained detector. Those sections say "pattern".
 ## 2. Inspect, then find the reference pipeline
 
 ```bash
-python bindings/python/examples/inspect_model.py model.onnx                       # inputs, outputs, and a heuristic guess
-python bindings/python/examples/inspect_model.py yolov8n_ncnn_model --option input_shapes=3x640x640   # NCNN needs the shapes
-python bindings/python/examples/inspect_model.py ggml-tiny.en.bin --backend whispercpp --option n_samples=176000   # a .bin goes to QNN unless forced
+python examples/python/inspect_model.py model.onnx                       # inputs, outputs, and a heuristic guess
+python examples/python/inspect_model.py yolov8n_ncnn_model --option input_shapes=3x640x640   # NCNN needs the shapes
+python examples/python/inspect_model.py ggml-tiny.en.bin --backend whispercpp --option n_samples=176000   # a .bin goes to QNN unless forced
 build/run_model --info <plugin> <backend> <model>                                  # the same table from C, without Python
 ```
 
@@ -79,8 +79,8 @@ This is what `inspect_model.py` encodes; confirm each row with the model card.
 | no tensors at all | a GGUF language model or a server model | 6.1, 7 |
 | integer inputs/outputs with a scale and zero point | a quantized model | 4.2, 5.6 |
 
-The helpers named below are in `bindings/python/examples/prepost.py` (NumPy, Pillow for image files; tests in
-`bindings/python/tests/test_prepost.py`). Use them with `sys.path.insert(0, "bindings/python/examples"); import prepost`.
+The helpers named below are in `examples/python/prepost.py` (NumPy, Pillow for image files; tests in
+`bindings/python/tests/test_prepost.py`). Use them with `sys.path.insert(0, "examples/python"); import prepost`.
 
 ## 4. Pre-processing
 
@@ -99,7 +99,7 @@ Decide each of these from the reference pipeline, in this order:
 | Batch | a leading dimension of 1 | wrong shape |
 
 ```python
-import sys; sys.path.insert(0, "bindings/python/examples")
+import sys; sys.path.insert(0, "examples/python")
 import numpy as np, uairt, prepost
 
 image = prepost.load_rgb("photo.jpg")
@@ -358,4 +358,4 @@ Report what you checked, on what input, and what you did not: the labels, the th
 | `needs ... got float64` | NumPy defaulted to float64; `astype(info.dtype)` |
 
 Related: [export-model.md](export-model.md) (getting a model into a loadable format), [troubleshooting.md](troubleshooting.md) (load and
-build errors), `bindings/python/examples/` (`detect_tensorrt.py` is a complete detector, `llm_generate.py` a complete language model).
+build errors), `examples/python/` (`detect_tensorrt.py` is a complete detector, `llm_generate.py` a complete language model).

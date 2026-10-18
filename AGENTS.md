@@ -13,7 +13,7 @@ installed by the user, build, run, verify against the vendor tool, and report wh
 Two more jobs use the same rules. If the model is not yet in a format a backend loads, or the user asks which format to
 use, follow `docs/agents/export-model.md`. If the user wants a program that uses UAIRT, follow `docs/agents/write-app.md`. When the model runs but its input has to be prepared or its
 output interpreted (images, audio, text and tokenizers, boxes, chat templates, sampling), start from the inputs and outputs the backend
-reports and follow `docs/agents/pre-post-processing.md`; `bindings/python/examples/inspect_model.py` prints them with a first guess.
+reports and follow `docs/agents/pre-post-processing.md`; `examples/python/inspect_model.py` prints them with a first guess.
 Vendor versions (tested, minimum, download pages) are in `docs/vendors.md`; `scripts/doctor.sh` compares what is installed
 with them.
 

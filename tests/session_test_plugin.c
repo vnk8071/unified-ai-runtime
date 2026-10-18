@@ -4,8 +4,9 @@
  *   1 "fake-session": a complete session table over a byte tokenizer.
  *   2 "fake-old": the backend struct as it was before the `session` field (struct_size ends at free_buffer).
  *   3 "fake-bad": a session table whose `reset` is missing.
+ *   4 "fake-short": a session table that ends before `is_end_of_generation` (struct_size says so, though the pointer is set).
  * Tokens are bytes (0..255) plus token 256 as BOS. After appending token t the logits favour t + 1, so greedy
- * generation counts upward.
+ * generation counts upward. Token 126 ('~') ends a generation.
  */
 #include <stddef.h>
 #include <stdlib.h>
@@ -203,8 +204,17 @@ static uairt_status reset(void* handle) {
 }
 #endif
 
+static int is_end_of_generation(const void* model, int32_t token) {
+  (void)model;
+  return token == '~';
+}
+
 static const uairt_session_api kSession = {
+#if SESSION_TEST_VARIANT == 4
+    .struct_size = offsetof(uairt_session_api, is_end_of_generation),
+#else
     .struct_size = sizeof(uairt_session_api),
+#endif
     .abi_version = UAIRT_SESSION_ABI_VERSION,
     .vocab_size = vocab_size,
     .tokenize = tokenize,
@@ -217,6 +227,7 @@ static const uairt_session_api kSession = {
 #if SESSION_TEST_VARIANT != 3
     .reset = reset,
 #endif
+    .is_end_of_generation = is_end_of_generation,
 };
 #endif
 
@@ -261,6 +272,8 @@ static const old_api_t kApi = {
 #else
 #if SESSION_TEST_VARIANT == 3
 #define API_NAME "fake-bad"
+#elif SESSION_TEST_VARIANT == 4
+#define API_NAME "fake-short"
 #else
 #define API_NAME "fake-session"
 #endif

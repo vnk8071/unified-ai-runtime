@@ -24,7 +24,7 @@ out.data = output_buffer; out.nbytes = output_size;
 uairt_model_run(model, &in, 1, &out, 1);
 ```
 
-A complete runnable program is in [examples/quickstart.c](examples/quickstart.c).
+A complete runnable program is in [examples/quickstart.c](examples/quickstart.c); there are also C++, Python and Rust examples in [examples/](examples/README.md).
 
 ## Use it with a coding agent
 
@@ -125,9 +125,33 @@ To see it run before writing anything, open [examples/notebooks/uairt_backends_t
 each backend it can (a section whose runtime is missing skips itself and says why). A [Google Colab notebook](examples/notebooks/uairt_tensorrt_colab.ipynb) does the same for TensorRT on a GPU.
 Both are saved with the outputs of a real run; see [examples/notebooks/README.md](examples/notebooks/README.md).
 
-What you still write: pre- and post-processing (resize, layout, normalization, box decoding, chat templates; [docs/agents/pre-post-processing.md](docs/agents/pre-post-processing.md) walks through it, starting from `bindings/python/examples/inspect_model.py`). Inputs must match the
+What you still write: pre- and post-processing (resize, layout, normalization, box decoding, chat templates; [docs/agents/pre-post-processing.md](docs/agents/pre-post-processing.md) walks through it, starting from `examples/python/inspect_model.py`). Inputs must match the
 model's dtype and shape exactly, because UAIRT never converts silently. If a backend cannot serve the device you ask for, the call fails
 instead of falling back to the CPU. [docs/agents/write-app.md](docs/agents/write-app.md) has the details and the pitfalls.
+
+## The problem it solves: porting a large application to another accelerator
+
+Say you built your application on TensorRT because the first target was an NVIDIA GPU. Months later the project is large, and
+the product has to ship on a Qualcomm NPU. With the vendor APIs that means starting over on QNN: a new engine and context
+lifecycle, new tensor and memory handling, new error handling, and a port of every place the application runs a model.
+
+With UAIRT the inference code stays. The application already talks to `uairt_engine`, `uairt_model` and `uairt_tensor`, so
+moving to QNN is a change of inputs, not of code:
+
+| Changes | Stays |
+|---|---|
+| The backend name: `"tensorrt"` to `"qnn"` (and its plugin library) | Engine, model and run calls, error handling, threading |
+| The model artifact: a TensorRT `.engine` to a QNN `.dlc` or context binary, made with Qualcomm's tools | Application logic, buffers and tensor-shape handling |
+| Backend options, such as the HTP device | The rest of the project |
+
+This is a port of the model, not of the program. Be aware of what UAIRT does not do for you:
+
+- **Converting the model is still your job** (see [docs/agents/export-model.md](docs/agents/export-model.md)), and a quantized QNN model
+  can need different input dtypes and scales than the FP32 TensorRT one. UAIRT never converts silently, so a mismatch fails loudly;
+  read the dtype, shape and quantization from `uairt_model_input_info` rather than hard-coding them.
+- **Pre- and post-processing is yours**, and it may change with the model format
+  ([docs/agents/pre-post-processing.md](docs/agents/pre-post-processing.md)).
+- **Verify the new backend** against the old one on the same inputs and compare the raw outputs, not just the top result.
 
 ## What it is, and is not
 
@@ -150,7 +174,7 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 | TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench` |
 | CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O, image inputs | Apple M5; identical to CoreML itself |
 | llama.cpp | `.gguf`; sessions (tokenize, append, logits); text completion (`uairt_model_complete`); `device` picks a llama.cpp device (`CUDA0`, `Vulkan0`, `GPUOpenCL`, `HTP0`) | Apple M5 (Metal); Ubuntu 24.04 x86_64 RTX 3060 (CUDA and Vulkan); Windows 11 ARM64 Snapdragon X Elite (CPU, OpenCL on the Adreno GPU, Hexagon NPU as `HTP0`). `ctest` compares with llama.cpp's own greedy output; some GPU and NPU outputs differ from the CPU's after a few tokens (see [docs/backends/llamacpp.md](docs/backends/llamacpp.md)) |
-| LLM servers | Ollama, LM Studio, SGLang through one `llmserver` backend (attach to a running server over HTTP; text in, streamed text out; no tensors or sessions) | macOS arm64 with Ollama only: output identical to a direct request to the server. LM Studio and SGLang untested (see [docs/backends/llmserver.md](docs/backends/llmserver.md)) |
+| LLM servers | Ollama, LM Studio, SGLang through one `llmserver` backend (attach to a running server over HTTP; text in, streamed text out; no tensors or sessions) | macOS arm64 with Ollama only: output identical to a direct request to the server. LM Studio, SGLang and Modular MAX (`max serve`, via `base_url`) untested (see [docs/backends/llmserver.md](docs/backends/llmserver.md)) |
 | OpenVINO | IR (`.xml` + `.bin`) and `.onnx`, static shapes; any OpenVINO device | an Intel Core CPU, and an x64 build under emulation on a Snapdragon X Elite laptop (there is no Windows ARM64 OpenVINO); bit-identical to OpenVINO's Python API. GPU and NPU devices untested |
 | NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan (matches NCNN's Python API); a Snapdragon X Elite laptop, CPU and Adreno GPU through Vulkan, same detections |
 | whisper.cpp | ggml `.bin` Whisper models; audio in (float32 PCM, 16 kHz), UTF-8 text out; CPU and Metal | Apple M5, `tiny.en`: transcript equal to `whisper-cli` on both CPU and Metal. Other models, CUDA and Vulkan untested |
@@ -283,6 +307,9 @@ build/llm_generate build/libuairt_backend_llamacpp.so model.gguf "The capital of
 
 Options: `n_gpu_layers` (default 99; `0` stays on the CPU) and `device` (one llama.cpp device by name). See [docs/backends/llamacpp.md](docs/backends/llamacpp.md).
 
+`build/llm_stream` is the same with sampling and streaming text (`libuairt_llm`, [docs/api.md](docs/api.md#generation-uairtuairt_llmh-libuairt_llm)):
+`build/llm_stream build/libuairt_backend_llamacpp.so model.gguf "The capital of France is" 40 0.8 40 0.95 7` (temperature, top-k, top-p, seed).
+
 ### LLM servers (Ollama, LM Studio, SGLang)
 
 Attaches to a server you have already started and gives you the same text API (`uairt_model_complete`) as llama.cpp. It needs libcurl and downloads no model.
@@ -353,7 +380,7 @@ build/run_model --repeat 100 --pinned build/libuairt_backend_tensorrt.so tensorr
 
 `--pinned` allocates the inputs and outputs as page-locked buffers (`UAIRT_MEM_PINNED`), which made a yolov8n run
 8.1 ms to 6.4 ms on a GTX 1650. A complete detection program, with the Python binding and pinned buffers, is
-[bindings/python/examples/detect_tensorrt.py](bindings/python/examples/detect_tensorrt.py); see
+[examples/python/detect_tensorrt.py](examples/python/detect_tensorrt.py); see
 [docs/backends/tensorrt.md](docs/backends/tensorrt.md).
 
 ### QNN (Qualcomm AI Runtime)

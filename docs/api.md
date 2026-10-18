@@ -170,6 +170,22 @@ logits, position, reset, destroy) are in `uairt/uairt.h`. They work on models wh
 `UAIRT_ERR_INVALID_ARGUMENT` with the size needed in the out count. Backends provide the table through the optional
 `session` field at the end of `uairt_backend_api` (see `uairt/uairt_backend.h`).
 
+`uairt_model_is_end_of_generation(model, token, &is_end)` says whether a token ends a generation (end of text, end of turn). It is an
+optional entry appended to the session table, so a plugin built earlier still loads and gets `UAIRT_ERR_UNSUPPORTED`; `llamacpp`
+answers with `llama_vocab_is_eog`. A token outside the vocabulary is not an end.
+
+## Generation (`uairt/uairt_llm.h`, `libuairt_llm`)
+
+A separate library on top of the session calls, not part of the core ABI. `uairt_llm_sample` draws one token from logits
+(greedy at temperature 0; otherwise temperature, `top_k`, `top_p` and a seeded random state `uairt_rng`), and
+`uairt_llm_generate` runs the whole loop: tokenize the prompt, append it to a session, sample, stop on `max_tokens`, a stop token or a
+callback that returns non-zero, and stream UTF-8 text to the callback with the bytes of a split character held back until it is complete
+(a truncated character at the end becomes U+FFFD). Pass a session to continue an earlier conversation, or `NULL` for a fresh one.
+Backend errors, such as a prompt longer than the context, are returned as they are, after the text already delivered. Greedy output is
+identical to llama.cpp's own (`llamacpp_vs_llama_completion`), including where it stops: generation ends, without emitting the token, when the model
+draws a token that ends a generation (`ignore_end_of_generation` turns that off) or one of `stop_tokens`. The one visible difference: when `max_tokens` cuts a multi-byte character in half, llama.cpp prints the partial bytes and this prints U+FFFD. The same seed gives the same tokens on the same logits, but this sampler's
+random numbers are its own (splitmix64), so sampled text does not match another library's for the same seed. See `examples/llm_stream.c`.
+
 ## Text completion (language model servers)
 
 `uairt_model_complete(model, prompt, options, num_options, callback, user_data)` sends one prompt and calls `callback` with each

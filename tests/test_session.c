@@ -166,10 +166,33 @@ static void test_sessions(void) {
   uairt_engine_destroy(engine);
 }
 
-/* argv[1] complete session table, argv[2] old-sized struct, argv[3] session table without reset. */
+static void test_end_of_generation(const char* backend, int supported) {
+  uairt_engine* engine;
+  uairt_model* model;
+  if (!open_model(backend, &engine, &model)) {
+    return;
+  }
+  int ends = -1;
+  if (supported) {
+    CHECK(uairt_model_is_end_of_generation(model, '~', &ends) == UAIRT_OK && ends == 1);
+    CHECK(uairt_model_is_end_of_generation(model, 'A', &ends) == UAIRT_OK && ends == 0);
+    CHECK(uairt_model_is_end_of_generation(model, 100000, &ends) == UAIRT_OK && ends == 0);  /* outside the vocabulary */
+    CHECK(uairt_model_is_end_of_generation(model, -1, &ends) == UAIRT_OK && ends == 0);
+  } else {
+    CHECK(uairt_model_is_end_of_generation(model, '~', &ends) == UAIRT_ERR_UNSUPPORTED);
+    CHECK(ends == -1);
+  }
+  CHECK(uairt_model_is_end_of_generation(NULL, '~', &ends) == UAIRT_ERR_INVALID_ARGUMENT);
+  CHECK(uairt_model_is_end_of_generation(model, '~', NULL) == UAIRT_ERR_INVALID_ARGUMENT);
+  uairt_model_destroy(model);
+  uairt_engine_destroy(engine);
+}
+
+/* argv[1] complete session table, argv[2] old-sized struct, argv[3] session table without reset, argv[4] session table
+ * that ends before is_end_of_generation. */
 int main(int argc, char** argv) {
-  if (argc != 4) {
-    fprintf(stderr, "usage: %s <fake-session plugin> <fake-old plugin> <fake-bad plugin>\n", argv[0]);
+  if (argc != 5) {
+    fprintf(stderr, "usage: %s <fake-session plugin> <fake-old plugin> <fake-bad plugin> <fake-short plugin>\n", argv[0]);
     return 2;
   }
   CHECK(uairt_load_backend_library(argv[3]) == UAIRT_ERR_INCOMPATIBLE_MODEL);
@@ -179,7 +202,13 @@ int main(int argc, char** argv) {
   CHECK(has_backend("fake-old"));
   CHECK(uairt_load_backend_library(argv[1]) == UAIRT_OK);
   CHECK(has_backend("fake-session"));
+  CHECK(uairt_load_backend_library(argv[4]) == UAIRT_OK);  /* a table from before the optional entry still loads */
+  CHECK(has_backend("fake-short"));
 
+  test_end_of_generation("fake-session", 1);
+  test_end_of_generation("fake-short", 0);
+  test_end_of_generation("fake-old", 0);
+  test_end_of_generation("reference", 0);
   test_without_sessions("reference");
   test_without_sessions("fake-old");
   test_sessions();

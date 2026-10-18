@@ -92,7 +92,7 @@ QNN on the NPU, the shortest form: `--option device=npu --option sdk_root=<QAIRT
 libraries and the Hexagon skel directory for you. `cache_dir` keeps the compiled context of a `.dlc` so later loads
 skip the compile; writes are off by default on Windows (see `docs/backends/qnn.md`).
 
-From a binding: `bindings/cpp/run_qnn.cpp`, `bindings/python/examples/run_qnn.py` and
+From a binding: `bindings/cpp/run_qnn.cpp`, `examples/python/run_qnn.py` and
 `bindings/rust/uairt/examples/run_qnn.rs` do the same through the C++, Python and Rust APIs. Python and Rust on
 Windows need `ADSP_LIBRARY_PATH` set before the process starts for the NPU (see `troubleshooting.md`).
 

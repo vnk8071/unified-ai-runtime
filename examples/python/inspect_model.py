@@ -13,7 +13,7 @@ import argparse
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 GUIDE = "docs/agents/pre-post-processing.md"
 TEXT_INPUT_NAMES = ("input_ids", "input_id", "token_ids", "tokens", "ids")
 

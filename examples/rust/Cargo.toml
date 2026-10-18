@@ -1,0 +1,22 @@
+[package]
+name = "uairt-examples"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "Rust examples for the Unified AI Runtime C API (hand-written FFI, no dependencies)"
+
+# Keep this crate out of any workspace that contains the repository.
+[workspace]
+
+[lib]
+name = "uairt"
+path = "src/lib.rs"
+
+[[bin]]
+name = "quickstart"
+path = "src/bin/quickstart.rs"
+
+[[bin]]
+name = "llm_stream"
+path = "src/bin/llm_stream.rs"

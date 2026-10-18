@@ -2,7 +2,7 @@
 """Compares UAIRT's llama.cpp backend with llama.cpp itself: greedy decoding of one prompt must give the same text.
 
     python tests/compare_with_llamacpp.py build/llm_generate build/libuairt_backend_llamacpp.so \
-        build/llama.cpp/bin/llama-completion model.gguf [--layers 0 99]
+        build/llama.cpp/bin/llama-completion model.gguf [--layers 0 99] [--llm-stream build/llm_stream]
 
 llm_generate runs a fixed number of tokens, so the prompt must not reach an end-of-generation token within them.
 """
@@ -30,6 +30,7 @@ def main():
     parser.add_argument("llama_completion")
     parser.add_argument("model")
     parser.add_argument("--layers", type=int, nargs="+", default=[0, 99])
+    parser.add_argument("--llm-stream", help="also check uairt_llm_generate (greedy), which uses n_gpu_layers 99")
     args = parser.parse_args()
 
     failed = False
@@ -41,6 +42,19 @@ def main():
         print(f"n_gpu_layers={layers}: {'identical' if same else 'DIFFERENT'}")
         print(f"  uairt:     {ours!r}")
         print(f"  llama.cpp: {theirs!r}")
+        failed = failed or not same
+    if args.llm_stream:
+        streamed = subprocess.run([args.llm_stream, args.plugin, args.model, PROMPT, str(TOKENS)],
+                                  capture_output=True, text=True)
+        if streamed.returncode != 0:
+            print(f"llm_stream failed: {streamed.stderr}", file=sys.stderr)
+            sys.exit(1)
+        reference = run([args.llama_completion, "-m", args.model, "-p", PROMPT, "-n", str(TOKENS), "--temp", "0",
+                         "-ngl", "99", "-no-cnv"])
+        reference = reference.removesuffix(" [end of text]")  # llama-completion's note that the model ended the text
+        same = streamed.stdout.strip() == reference
+        print(f"uairt_llm_generate: {'identical' if same else 'DIFFERENT'}")
+        print(f"  uairt_llm: {streamed.stdout.strip()!r}")
         failed = failed or not same
     if failed:
         sys.exit(1)

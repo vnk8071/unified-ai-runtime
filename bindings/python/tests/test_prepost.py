@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
+EXAMPLES = Path(__file__).resolve().parents[3] / "examples" / "python"
 spec = importlib.util.spec_from_file_location("prepost", EXAMPLES / "prepost.py")
 prepost = importlib.util.module_from_spec(spec)
 sys.modules["prepost"] = prepost

@@ -73,7 +73,7 @@ uairt_session_logits(session, logits, vocab, &n);        /* pick a token, append
 
 `examples/llm_generate.c` is a complete greedy generator. From Python: `uairt.AutoModel.from_file("model.gguf",
 device="gpu")`, then `model.generate(prompt, max_tokens=..., temperature=..., top_k=..., top_p=..., seed=...)`, or
-`model.tokenize`, `model.session()` and `session.logits()` for your own loop (`bindings/python/examples/llm_generate.py`).
+`model.tokenize`, `model.session()` and `session.logits()` for your own loop (`examples/python/llm_generate.py`).
 
 ### Text completion
 

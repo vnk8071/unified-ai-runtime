@@ -61,7 +61,7 @@ First public version. Pre-1.0: the API and ABI may change.
   order, range, normalization, quantized inputs), audio, box decoding with NMS, classification, embeddings, CTC, tokenizers (GGUF and Hugging Face `tokenizers`), chat
   templates read from the GGUF, stop tokens, sampling, and how to verify against the original pipeline. Linked from `AGENTS.md`, `write-app.md`, `run-model.md`, the
   `run-model-on-device` skill and the README.
-- `bindings/python/examples/inspect_model.py` prints a model's inputs and outputs and a heuristic guess of what it is; `prepost.py` holds the tested NumPy helpers.
+- `examples/python/inspect_model.py` prints a model's inputs and outputs and a heuristic guess of what it is; `prepost.py` holds the tested NumPy helpers.
   `tests/test_prepost.py` and `tests/test_inspect_model.py` need no native library. Checked on an Apple M5: NMS equals `torchvision.ops.nms` (150 random cases), the ImageNet
   recipe equals torchvision's (7e-7, 8 image shapes), a ResNet-18 through UAIRT equals PyTorch (2e-6), UAIRT's GGUF tokenizer ids equal Hugging Face's, and the hand-built chat
   prompt equals the GGUF's own template. Not run: log-mel features, CTC with a real model, segmentation, quantized models, a trained detector.
@@ -133,7 +133,7 @@ First public version. Pre-1.0: the API and ABI may change.
 - `UAIRT_MEM_PINNED` memory domain (appended, existing values unchanged): page-locked host buffers from
   `uairt_buffer_alloc`. On the TensorRT backend they cut a yolov8n run from 8.1 ms to 6.4 ms. `run_model --pinned`,
   and `Domain::Pinned` / `"pinned"` in the C++, Rust and Python bindings.
-- Example: `bindings/python/examples/detect_tensorrt.py` (YOLOv8 detection through the Python binding).
+- Example: `examples/python/detect_tensorrt.py` (YOLOv8 detection through the Python binding).
 
 ### Added (TFLite)
 - TFLite backend (`tflite`): `.tflite` from a path or from memory; optional QNN delegate on HTP.
@@ -149,6 +149,12 @@ First public version. Pre-1.0: the API and ABI may change.
 - The ONNX Runtime backend accepts `ep_library`, `ep_name` and `ep_option.<key>` to load a plugin execution
   provider. Verified with the MLX provider on an Apple M5: ResNet50 at batch 8 ran 3.1 to 3.2 times faster than
   the CPU EP with the same outputs; MobileNetV2 at batch 1 showed no gain.
+
+### Added (generation)
+- `libuairt_llm` (`uairt/uairt_llm.h`): sampling (temperature, top-k, top-p, seed) and a streaming generation loop over the session
+  API, for any backend that has sessions, stopping where the model ends its text. `examples/llm_stream.c`, and C++, Python and Rust
+  examples under `examples/`.
+- `uairt_model_is_end_of_generation` (core) and an optional `is_end_of_generation` entry at the end of the session table; `llamacpp` implements it.
 
 ### Added (llama.cpp and sessions)
 - `llamacpp` backend: GGUF language models through llama.cpp, a pinned submodule (`third_party/llama.cpp`, MIT), built with

@@ -55,7 +55,26 @@ if(UAIRT_BUILD_REFERENCE_BACKEND)
   target_compile_definitions(uairt PRIVATE UAIRT_WITH_REFERENCE_BACKEND)
 endif()
 
-install(TARGETS uairt EXPORT uairtTargets ARCHIVE LIBRARY RUNTIME)
+# Text generation on top of the public C API (sampling, the generation loop). A separate library so the core ABI stays as it is.
+add_library(uairt_llm src/llm.cpp)
+target_compile_features(uairt_llm PRIVATE cxx_std_17)
+target_compile_options(uairt_llm PRIVATE
+  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-exceptions>
+  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-rtti>
+  $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->)
+set_target_properties(uairt_llm PROPERTIES LINKER_LANGUAGE C CXX_VISIBILITY_PRESET hidden)
+target_link_options(uairt_llm PRIVATE
+  $<$<PLATFORM_ID:Darwin>:-Wl,-dead_strip_dylibs>
+  $<$<PLATFORM_ID:Linux>:-Wl,--as-needed>)
+target_link_libraries(uairt_llm PUBLIC uairt)
+if(NOT WIN32)
+  target_link_libraries(uairt_llm PRIVATE m)
+endif()
+if(BUILD_SHARED_LIBS)
+  target_compile_definitions(uairt_llm PRIVATE UAIRT_BUILDING_SHARED)
+endif()
+
+install(TARGETS uairt uairt_llm EXPORT uairtTargets ARCHIVE LIBRARY RUNTIME)
 install(DIRECTORY include/uairt DESTINATION include)
 
 option(UAIRT_BUILD_EXAMPLES "Build examples" ON)
@@ -389,6 +408,8 @@ if(UAIRT_BUILD_LLAMACPP)
   if(UAIRT_BUILD_EXAMPLES)
     add_executable(llm_generate examples/llm_generate.c)
     target_link_libraries(llm_generate PRIVATE uairt)
+    add_executable(llm_stream examples/llm_stream.c)
+    target_link_libraries(llm_stream PRIVATE uairt_llm)
   endif()
 endif()
 
@@ -502,7 +523,7 @@ if(UAIRT_BUILD_TESTS)
     add_test(NAME global_symbols_opt_in COMMAND test_global_symbols $<TARGET_FILE:uairt_global_symbols_test_1> 1)
   endif()
 
-  foreach(variant 1 2 3)
+  foreach(variant 1 2 3 4)
     add_library(uairt_session_test_${variant} MODULE tests/session_test_plugin.c)
     target_compile_definitions(uairt_session_test_${variant} PRIVATE
       UAIRT_BUILDING_SHARED SESSION_TEST_VARIANT=${variant})
@@ -512,7 +533,16 @@ if(UAIRT_BUILD_TESTS)
   add_executable(test_session tests/test_session.c)
   target_link_libraries(test_session PRIVATE uairt)
   add_test(NAME session COMMAND test_session
-    $<TARGET_FILE:uairt_session_test_1> $<TARGET_FILE:uairt_session_test_2> $<TARGET_FILE:uairt_session_test_3>)
+    $<TARGET_FILE:uairt_session_test_1> $<TARGET_FILE:uairt_session_test_2> $<TARGET_FILE:uairt_session_test_3>
+    $<TARGET_FILE:uairt_session_test_4>)
+
+  add_executable(test_llm tests/test_llm.c)
+  target_link_libraries(test_llm PRIVATE uairt_llm)
+  add_test(NAME llm COMMAND test_llm $<TARGET_FILE:uairt_session_test_1> $<TARGET_FILE:uairt_session_test_4>)
+  add_executable(test_llm_utf8 tests/test_llm_utf8.cpp)
+  target_include_directories(test_llm_utf8 PRIVATE include src)
+  target_link_libraries(test_llm_utf8 PRIVATE uairt)
+  add_test(NAME llm_utf8 COMMAND test_llm_utf8)
 
   if(UAIRT_BUILD_ONNXRUNTIME)
     add_executable(test_onnxruntime tests/test_onnxruntime.c)
@@ -651,7 +681,8 @@ if(UAIRT_BUILD_TESTS)
         add_test(NAME llamacpp_vs_llama_completion COMMAND ${Python3_EXECUTABLE}
           ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_llamacpp.py
           $<TARGET_FILE:llm_generate> $<TARGET_FILE:uairt_backend_llamacpp>
-          $<TARGET_FILE:llama-completion> $ENV{UAIRT_LLAMACPP_TEST_MODEL})
+          $<TARGET_FILE:llama-completion> $ENV{UAIRT_LLAMACPP_TEST_MODEL}
+          --llm-stream $<TARGET_FILE:llm_stream>)
       endif()
     endif()
   endif()
@@ -761,4 +792,8 @@ if(SKBUILD)
   if(TARGET uairt_backend_onnxruntime)
     install(TARGETS uairt_backend_onnxruntime COMPONENT python LIBRARY DESTINATION uairt/plugins)
   endif()
+endif()
+
+if(UAIRT_BUILD_EXAMPLES)
+  add_subdirectory(examples/cpp)
 endif()

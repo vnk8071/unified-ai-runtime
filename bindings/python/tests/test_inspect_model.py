@@ -6,8 +6,9 @@ from collections import namedtuple
 from pathlib import Path
 
 import numpy as np
+import pytest
 
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
+EXAMPLES = Path(__file__).resolve().parents[3] / "examples" / "python"
 spec = importlib.util.spec_from_file_location("inspect_model", EXAMPLES / "inspect_model.py")
 inspect_model = importlib.util.module_from_spec(spec)
 sys.modules["inspect_model"] = inspect_model

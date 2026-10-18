@@ -51,6 +51,19 @@ Completion options (`uairt_model_complete`): `max_tokens` (integer, at least 1),
 `seed` (integer, 0 or more), `system` (a system message). Unset options are left to the server's defaults (the `llamacpp` backend takes the same options but is greedy when `temperature` is unset). Each call is one user
 message (plus the optional system message); there is no conversation history, so each call is independent.
 
+## Modular MAX (`max serve`), untested
+
+`max serve --model <hf-model>` exposes the same OpenAI-compatible API, so it should work with the `base_url` option and no
+preset. MAX listens on port 8000 by default:
+
+```c
+uairt_option server = {"base_url", "http://127.0.0.1:8000"};
+```
+
+and the model name is the one you passed to `max serve`. This has not been run: it assumes MAX answers `/v1/models` and streams
+`/v1/chat/completions` like the servers above, which `uairt_model_load` needs. MAX also has a C API for compiled graphs
+(`max/include/max/c`), but its runtime library is not in the open-source repository, so there is no native backend for it.
+
 ## Behaviour to know
 
 - `uairt_model_load` asks the server for `/v1/models` and fails with `UAIRT_ERR_NOT_FOUND` if the name is not listed. A name without a

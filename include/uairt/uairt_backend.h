@@ -70,6 +70,11 @@ typedef struct uairt_session_api {
   uairt_status (*logits)(const void* session, float* out, size_t capacity, size_t* out_count);
   uairt_status (*position)(const void* session, size_t* out_position);
   uairt_status (*reset)(void* session);
+  /*
+   * Optional, appended after `reset`: read only when struct_size covers it. Returns non-zero when `token` ends a
+   * generation (end of text, end of turn). A token outside the vocabulary is not one. NULL: the backend cannot tell.
+   */
+  int (*is_end_of_generation)(const void* model, int32_t token);
 } uairt_session_api;
 
 #define UAIRT_TEXT_ABI_VERSION 1

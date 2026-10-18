@@ -18,7 +18,7 @@ description: >-
 4. On any error, look it up in `docs/agents/troubleshooting.md` before trying anything else.
 5. If the model is not in a loadable format, follow `docs/agents/export-model.md`; if the user wants a program, follow
    `docs/agents/write-app.md`. To prepare inputs or decode outputs (images, audio, tokenizers, chat templates, boxes), start from
-   `python bindings/python/examples/inspect_model.py <model>` and follow `docs/agents/pre-post-processing.md`. Installed versus tested vendor
+   `python examples/python/inspect_model.py <model>` and follow `docs/agents/pre-post-processing.md`. Installed versus tested vendor
    versions: `docs/vendors.md`.
 
 Done means `ctest` passes, `doctor.sh` reports the backend as `ok`, and a run on the requested device is shown with

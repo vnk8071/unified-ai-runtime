@@ -66,7 +66,7 @@ A plugin is a file named `libuairt_backend_<name>.so`, `.dylib` or `.dll`. `uair
 by path, and `uairt.available_backends()` and `uairt.discover_plugins()` show what is registered and what was found. A plugin
 still needs its vendor runtime installed; loading it reports that.
 
-`examples/auto_model.py` loads any model this way and prints what was chosen.
+[`examples/python/auto_model.py`](../../examples/python/auto_model.py) loads any model this way and prints what was chosen.
 
 - Inputs must match the model's dtype and shape exactly; the binding never converts silently.
 - Errors are `uairt.UairtError` subclasses (`NotFound`, `Unsupported`, `IncompatibleModel`, `IoFailure`, ...)
@@ -85,7 +85,7 @@ those tests are skipped. In a shared-library build (`-DBUILD_SHARED_LIBS=ON`) wi
 the whole directory.
 
 Windows ARM64: use an ARM64 Python (an x64 Python cannot load the ARM64 `uairt.dll`), build libuairt as a DLL and set
-`UAIRT_LIBRARY` to `build-shared\Debug\uairt.dll`. `examples/run_qnn.py <plugin> <QAIRT root> <model.dlc> [npu|cpu|gpu]`
+`UAIRT_LIBRARY` to `build-shared\Debug\uairt.dll`. `examples/python/run_qnn.py <plugin> <QAIRT root> <model.dlc> [npu|cpu|gpu]`
 runs a model through the QNN plugin (0.8 ms on the Snapdragon X Elite NPU for `face_det_lite`). Set `ADSP_LIBRARY_PATH`
 to `<QAIRT root>\lib\hexagon-v73\unsigned` before starting Python for `npu`; see the Rust README for the caveat.
 

@@ -216,6 +216,12 @@ UAIRT_API uairt_status uairt_model_detokenize(
     size_t* out_nbytes);
 
 /*
+ * Whether `token` ends a generation (end of text, end of turn) for this model. A generation loop stops when it draws one,
+ * without emitting it. UAIRT_ERR_UNSUPPORTED when the backend has no sessions or cannot tell.
+ */
+UAIRT_API uairt_status uairt_model_is_end_of_generation(const uairt_model* model, int32_t token, int* out_is_end);
+
+/*
  * A session keeps the model's state (the KV cache) between calls. A model can have several sessions, each independent.
  * Do not use one session from two threads at once; different sessions are independent and may be used from different
  * threads. Destroy sessions before their model. Option: `n_ctx`, the tokens of context.

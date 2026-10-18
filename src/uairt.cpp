@@ -174,7 +174,7 @@ static const uairt_text_api* text_of(const uairt_backend_api* api) {
 }
 
 static const char* missing_session_entry(const uairt_session_api* sessions) {
-  if (sessions->struct_size < sizeof(*sessions)) {
+  if (sessions->struct_size < offsetof(uairt_session_api, is_end_of_generation)) {
     return "struct_size";
   }
   if (sessions->abi_version != UAIRT_SESSION_ABI_VERSION) {
@@ -708,6 +708,24 @@ uairt_status uairt_model_detokenize(
   const uairt_session_api* sessions = require_sessions(model, "detokenize");
   return sessions ? sessions->detokenize(model->handle, tokens, count, out, capacity, out_nbytes)
                   : UAIRT_ERR_UNSUPPORTED;
+}
+
+uairt_status uairt_model_is_end_of_generation(const uairt_model* model, int32_t token, int* out_is_end) {
+  if (!model || !out_is_end) {
+    uairt_set_error("invalid argument to uairt_model_is_end_of_generation");
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
+  const uairt_session_api* sessions = require_sessions(model, "is_end_of_generation");
+  if (!sessions) {
+    return UAIRT_ERR_UNSUPPORTED;
+  }
+  if (sessions->struct_size < offsetof(uairt_session_api, is_end_of_generation) + sizeof(sessions->is_end_of_generation) ||
+      !sessions->is_end_of_generation) {
+    uairt_set_error("backend '%s' cannot tell which tokens end a generation", model->api->name);
+    return UAIRT_ERR_UNSUPPORTED;
+  }
+  *out_is_end = sessions->is_end_of_generation(model->handle, token) != 0;
+  return UAIRT_OK;
 }
 
 uairt_status uairt_session_create(

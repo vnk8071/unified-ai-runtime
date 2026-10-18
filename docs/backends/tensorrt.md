@@ -70,12 +70,12 @@ before running cmake; the outputs must be identical.
 its headers, builds the plugin, makes an engine from ResNet-18 and compares UAIRT's output with PyTorch's. On a Colab T4 (TensorRT 10.9.0.34) it ran to completion: the FP32 engine matched PyTorch to 1.5e-6 and the FP16 engine to 2.6e-3.
 
 
-`bindings/python/examples/detect_tensorrt.py` runs a YOLOv8 engine on an image through the Python binding with pinned
+`examples/python/detect_tensorrt.py` runs a YOLOv8 engine on an image through the Python binding with pinned
 buffers and prints the detections (it needs numpy and Pillow only):
 
 ```bash
 export UAIRT_LIBRARY=$PWD/build-shared/libuairt.so PYTHONPATH=$PWD/bindings/python
-python bindings/python/examples/detect_tensorrt.py build/libuairt_backend_tensorrt.so yolov8n.engine bus.jpg
+python examples/python/detect_tensorrt.py build/libuairt_backend_tensorrt.so yolov8n.engine bus.jpg
 ```
 
 On `bus.jpg` it reports four people and a bus; `--plain` uses ordinary arrays for comparison.

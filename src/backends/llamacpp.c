@@ -238,6 +238,11 @@ static uairt_status tokenize(
   return UAIRT_OK;
 }
 
+static int is_end_of_generation(const void* handle, int32_t token) {
+  const model_t* model = handle;
+  return token >= 0 && token < model->n_vocab && llama_vocab_is_eog(model->vocab, token);
+}
+
 static uairt_status detokenize(
     const void* handle,
     const int32_t* tokens,
@@ -669,6 +674,7 @@ static const uairt_session_api kSession = {
     .logits = logits,
     .position = position,
     .reset = reset,
+    .is_end_of_generation = is_end_of_generation,
 };
 
 static const uairt_backend_api kApi = {

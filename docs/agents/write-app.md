@@ -9,7 +9,7 @@ it on a device is [run-model.md](run-model.md).
 
 | Language | Use when | Start from |
 |---|---|---|
-| Python | scripts, demos, pre/post-processing with NumPy | `bindings/python/examples/auto_model.py` (any model), `llm_generate.py` (GGUF) |
+| Python | scripts, demos, pre/post-processing with NumPy | `examples/python/auto_model.py` (any model), `llm_generate.py` (GGUF) |
 | C | a library or tool with no dependencies | `examples/quickstart.c`, `examples/run_model.c`, `examples/llm_generate.c` |
 | C++ | RAII and exceptions on the caller's side | `bindings/cpp/run_qnn.cpp` |
 | Rust | safe wrapper | `bindings/rust/uairt/examples/run_qnn.rs` |
@@ -32,7 +32,7 @@ What the model does not do is yours to write, and it comes from the model's own 
 
 The full procedure, from the printed inputs and outputs to a verified result, with tested helpers for images, boxes, tokenizers, chat
 templates, stop tokens and sampling, is [pre-post-processing.md](pre-post-processing.md). Run
-`python bindings/python/examples/inspect_model.py <model>` first.
+`python examples/python/inspect_model.py <model>` first.
 
 ## 3. The pattern
 
