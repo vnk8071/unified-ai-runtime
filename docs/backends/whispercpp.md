@@ -60,7 +60,7 @@ Engine options:
 - `language`: a code such as `en` (default) or `auto` to detect it. An English-only model with another language fails at load.
 - `translate`: `true` translates to English.
 - `num_threads`, `use_gpu` (default `true`: whichever GPU backend your whisper.cpp was built with, Metal on a Mac), `gpu_device`,
-  `flash_attn`.
+  `flash_attn` (default `true`, as in whisper.cpp; `false` is slower and, on the CPU, uses about 50 MB more).
 
 ## Limits
 

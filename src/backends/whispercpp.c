@@ -93,6 +93,7 @@ static uairt_status create_engine(const uairt_option* options, size_t num_option
   engine->max_text_bytes = DEFAULT_MAX_TEXT_BYTES;
   strcpy(engine->language, "en");
   engine->use_gpu = true;
+  engine->flash_attn = true; /* whisper.cpp's own default */
   for (size_t i = 0; i < num_options; ++i) {
     const char* key = options[i].key;
     const char* value = options[i].value ? options[i].value : "";
