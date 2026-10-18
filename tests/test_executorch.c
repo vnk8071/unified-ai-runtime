@@ -27,6 +27,11 @@ int main(int argc, char** argv) {
   uairt_option bad_option = {"no_such_option", "1"};
   CHECK(uairt_engine_create("executorch", &bad_option, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
   CHECK(strstr(uairt_last_error(), "no_such_option") != NULL);
+  uairt_option zero_threads = {"num_threads", "0"};
+  CHECK(uairt_engine_create("executorch", &zero_threads, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
+  CHECK(strstr(uairt_last_error(), "num_threads") != NULL);
+  uairt_option bad_threads = {"num_threads", "4x"};
+  CHECK(uairt_engine_create("executorch", &bad_threads, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
   uairt_option empty_method = {"method", ""};
   CHECK(uairt_engine_create("executorch", &empty_method, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
   CHECK(engine == NULL);

@@ -4,7 +4,7 @@
  * 16-byte copy, so the number is the core's per-run overhead; with a real backend, run it before and after a core change and
  * compare. Built with the tests (bench_core_overhead), not run by ctest.
  *
- *   bench_core_overhead [--runs N] [<plugin>] <backend> <model>
+ *   bench_core_overhead [--runs N] [--option key=value]... [<plugin>] <backend> <model>
  */
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
@@ -15,6 +15,7 @@
 #include <uairt/uairt.h>
 
 #define MAX_TENSORS 16
+#define MAX_OPTIONS 16
 
 static double now_ns(void) {
   struct timespec ts;
@@ -30,13 +31,26 @@ static int compare_double(const void* a, const void* b) {
 int main(int argc, char** argv) {
   long runs = 200000;
   int arg = 1;
-  if (arg + 1 < argc && strcmp(argv[arg], "--runs") == 0) {
-    runs = atol(argv[arg + 1]);
+  uairt_option options[MAX_OPTIONS];
+  size_t num_options = 0;
+  while (arg + 1 < argc && argv[arg][0] == '-') {
+    if (strcmp(argv[arg], "--runs") == 0) {
+      runs = atol(argv[arg + 1]);
+    } else if (strcmp(argv[arg], "--option") == 0 && num_options < MAX_OPTIONS && strchr(argv[arg + 1], '=')) {
+      char* pair = argv[arg + 1];
+      char* equals = strchr(pair, '=');
+      *equals = '\0';
+      options[num_options].key = pair;
+      options[num_options].value = equals + 1;
+      ++num_options;
+    } else {
+      break;
+    }
     arg += 2;
   }
   const char* plugin = argc - arg == 3 ? argv[arg++] : NULL;
   if (argc - arg != 2 || runs < 1000) {
-    fprintf(stderr, "usage: %s [--runs N (>=1000)] [<plugin>] <backend> <model>\n", argv[0]);
+    fprintf(stderr, "usage: %s [--runs N (>=1000)] [--option key=value]... [<plugin>] <backend> <model>\n", argv[0]);
     return 2;
   }
   if (plugin && uairt_load_backend_library(plugin) != UAIRT_OK) {
@@ -46,7 +60,7 @@ int main(int argc, char** argv) {
   uairt_engine* engine = NULL;
   uairt_model* model = NULL;
   uairt_model_source source = {.struct_size = sizeof(source), .path = argv[arg + 1]};
-  if (uairt_engine_create(argv[arg], NULL, 0, &engine) != UAIRT_OK ||
+  if (uairt_engine_create(argv[arg], options, num_options, &engine) != UAIRT_OK ||
       uairt_model_load(engine, &source, &model) != UAIRT_OK) {
     fprintf(stderr, "%s\n", uairt_last_error());
     return 1;

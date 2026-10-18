@@ -69,6 +69,8 @@ First public version. Pre-1.0: the API and ABI may change.
 
 ### Added (ExecuTorch)
 
+- ExecuTorch `num_threads` option. On a tiny model the default thread pool costs about 45 µs per run against 9 µs with one thread.
+
 - Plugins may export `uairt_backend_global_symbols` to be opened `RTLD_GLOBAL` instead of `RTLD_LOCAL` (POSIX only, opt-in per
   plugin; the default is unchanged). The ExecuTorch Metal build uses it.
 

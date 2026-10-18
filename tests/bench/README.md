@@ -67,4 +67,5 @@ Times `uairt_model_run` on zero-filled host buffers; CMake builds it as `bench_c
 ```bash
 build/bench_core_overhead reference unused
 build/bench_core_overhead build/libuairt_backend_executorch.so executorch model.pte
+build/bench_core_overhead --option num_threads=1 build/libuairt_backend_executorch.so executorch model.pte   # engine options
 ```

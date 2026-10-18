@@ -111,7 +111,7 @@ such order, so its inputs and outputs are sorted by name.
 | OpenVINO | `openvino` | OpenVINO IR `.xml`, `.onnx`, or a directory with one `.xml` (path only), static shapes | `device` (`CPU`, `GPU`, `NPU`, `AUTO`, ...), `performance_hint`, `num_threads`, `cache_dir` | host |
 | NCNN | `ncnn` | `.param` + `.bin` or a directory with one (path only), float32, static shapes | `input_shapes` (required), `device` (`cpu`, `vulkan`), `vulkan_device`, `fp16`, `num_threads` | host |
 | whisper.cpp | `whispercpp` | ggml `.bin` Whisper model (path only); input float32 `[n_samples]` audio, outputs uint8 `[max_text_bytes]` text and int32 `[1]` length | `n_samples`, `max_text_bytes`, `language`, `translate`, `num_threads`, `use_gpu`, `gpu_device`, `flash_attn` | host |
-| ExecuTorch | `executorch` | `.pte` (path only), tensor I/O, static shapes, contiguous | `method` (default `forward`) | host |
+| ExecuTorch | `executorch` | `.pte` (path only), tensor I/O, static shapes, contiguous | `method` (default `forward`), `num_threads` | host |
 | TensorRT | `tensorrt` | serialized engine `.engine` / `.plan` (ultralytics exports load as is), static shapes | `device` (CUDA device index) | host, pinned |
 | CoreML | `coreml` | `.mlmodelc`, `.mlpackage`, `.mlmodel` (path only), multi-array I/O and fixed-size image inputs (uint8 `[1,H,W,C]`), static shapes | `compute_units`: `all`, `cpu_only`, `cpu_and_gpu`, `cpu_and_ne` | host |
 | llama.cpp | `llamacpp` | `.gguf` (path only), session API instead of `run` | `n_gpu_layers`, `device` (a llama.cpp device name such as `CUDA0`, `Vulkan0`, `GPUOpenCL` or `HTP0`; an unknown name fails at model load) | host |

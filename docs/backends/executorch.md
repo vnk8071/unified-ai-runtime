@@ -48,6 +48,9 @@ build/run_model --repeat 100 build/libuairt_backend_executorch.so executorch mod
 Engine options:
 
 - `method`: the method to run (default `forward`).
+- `num_threads`: size of ExecuTorch's thread pool (1 to 1024; default: ExecuTorch's own, which uses every core). The pool is shared by every
+  ExecuTorch model in the process, and it is reset when the engine is created, so create engines before running any model. For a model
+  that runs in microseconds the default is slower than one thread (see Result); for a large model try more.
 
 Inputs and outputs are named `input0`, `input1`, ... and `output0`, ...: a `.pte` does not carry usable names.
 
@@ -55,7 +58,7 @@ Inputs and outputs are named `input0`, `input1`, ... and `output0`, ...: a `.pte
 
 Tensor inputs and outputs only (a method that takes an int, bool or string is rejected with `UAIRT_ERR_UNSUPPORTED`);
 static shapes (a dynamic-shape model reports its upper bound and is not supported); the default contiguous dim order
-(channels-last tensors are rejected); host memory; models from a path, not from memory; no thread-count option yet. A
+(channels-last tensors are rejected); host memory; models from a path, not from memory. A
 `.pte` that uses an operator or delegate missing from your ExecuTorch build fails to load with
 `UAIRT_ERR_INCOMPATIBLE_MODEL`, and the plugin does not fall back to another device.
 
@@ -108,7 +111,9 @@ e229c58, so not the same commit as the C++ library):
 | portable kernels | both outputs equal to ExecuTorch's Python runtime (max abs difference 0) |
 | XNNPACK delegate | both outputs equal to ExecuTorch's Python runtime (max abs difference 0); the `.pte` holds `XnnpackBackend` |
 
-Median 0.05 ms per run for the XNNPACK model (200 runs); too small to say anything about speed. Error-path and comparison
+Time per `uairt_model_run` for the XNNPACK model, 200000 runs with `bench_core_overhead` (median, two rounds): 45.7 and 45.8 µs by default, 9.0 and 8.9 µs
+with `num_threads=1`, 14.1 µs with 2 and 19.4 µs with 4. The net is tiny, so this measures thread wake-up cost, not model speed; the
+plugin's own overhead around `Module::execute` is under 200 ns of that. Error-path and comparison
 tests also pass under AddressSanitizer and UBSan (LeakSanitizer is not available on macOS arm64).
 
 Not verified: any NPU or GPU delegate (CoreML, QNN, Vulkan), Linux, Android, iOS, Windows, a real model (this is a small

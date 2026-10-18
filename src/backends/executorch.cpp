@@ -9,9 +9,12 @@
  */
 #include <executorch/extension/module/module.h>
 #include <executorch/extension/tensor/tensor.h>
+#include <executorch/extension/threadpool/threadpool.h>
 
 #include <cstdarg>
+#include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <memory>
@@ -23,6 +26,7 @@
 #include "common.h"
 
 #define OPTION_METHOD "method"
+#define OPTION_THREADS "num_threads"
 
 namespace {
 
@@ -39,6 +43,7 @@ const uairt_host_api* g_host;
 
 struct Engine {
   std::string method = "forward";
+  uint32_t num_threads = 0; // 0: leave ExecuTorch's pool as it is
 };
 
 struct Io {
@@ -84,10 +89,23 @@ uairt_status create_engine(const uairt_option* options, size_t num_options, void
           return UAIRT_ERR_INVALID_ARGUMENT;
         }
         engine->method = value;
+      } else if (key == OPTION_THREADS) {
+        char* last = nullptr;
+        errno = 0;
+        long number = std::strtol(value.c_str(), &last, 10);
+        if (value.empty() || *last != '\0' || errno != 0 || number < 1 || number > 1024) {
+          fail("%s must be an integer from 1 to 1024", OPTION_THREADS);
+          return UAIRT_ERR_INVALID_ARGUMENT;
+        }
+        engine->num_threads = static_cast<uint32_t>(number);
       } else {
         fail("unknown option '%s'", key.c_str());
         return UAIRT_ERR_INVALID_ARGUMENT;
       }
+    }
+    if (engine->num_threads > 0) {
+      // The pool is shared by every ExecuTorch model in the process, and resetting it while one is running is unsafe.
+      ::executorch::extension::threadpool::get_threadpool()->_unsafe_reset_threadpool(engine->num_threads);
     }
     *out_engine = engine.release();
     return UAIRT_OK;
