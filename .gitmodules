@@ -10,3 +10,7 @@
 	path = third_party/whisper.cpp
 	url = https://github.com/ggml-org/whisper.cpp
 	shallow = true
+[submodule "third_party/MNN"]
+	path = third_party/MNN
+	url = https://github.com/alibaba/MNN
+	shallow = true

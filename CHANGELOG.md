@@ -153,6 +153,17 @@ ARM64 wheel, vendor version checks in `doctor`, and the export, application and 
   provider. Verified with the MLX provider on an Apple M5: ResNet50 at batch 8 ran 3.1 to 3.2 times faster than
   the CPU EP with the same outputs; MobileNetV2 at batch 1 showed no gain.
 
+### Added (Paddle Lite backend)
+- `paddlelite` backend (`-DUAIRT_BUILD_PADDLELITE=ON`, `PADDLE_LITE_ROOT`): `.nb` models, float32, static shapes (`input_shapes` required), CPU; options `num_threads`, `power_mode`,
+  `precision`. Byte-identical to Paddle Lite's own C++ API in `tests/compare_with_paddlelite.py`; `ctest -R paddlelite` runs `tests/test_paddlelite.c` on `tests/data/add_mul.nb`.
+  Paddle Lite is built by the user (the recipe and its workarounds are in `docs/backends/paddlelite.md`); not run on Android or Linux. `uairt.AutoModel` maps `.nb` to it.
+
+### Added (MNN backend)
+- `mnn` backend (`-DUAIRT_BUILD_MNN=ON`, MNN 3.6.1 as the pinned submodule `third_party/MNN`, or `MNN_ROOT`): `.mnn` models, CPU and Metal, options `device`, `num_threads`,
+  `precision` and `input_shapes`. A GPU device that MNN did not end up on is an error. Identical to MNN's Python API in `tests/compare_with_mnn.py`;
+  `ctest -R mnn` runs `tests/test_mnn.c` on `tests/data/add_mul.mnn`. The Android build compiled; it was not run on a device.
+- `scripts/export_model.py` can write `.mnn` (from ONNX); `uairt.AutoModel` maps `.mnn` to the backend; `doctor.sh` knows MNN.
+
 ### Added (exporting models)
 - `scripts/export_model.py`: exports a PyTorch module or an ONNX file to ONNX Runtime, CoreML, ExecuTorch, OpenVINO or NCNN and checks each result through UAIRT against the
   original (one process per target). `docs/agents/export-model.md` is rewritten around it: a source-by-target table, what was run here, and the traps found (half-precision defaults in

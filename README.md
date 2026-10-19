@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Unified AI Runtime (UAIRT)
 
-One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML, llama.cpp (GGUF language models), TensorRT (NVIDIA GPUs), OpenVINO (Intel), NCNN (CPU and Vulkan GPUs), ExecuTorch (`.pte`), whisper.cpp (speech to text), and language model servers (Ollama, LM Studio, SGLang).
+One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML, llama.cpp (GGUF language models), TensorRT (NVIDIA GPUs), OpenVINO (Intel), NCNN (CPU and Vulkan GPUs), MNN (Alibaba), Paddle Lite (Baidu), ExecuTorch (`.pte`), whisper.cpp (speech to text), and language model servers (Ollama, LM Studio, SGLang).
 Write the application code once; choose the backend by name when you create an engine.
 
 ```c
@@ -180,6 +180,8 @@ Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANG
 | LLM servers | Ollama, LM Studio, SGLang through one `llmserver` backend (attach to a running server over HTTP; text in, streamed text out; no tensors or sessions) | macOS arm64 with Ollama only: output identical to a direct request to the server. LM Studio, SGLang and Modular MAX (`max serve`, via `base_url`) untested (see [docs/backends/llmserver.md](docs/backends/llmserver.md)) |
 | OpenVINO | IR (`.xml` + `.bin`) and `.onnx`, static shapes; any OpenVINO device | an Intel Core CPU, and an x64 build under emulation on a Snapdragon X Elite laptop (there is no Windows ARM64 OpenVINO); bit-identical to OpenVINO's Python API. GPU and NPU devices untested |
 | NCNN | `.param` + `.bin`, float32, static shapes; CPU and Vulkan | i9-9900K CPU and a GTX 1650 through Vulkan (matches NCNN's Python API); a Snapdragon X Elite laptop, CPU and Adreno GPU through Vulkan, same detections |
+| MNN | `.mnn` (from ONNX, TFLite or TorchScript with `mnnconvert`); host memory, static shapes; CPU, and Metal | Apple M5, CPU and Metal: identical to MNN's own Python API on three models and five option sets each; cross-compiled for Android with the NDK, **not run on a device**. OpenCL, Vulkan and CUDA untested |
+| Paddle Lite | `.nb` (made from a Paddle model with `opt`); float32, static shapes; CPU | Apple M5 CPU: byte-identical to Paddle Lite's own C++ API on two models and five option sets each, and within 1e-4 of PaddlePaddle on the original model. You build Paddle Lite yourself; Android, Linux and its GPU and NPU delegates untested |
 | whisper.cpp | ggml `.bin` Whisper models; audio in (float32 PCM, 16 kHz), UTF-8 text out; CPU and Metal | Apple M5, `tiny.en`: transcript equal to `whisper-cli` on both CPU and Metal. Other models, CUDA and Vulkan untested |
 | ExecuTorch | `.pte`, tensor I/O, static shapes; CPU (XNNPACK) or whatever delegates your ExecuTorch build has | Apple M5 CPU (XNNPACK): equal to ExecuTorch's Python runtime on a small synthetic net. The experimental Metal delegate ran the same net, within 1.2e-8 of the CPU result. No NPU delegate tested |
 | TensorRT | serialized `.engine` / `.plan` (ultralytics exports load as is), static shapes; host and pinned buffers | NVIDIA GTX 1650, TensorRT 10.9; bit-identical to TensorRT's Python API. Also a Colab Tesla T4 (TensorRT 10.9.0.34 from pip): a ResNet-18 engine matched PyTorch to 1.5e-6 (FP32) and 2.6e-3 (FP16) |
@@ -326,6 +328,32 @@ build/run_model --repeat 100 --option input_shapes=3x640x640 --option device=vul
 
 On a GTX 1650 a yolov8n model runs in 21.9 ms through Vulkan against 79 ms on the CPU; `device=vulkan` fails instead of
 quietly using the CPU when no GPU is usable. See [docs/backends/ncnn.md](docs/backends/ncnn.md).
+
+### MNN (Alibaba)
+
+MNN is a pinned submodule (Apache-2.0): `git submodule update --init --depth 1 third_party/MNN`, then `-DUAIRT_BUILD_MNN=ON` (add
+`-DUAIRT_MNN_METAL=ON` on a Mac). Convert a model with `mnnconvert -f ONNX --modelFile model.onnx --MNNModel model.mnn` (from `pip install MNN`):
+
+```bash
+cmake -S . -B build -DUAIRT_BUILD_MNN=ON && cmake --build build
+build/run_model --info build/libuairt_backend_mnn.so mnn model.mnn
+```
+
+Inputs and outputs are numbered by name. MNN prints a line about the CPU to standard output when a session starts. See
+[docs/backends/mnn.md](docs/backends/mnn.md).
+
+### Paddle Lite (Baidu)
+
+Paddle Lite is built by you (steps and two workarounds in [docs/backends/paddlelite.md](docs/backends/paddlelite.md)); point `PADDLE_LITE_ROOT` at its published `cxx`
+directory, build the plugin with `-DUAIRT_BUILD_PADDLELITE=ON`, and give the input shapes, since a `.nb` file records none:
+
+```bash
+export PADDLE_LITE_ROOT=/path/to/Paddle-Lite/build/inference_lite_lib.armmacos.armv8/cxx
+cmake -S . -B build -DUAIRT_BUILD_PADDLELITE=ON && cmake --build build
+build/run_model --option input_shapes=1x3x224x224 --info build/libuairt_backend_paddlelite.so paddlelite model.nb
+```
+
+This wraps Paddle Lite (the mobile and edge engine), not Paddle Inference (the server engine). Paddle Lite must be built with exceptions on.
 
 ### llama.cpp (GGUF language models)
 

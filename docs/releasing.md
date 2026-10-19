@@ -16,7 +16,7 @@ run of the workflow with `publish` set to `testpypi` or `pypi`.
 - **Inside a wheel:** the Python package, the native core library (`libuairt`), and the ONNX Runtime plugin in `uairt/plugins/`. The
   plugin loads ONNX Runtime when it loads, so it uses whichever release is installed (1.22 or newer): `pip install
   uairt[onnxruntime]` pulls in the `onnxruntime` wheel, and the package finds its library on its own.
-- **Not inside a wheel:** QNN, TensorRT, CoreML, OpenVINO, NCNN and TFLite. QNN, TensorRT and CoreML need vendor SDKs that cannot
+- **Not inside a wheel:** QNN, TensorRT, CoreML, OpenVINO, NCNN, MNN, Paddle Lite and TFLite. QNN, TensorRT and CoreML need vendor SDKs that cannot
   be redistributed; build those plugins from source (see `docs/backends/`) and put them on `UAIRT_PLUGIN_PATH`.
 
 ## One-time setup (yours, on PyPI and GitHub)

@@ -8,11 +8,11 @@
 
 SOURCE is `torchvision:<name>` (random weights unless --state-dict is given), `<file.py or module>:<factory>` (a function returning an
 nn.Module), or an `.onnx` file. Targets: onnx (onnxruntime backend), coreml (coreml), executorch (executorch, XNNPACK), openvino (openvino, from
-ONNX), ncnn (ncnn, through pnnx). Each export writes `<out>/<name>.<ext>` and, unless --no-verify, runs the reference (PyTorch, or ONNX
+ONNX), ncnn (ncnn, through pnnx), mnn (mnn, through MNN's converter, from ONNX). Each export writes `<out>/<name>.<ext>` and, unless --no-verify, runs the reference (PyTorch, or ONNX
 Runtime for an ONNX source) and the converted file through UAIRT on the same random input and compares the raw outputs.
 
 What the converters need is not installed by this script: the packages it names when one is missing (torch, onnx, coremltools, executorch,
-openvino, pnnx, onnxruntime) go in a throw-away virtual environment, and UAIRT's Python binding needs a shared build of the core and the
+openvino, pnnx, MNN, onnxruntime) go in a throw-away virtual environment, and UAIRT's Python binding needs a shared build of the core and the
 backend plugins (UAIRT_LIBRARY, UAIRT_PLUGIN_PATH; see bindings/python/README.md). Exit status is 0 only if every export and check passed.
 """
 import argparse
@@ -32,6 +32,7 @@ TARGETS: Dict[str, Tuple[str, str]] = {
     "executorch": ("executorch", ".pte"),
     "openvino": ("openvino", ".xml"),
     "ncnn": ("ncnn", ".ncnn.param"),
+    "mnn": ("mnn", ".mnn"),
 }
 
 
@@ -188,6 +189,16 @@ def export_ncnn_from_onnx(onnx_path: Path, shapes: Sequence[Tuple[int, ...]], ou
     return out
 
 
+def export_mnn_from_onnx(onnx_path: Path, out: Path) -> Path:
+    need("MNN", "the MNN conversion", "MNN")
+    # MNN's converter is a module of the pip package; it was seen installing and replacing packages (protobuf) on its first run
+    result = subprocess.run([sys.executable, "-m", "MNN.tools.mnnconvert", "-f", "ONNX", "--modelFile", str(onnx_path),
+                             "--MNNModel", str(out), "--bizCode", "uairt"], capture_output=True, text=True)
+    if result.returncode != 0 or not out.exists():
+        raise ExportError(f"mnnconvert failed on {onnx_path} (status {result.returncode}): {(result.stderr or result.stdout).strip()[-300:]}")
+    return out
+
+
 # ---- the check: reference vs the converted file through UAIRT ----------------------------------------------------------------------
 
 def reference_outputs(source: str, model, onnx_path: Optional[Path], inputs: Sequence[np.ndarray]) -> List[np.ndarray]:
@@ -302,9 +313,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     onnx_path: Optional[Path] = Path(args.source) if is_onnx_source else None
     try:
         if is_onnx_source:
-            unsupported = [t for t in args.to if t not in ("onnx", "openvino", "ncnn")]
+            unsupported = [t for t in args.to if t not in ("onnx", "openvino", "ncnn", "mnn")]
             if unsupported:
-                raise ExportError(f"an ONNX file converts to openvino and ncnn here; {', '.join(unsupported)} needs the PyTorch model (CoreML and ExecuTorch do not read ONNX)")
+                raise ExportError(f"an ONNX file converts to openvino, ncnn and mnn here; {', '.join(unsupported)} needs the PyTorch model (CoreML and ExecuTorch do not read ONNX)")
             onnx = need("onnx", "reading the ONNX file")
             graph = onnx.load(str(onnx_path)).graph
             initializers = {i.name for i in graph.initializer}
@@ -347,6 +358,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 # NCNN shapes have no batch dimension, and its default on an Arm CPU is half precision (the check wants float32)
                 per_input = ";".join("x".join(str(d) for d in (s[1:] if len(s) > 1 and s[0] == 1 else s)) for s in shapes)
                 options = {"input_shapes": per_input, "fp16": "false", **options}
+            elif target == "mnn":
+                if onnx_path is None:  # a PyTorch source goes through ONNX first
+                    onnx_path = export_onnx(model, inputs, out_dir / f"{name}.onnx", args.opset)
+                path = export_mnn_from_onnx(onnx_path, path)
+                options = {"precision": "high", **options}  # float32 compute for the check
             elif target == "openvino":
                 options = {"inference_precision": "f32", **options}  # OpenVINO's default on an Arm CPU is half precision
                 if onnx_path is None:  # a PyTorch source goes through ONNX first

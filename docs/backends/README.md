@@ -13,6 +13,8 @@ and how to check the result. Vendor SDKs are never part of this repository
 | QNN | [qnn.md](qnn.md) | Linux, Windows (no macOS libraries) |
 | OpenVINO | [openvino.md](openvino.md) | Linux, Windows (verified on a Linux CPU) |
 | NCNN | [ncnn.md](ncnn.md) | Linux (CPU and Vulkan GPU, verified on a GTX 1650) |
+| Paddle Lite | [paddlelite.md](paddlelite.md) | macOS (CPU, verified on an Apple M5); you build Paddle Lite |
+| MNN | [mnn.md](mnn.md) | macOS (CPU and Metal, verified on an Apple M5); built for Android, not run there |
 | TensorRT | [tensorrt.md](tensorrt.md) | Linux with an NVIDIA GPU (verified on a GTX 1650) |
 | whisper.cpp | [whispercpp.md](whispercpp.md) | speech to text; ggml `.bin` Whisper models. Verified on macOS (CPU, Metal) |
 | ExecuTorch | [executorch.md](executorch.md) | macOS (CPU, XNNPACK); `.pte` files. Verified on macOS only |

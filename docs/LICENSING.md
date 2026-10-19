@@ -11,6 +11,8 @@ UAIRT is Apache-2.0. It wraps vendor runtimes that are not open source.
 | llama.cpp | MIT | MIT | As a pinned git submodule at `third_party/llama.cpp` (only the pin is in the repo) |
 | whisper.cpp | MIT | MIT | As a pinned git submodule at `third_party/whisper.cpp` |
 | NCNN | BSD-3-Clause, plus bundled zlib, BSD-2 and BSD-3 components | same | As a pinned git submodule at `third_party/ncnn` |
+| Paddle Lite | Apache-2.0 | same | Not in the repository: you build it and point `PADDLE_LITE_ROOT` at it |
+| MNN | Apache-2.0 (its `LICENSE.txt` also covers the third-party code it bundles) | same | As a pinned git submodule at `third_party/MNN` |
 
 ## Rules
 

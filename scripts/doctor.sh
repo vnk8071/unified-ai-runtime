@@ -273,6 +273,36 @@ else
     report skip "ncnn: run git submodule update --init --depth 1 third_party/ncnn (or set NCNN_ROOT to an install)"
   fi
 fi
+if [[ -n "${MNN_ROOT:-}" ]]; then
+  if [[ -f "$MNN_ROOT/include/MNN/Interpreter.hpp" ]]; then
+    report ok "mnn: $MNN_ROOT"
+    vendor_check mnn "$(awk '/#define MNN_VERSION_(MAJOR|MINOR|PATCH) /{v=v (v?".":"") $3} END{print v}' "$MNN_ROOT/include/MNN/MNNDefine.h" 2>/dev/null)"
+  else
+    report missing "mnn: include/MNN/Interpreter.hpp not found under MNN_ROOT"
+    vendor_hint mnn
+  fi
+else
+  mnn_src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/third_party/MNN"
+  if [[ -f "$mnn_src/CMakeLists.txt" ]]; then
+    report ok "mnn: $mnn_src (pinned submodule, built with -DUAIRT_BUILD_MNN=ON; set MNN_ROOT to use an install instead)"
+    mnn_commit="$(git -C "$mnn_src" describe --tags --always 2>/dev/null || true)"
+    [[ -n "$mnn_commit" ]] && report info "mnn: version $mnn_commit (a pinned submodule; bumping it needs ctest and a model run, see docs/vendors.md)"
+  else
+    report skip "mnn: run git submodule update --init --depth 1 third_party/MNN (or set MNN_ROOT to an install)"
+  fi
+fi
+if [[ -n "${PADDLE_LITE_ROOT:-}" ]]; then
+  if [[ -f "$PADDLE_LITE_ROOT/include/paddle_api.h" ]]; then
+    report ok "paddlelite: $PADDLE_LITE_ROOT"
+    vendor_check paddlelite ""
+    [[ -f "$PADDLE_LITE_ROOT/lib/libpaddle_api_light_bundled.a" ]] || report missing "paddlelite: lib/libpaddle_api_light_bundled.a not found under PADDLE_LITE_ROOT"
+  else
+    report missing "paddlelite: include/paddle_api.h not found under PADDLE_LITE_ROOT (it is the cxx directory of a Paddle Lite build)"
+    vendor_hint paddlelite
+  fi
+else
+  report skip "paddlelite: build Paddle Lite (docs/backends/paddlelite.md) and set PADDLE_LITE_ROOT to its cxx directory"
+fi
 
 if [[ -n "${WHISPER_ROOT:-}" ]]; then
   if [[ -f "$WHISPER_ROOT/include/whisper.h" ]]; then

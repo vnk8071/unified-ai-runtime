@@ -7,6 +7,7 @@ error is raised. There is no fallback to another runtime or to the CPU, and `pla
 were passed over. Pass `backend=` to force one.
 """
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -24,6 +25,8 @@ FORMATS: Dict[str, List[str]] = {
     ".onnx": ["onnxruntime", "openvino"],
     ".xml": ["openvino"],
     ".param": ["ncnn"],
+    ".mnn": ["mnn"],
+    ".nb": ["paddlelite"],
     ".engine": ["tensorrt"],
     ".plan": ["tensorrt"],
     ".tflite": ["tflite"],
@@ -107,6 +110,29 @@ def _ncnn(kind, index):
     raise _Skip(f"ncnn runs on the cpu or a Vulkan gpu, not {kind}")
 
 
+def _mnn(kind, index):
+    if kind is None:
+        return {}
+    if kind == "cpu":
+        _no_index("mnn on the cpu", index)
+        return {"device": "cpu"}
+    if kind in ("metal", "opencl", "vulkan", "cuda"):
+        _no_index(f"mnn on {kind}", index)
+        return {"device": kind}
+    if kind == "gpu":  # MNN has one backend per GPU API; only Metal has been run, so a plain "gpu" means Metal where there is one
+        if sys.platform == "darwin":
+            return {"device": "metal"}
+        raise _Skip("name the GPU API for mnn: metal, opencl, vulkan or cuda")
+    raise _Skip(f"mnn runs on the cpu or a GPU API (metal, opencl, vulkan, cuda), not {kind}")
+
+
+def _paddlelite(kind, index):
+    if kind in (None, "cpu"):
+        _no_index("paddlelite on the cpu", index)
+        return {}
+    raise _Skip(f"paddlelite runs on the cpu here, not {kind} (its GPU and NPU delegates are not exposed)")
+
+
 def _tensorrt(kind, index):
     if kind in (None, "gpu", "cuda", "tensorrt"):
         return {} if index is None else {"device": str(index)}
@@ -138,7 +164,7 @@ def _llamacpp(kind, index):
 
 
 _MAPPERS: Dict[str, Callable] = {
-    "qnn": _qnn, "onnxruntime": _onnxruntime, "openvino": _openvino, "ncnn": _ncnn, "tensorrt": _tensorrt,
+    "qnn": _qnn, "onnxruntime": _onnxruntime, "openvino": _openvino, "ncnn": _ncnn, "mnn": _mnn, "paddlelite": _paddlelite, "tensorrt": _tensorrt,
     "tflite": _tflite, "coreml": _coreml, "llamacpp": _llamacpp,
 }
 

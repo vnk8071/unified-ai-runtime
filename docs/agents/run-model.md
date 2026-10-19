@@ -21,6 +21,8 @@ a Hexagon architecture hint (it is a hint: check it against the chip before rely
 | `.onnx` | `onnxruntime` | CPU; NVIDIA GPU with the `cuda` or `tensorrt` provider; NPU through a plugin execution provider | an ONNX Runtime release matching the headers (1.22+), a GPU release for the GPU providers |
 | `.tflite` | `tflite` | CPU; NPU through the QNN delegate (`libQnnTFLiteDelegate.so`, so Linux or Android) | a TFLite C library built for the target |
 | OpenVINO IR (`.xml` + `.bin`), also `.onnx` | `openvino` | Intel CPU, GPU, NPU | OpenVINO (pip or release), Intel GPU/NPU drivers for those devices |
+| Paddle Lite `.nb` | `paddlelite` | CPU | build Paddle Lite yourself (`docs/backends/paddlelite.md`), set `PADDLE_LITE_ROOT`, `-DUAIRT_BUILD_PADDLELITE=ON`; `input_shapes` option required |
+| MNN `.mnn` | `mnn` | CPU, Metal on Apple | `git submodule update --init --depth 1 third_party/MNN` and `-DUAIRT_BUILD_MNN=ON` (`-DUAIRT_MNN_METAL=ON` on a Mac); inputs and outputs are numbered by name, `input_shapes` only for dynamic shapes |
 | NCNN `.param` + `.bin` | `ncnn` | CPU, any Vulkan GPU | `git submodule update --init --depth 1 third_party/ncnn` (for Vulkan add `--recursive` and `-DUAIRT_NCNN_VULKAN=ON`) and a Vulkan driver for the GPU; `input_shapes` option |
 | whisper ggml `.bin` | `whispercpp` | CPU, and any GPU the build supports (Metal verified on a Mac) | `git submodule update --init --depth 1 third_party/whisper.cpp` and a ggml Whisper model file (ask before downloading one); audio as float32 16 kHz, see `docs/backends/whispercpp.md` |
 | `.pte` (ExecuTorch) | `executorch` | CPU (XNNPACK) and any delegate built into your ExecuTorch | ExecuTorch built from source with the Module and Tensor extensions; see `docs/backends/executorch.md` |

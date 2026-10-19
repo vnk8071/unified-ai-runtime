@@ -30,6 +30,8 @@ Find the target backend in the first column, then the row for the source you hav
 | `executorch` | `torch.export` then `to_edge_transform_and_lower` (XNNPACK) | none | **Run here** |
 | `openvino` | export ONNX first | `openvino.convert_model` (or `ovc`) | **Run here**, from both |
 | `ncnn` | `pnnx` on the module | `pnnx model.onnx inputshape=[1,3,224,224] fp16=0` | **Run here**, from both |
+| `paddlelite` | save a Paddle model (`paddle.jit.save`, legacy format), then `opt` | ONNX to Paddle with `x2paddle`, then `opt` | `opt` from a Paddle model **run here** (PaddlePaddle 3.3.1, Paddle Lite v2.14-rc); `x2paddle` not run |
+| `mnn` | export ONNX first | `mnnconvert -f ONNX --modelFile m.onnx --MNNModel m.mnn` | **Run here**, from both |
 | `tensorrt` | export ONNX first | `trtexec --onnx` on the GPU that runs it | not run here (needs an NVIDIA GPU) |
 | `qnn` (Snapdragon NPU) | export ONNX first | `qairt-converter` then `qairt-quantizer`, on x86_64 Linux | conversion not run here; loading a `.dlc` and a context `.bin` is, see below |
 | `tflite` | `ai-edge-torch`, or ONNX first | `onnx2tf` | not run here |
@@ -53,7 +55,7 @@ scripts/export_model.py torchvision:resnet18 --shape 1,3,224,224 --to onnx corem
 scripts/export_model.py my_model.py:build --shape 1,3,640,640 --to onnx --state-dict weights.pt
 
 # an ONNX file (the shape is read from the file, which must have fixed input shapes)
-scripts/export_model.py model.onnx --to openvino ncnn
+scripts/export_model.py model.onnx --to openvino ncnn mnn
 ```
 
 What it does for each target: writes `<out>/<name>.<ext>`, runs the reference (PyTorch, or ONNX Runtime for an ONNX source) and the
@@ -62,7 +64,7 @@ check. It fails the target on a difference above `--atol` plus 0.2% of the outpu
 The exit status is 0 only if every target passed.
 
 What it needs, none of which it installs: the converter packages it names when one is missing (`torch`, `onnx`, `coremltools`,
-`executorch`, `openvino`, `pnnx`, `onnxruntime`), and UAIRT built shared with the backend plugins (`UAIRT_LIBRARY`,
+`executorch`, `openvino`, `pnnx`, `MNN`, `onnxruntime`), and UAIRT built shared with the backend plugins (`UAIRT_LIBRARY`,
 `UAIRT_PLUGIN_PATH`, see `bindings/python/README.md`). Each target runs in its **own process**: ONNX Runtime, OpenVINO and PyTorch
 together deadlocked once (OpenVINO blocked in an abseil mutex after an ONNX Runtime run), and a crashing converter then costs only
 its own target. Pass `--option key=value` for a backend option in the check and `--no-verify` to export only.
@@ -77,6 +79,7 @@ ResNet-18 with random weights, input 1x3x224x224, largest difference from PyTorc
 | executorch (XNNPACK) | 5e-6 | |
 | openvino | 4e-6 | needs `inference_precision=f32`: its default on an Arm CPU is half precision and gave 0.048 |
 | ncnn | 3e-6 | needs `fp16=False` in `pnnx` (weights) and `fp16=false` in the backend: with the defaults 0.02 |
+| mnn | 1e-4 | `mnnconvert` fuses and optimises layers; the check runs MNN at `precision=high` |
 | an ONNX file to openvino, and to ncnn | 4e-6 and 5e-6 | ONNX Runtime as the reference |
 
 The script already sets those two precision choices for its check. When you export for speed, choose half precision on purpose and
@@ -105,6 +108,8 @@ Without the `inference_precision` option OpenVINO runs the model in the device's
 `input_shapes` option has no batch dimension (`3x224x224`), and its outputs have none either. The `pnnx` Python wrapper ran a
 self-check on a generated file that failed to parse after the NCNN files were written; the script accepts that only when the files
 exist, and the check through UAIRT is what counts.
+
+**MNN.** `mnnconvert` ships in the `MNN` pip package and replaced packages (`protobuf`) the first time it ran, so use the throw-away environment. MNN's inputs and outputs are numbered by name, not by the model's order: match by name, or let the script match by shape. A converted ResNet-18 differs from PyTorch by 1e-4 on logits of size 6, five times the others' spread but harmless.
 
 **TensorRT.** `trtexec --onnx=model.onnx --saveEngine=model.engine` on the GPU that will run it, with the TensorRT version UAIRT is built
 against (`scripts/doctor.sh`). An engine is not portable across GPUs or TensorRT versions.

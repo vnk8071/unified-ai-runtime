@@ -4,7 +4,7 @@ description: >-
   Build UAIRT and run an AI model on a target device (CPU, GPU or NPU), then verify and report the result.
   Use when the user asks to run, benchmark or test a model (.dlc, .bin, .onnx, .tflite, .mlmodel, .mlpackage, .gguf,
   .pte, .engine, a Whisper ggml model, or a PyTorch model) on this machine or a board, to set up a backend (QNN/QAIRT,
-  ONNX Runtime, TFLite, CoreML, OpenVINO, NCNN, TensorRT, llama.cpp, whisper.cpp, ExecuTorch, or a language model
+  ONNX Runtime, TFLite, CoreML, OpenVINO, NCNN, MNN, Paddle Lite, TensorRT, llama.cpp, whisper.cpp, ExecuTorch, or a language model
   server), to use the NPU or GPU, or when a build, load or NPU run fails.
 ---
 

@@ -143,3 +143,16 @@ Redistributions in binary form must reproduce the above copyright notice, this l
 Neither the name of [copyright holder] nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## MNN (Apache-2.0)
+
+Used by the optional `mnn` backend: https://github.com/alibaba/MNN, Copyright 2018 Alibaba Group. MNN is licensed under the Apache License,
+Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0); the full text is `third_party/MNN/LICENSE.txt` in the pinned submodule, which a binary
+built with `-DUAIRT_BUILD_MNN=ON` must be accompanied by. MNN bundles further third-party code under `third_party/MNN/3rd_party`, each with
+its own license file there.
+
+## Paddle Lite (Apache-2.0)
+
+Used by the optional `paddlelite` backend: https://github.com/PaddlePaddle/Paddle-Lite, Copyright 2019 PaddlePaddle Authors. It is not part of this repository:
+you build it and set `PADDLE_LITE_ROOT`. A plugin built against it links its static library, so redistributing such a binary needs Paddle Lite's Apache License,
+Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0) and its own third-party notices, which Paddle Lite's repository carries.

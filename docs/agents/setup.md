@@ -88,6 +88,23 @@ Goal: get a requested backend building and passing tests. Logic lives in
 - `device=GPU` or `NPU` needs Intel's drivers; if OpenVINO lists only `CPU` the engine reports the available devices.
   See `docs/backends/openvino.md`.
 
+## Paddle Lite
+
+- There is no submodule and no download: build Paddle Lite from its source (the recipe, with the two workarounds it needed on macOS arm64, is in
+  `docs/backends/paddlelite.md`), with exceptions on, then set `PADDLE_LITE_ROOT` to the `cxx` directory it publishes and configure with
+  `-DUAIRT_BUILD_PADDLELITE=ON`. It is Apache-2.0, so there is no licence step. This is Paddle Lite (mobile and edge), not Paddle Inference.
+- A model is a `.nb` file made by Paddle Lite's `opt` from a Paddle `.pdmodel` + `.pdiparams` (a Paddle 3.x save needs `FLAGS_enable_pir_api=0`).
+  It records no input shapes: pass `input_shapes`.
+
+## MNN
+
+- Run `git submodule update --init --depth 1 third_party/MNN` (MNN is Apache-2.0, so no licence step; the checkout is about 260 MB) and
+  configure with `-DUAIRT_BUILD_MNN=ON`: it builds the pinned MNN for the CPU, plus Metal with `-DUAIRT_MNN_METAL=ON`. Or build MNN yourself and
+  set `MNN_ROOT`; see `docs/backends/mnn.md`.
+- A model is a `.mnn` file: `mnnconvert -f ONNX --modelFile model.onnx --MNNModel model.mnn --bizCode uairt` from `pip install MNN`, in a
+  throw-away virtual environment (it replaced packages such as `protobuf`). Inputs and outputs are numbered by name: read them with `--info`.
+- MNN prints a line about the CPU to standard output when a session starts; do not parse a program's standard output when it uses this backend.
+
 ## NCNN
 
 - Run `git submodule update --init --depth 1 third_party/ncnn` (NCNN is BSD-3-Clause, so no licence step) and configure with `-DUAIRT_BUILD_NCNN=ON`:

@@ -51,10 +51,10 @@ cites. It only reads pages: SDKs and drivers stay with the user, as above.
 
 ## Open-source dependencies
 
-llama.cpp, whisper.cpp (MIT) and NCNN (BSD-3-Clause) are pinned git submodules, not vendor SDKs, so they can live in the repository. `.github/dependabot.yml` opens
+llama.cpp, whisper.cpp (MIT), NCNN (BSD-3-Clause) and MNN (Apache-2.0) are pinned git submodules, not vendor SDKs, so they can live in the repository. `.github/dependabot.yml` opens
 a weekly pull request when upstream moves, and the build and tests run on it. `llama.h` changes often, so a bump is merged only
 after `ctest` passes and a GGUF model has produced the same tokens as llama.cpp's own tool
-(`tests/compare_with_llamacpp.py`). A whisper.cpp or NCNN bump is merged only after `ctest` passes and a model has matched the project's own tool
-(`tests/compare_with_whisper_cli.py`; NCNN's comparison in `tests/compare_with_ncnn.py`). whisper.cpp and llama.cpp share one ggml when both are
+(`tests/compare_with_llamacpp.py`). A whisper.cpp, NCNN or MNN bump is merged only after `ctest` passes and a model has matched the project's own tool
+(`tests/compare_with_whisper_cli.py`; NCNN's comparison in `tests/compare_with_ncnn.py`, MNN's in `tests/compare_with_mnn.py`). whisper.cpp and llama.cpp share one ggml when both are
 built, so a bump of either that breaks the other's build is a reason to bump both. Other submodules should follow the same rule and have
 their licence checked first.

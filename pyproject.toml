@@ -10,7 +10,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "uairt"
 version = "0.2.0"
-description = "One API to run compiled AI models on NPUs, GPUs and CPUs: QNN, ONNX Runtime, TensorRT, OpenVINO, NCNN, CoreML, TFLite"
+description = "One API to run compiled AI models on NPUs, GPUs and CPUs: QNN, ONNX Runtime, TensorRT, OpenVINO, NCNN, MNN, CoreML, TFLite"
 readme = "bindings/python/README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.9"

@@ -301,6 +301,102 @@ if(UAIRT_BUILD_NCNN)
   install(TARGETS uairt_backend_ncnn LIBRARY DESTINATION lib/uairt)
 endif()
 
+option(UAIRT_BUILD_MNN "Build the MNN backend plugin" OFF)
+if(UAIRT_BUILD_MNN)
+  enable_language(CXX)
+  set(MNN_ROOT "$ENV{MNN_ROOT}" CACHE PATH
+      "MNN install prefix (include/MNN/Interpreter.hpp and lib/libMNN), used instead of the pinned submodule; build it with the same C++ toolchain as this plugin")
+  set(UAIRT_MNN_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/MNN" CACHE PATH "MNN source tree; the default is the pinned submodule")
+  option(UAIRT_MNN_METAL "Build the pinned MNN with its Metal backend (Apple platforms)" OFF)
+  option(UAIRT_MNN_OPENCL "Build the pinned MNN with its OpenCL backend" OFF)
+  option(UAIRT_MNN_VULKAN "Build the pinned MNN with its Vulkan backend" OFF)
+
+  add_library(uairt_backend_mnn MODULE src/backends/mnn.cpp)
+  target_include_directories(uairt_backend_mnn PRIVATE include)
+  target_compile_features(uairt_backend_mnn PRIVATE cxx_std_17)
+  target_compile_definitions(uairt_backend_mnn PRIVATE UAIRT_BUILDING_SHARED)
+  if(MNN_ROOT)
+    find_path(UAIRT_MNN_INCLUDE MNN/Interpreter.hpp HINTS ${MNN_ROOT}/include)
+    find_library(UAIRT_MNN_LIBRARY NAMES MNN HINTS ${MNN_ROOT}/lib ${MNN_ROOT}/lib64)
+    if(NOT UAIRT_MNN_INCLUDE OR NOT UAIRT_MNN_LIBRARY)
+      message(FATAL_ERROR
+        "MNN not found. Set MNN_ROOT to an MNN install prefix containing include/MNN/Interpreter.hpp and lib/libMNN.")
+    endif()
+    get_filename_component(UAIRT_MNN_LIBRARY_DIR ${UAIRT_MNN_LIBRARY} DIRECTORY)
+    target_include_directories(uairt_backend_mnn SYSTEM PRIVATE ${UAIRT_MNN_INCLUDE})
+    target_link_libraries(uairt_backend_mnn PRIVATE ${UAIRT_MNN_LIBRARY})
+    set_target_properties(uairt_backend_mnn PROPERTIES
+      PREFIX "lib" CXX_VISIBILITY_PRESET hidden BUILD_RPATH ${UAIRT_MNN_LIBRARY_DIR})
+  else()
+    if(NOT EXISTS "${UAIRT_MNN_SOURCE}/CMakeLists.txt")
+      message(FATAL_ERROR
+        "MNN not found at ${UAIRT_MNN_SOURCE}. Run: git submodule update --init --depth 1 third_party/MNN "
+        "(or set MNN_ROOT to an MNN install, or UAIRT_MNN_SOURCE to a checkout).")
+    endif()
+    set(UAIRT_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    set(MNN_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(MNN_SEP_BUILD OFF CACHE BOOL "" FORCE)
+    set(MNN_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(MNN_BUILD_DEMO OFF CACHE BOOL "" FORCE)
+    set(MNN_BUILD_TEST OFF CACHE BOOL "" FORCE)
+    set(MNN_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
+    set(MNN_BUILD_CONVERTER OFF CACHE BOOL "" FORCE)
+    set(MNN_BUILD_QUANTOOLS OFF CACHE BOOL "" FORCE)
+    set(MNN_METAL ${UAIRT_MNN_METAL} CACHE BOOL "" FORCE)
+    set(MNN_OPENCL ${UAIRT_MNN_OPENCL} CACHE BOOL "" FORCE)
+    set(MNN_VULKAN ${UAIRT_MNN_VULKAN} CACHE BOOL "" FORCE)
+    add_subdirectory(${UAIRT_MNN_SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/mnn EXCLUDE_FROM_ALL)
+    set(BUILD_SHARED_LIBS ${UAIRT_SAVED_BUILD_SHARED_LIBS})
+    target_link_libraries(uairt_backend_mnn PRIVATE MNN)
+    target_include_directories(uairt_backend_mnn SYSTEM PRIVATE ${UAIRT_MNN_SOURCE}/include)
+    set_target_properties(uairt_backend_mnn PROPERTIES PREFIX "lib" CXX_VISIBILITY_PRESET hidden)
+    # MNN is linked statically: keep its symbols out of the process so they cannot clash with the application's own MNN.
+    if(APPLE)
+      target_link_options(uairt_backend_mnn PRIVATE -Wl,-exported_symbol,_uairt_backend_get_api)
+    elseif(NOT WIN32)
+      target_link_options(uairt_backend_mnn PRIVATE -Wl,--exclude-libs,ALL)
+    endif()
+  endif()
+  install(TARGETS uairt_backend_mnn LIBRARY DESTINATION lib/uairt)
+endif()
+
+option(UAIRT_BUILD_PADDLELITE "Build the Paddle Lite backend plugin" OFF)
+if(UAIRT_BUILD_PADDLELITE)
+  enable_language(CXX)
+  set(PADDLE_LITE_ROOT "$ENV{PADDLE_LITE_ROOT}" CACHE PATH
+      "Paddle Lite's published cxx directory (include/paddle_api.h and lib/libpaddle_api_light_bundled.a), built with the same C++ toolchain as this plugin and with exceptions on (LITE_WITH_EXCEPTION=ON)")
+  find_path(UAIRT_PADDLE_LITE_INCLUDE paddle_api.h HINTS ${PADDLE_LITE_ROOT}/include NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+  find_library(UAIRT_PADDLE_LITE_STATIC NAMES libpaddle_api_light_bundled.a paddle_api_light_bundled
+    HINTS ${PADDLE_LITE_ROOT}/lib NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+  if(NOT UAIRT_PADDLE_LITE_INCLUDE OR NOT UAIRT_PADDLE_LITE_STATIC)
+    message(FATAL_ERROR
+      "Paddle Lite not found. Set PADDLE_LITE_ROOT to the cxx directory of a Paddle Lite build (it holds include/paddle_api.h and "
+      "lib/libpaddle_api_light_bundled.a); docs/backends/paddlelite.md shows how to build it.")
+  endif()
+
+  add_library(uairt_backend_paddlelite MODULE src/backends/paddlelite.cpp)
+  target_include_directories(uairt_backend_paddlelite PRIVATE include)
+  target_include_directories(uairt_backend_paddlelite SYSTEM PRIVATE ${UAIRT_PADDLE_LITE_INCLUDE})
+  target_compile_features(uairt_backend_paddlelite PRIVATE cxx_std_17)
+  target_compile_definitions(uairt_backend_paddlelite PRIVATE UAIRT_BUILDING_SHARED)
+  set_target_properties(uairt_backend_paddlelite PROPERTIES PREFIX "lib" CXX_VISIBILITY_PRESET hidden)
+  # Paddle Lite registers its operators and kernels from static initializers of the objects in its archive: a plain link drops them and a
+  # model then fails with "can not create operator 'feed'". Link the whole archive, and keep its symbols out of the process.
+  if(APPLE)
+    target_link_options(uairt_backend_paddlelite PRIVATE
+      "LINKER:-force_load,${UAIRT_PADDLE_LITE_STATIC}" -Wl,-exported_symbol,_uairt_backend_get_api)
+  else()
+    target_link_libraries(uairt_backend_paddlelite PRIVATE
+      -Wl,--whole-archive ${UAIRT_PADDLE_LITE_STATIC} -Wl,--no-whole-archive)
+    if(NOT WIN32)
+      target_link_options(uairt_backend_paddlelite PRIVATE -Wl,--exclude-libs,ALL)
+    endif()
+  endif()
+  install(TARGETS uairt_backend_paddlelite LIBRARY DESTINATION lib/uairt)
+endif()
+
 option(UAIRT_BUILD_EXECUTORCH "Build the ExecuTorch backend plugin" OFF)
 if(UAIRT_BUILD_EXECUTORCH)
   set(EXECUTORCH_ROOT "$ENV{EXECUTORCH_ROOT}" CACHE PATH
@@ -607,6 +703,46 @@ if(UAIRT_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_ncnn.py
         $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_ncnn>
         $ENV{UAIRT_NCNN_TEST_MODEL} $ENV{UAIRT_NCNN_TEST_SHAPES})
+    endif()
+  endif()
+
+  if(UAIRT_BUILD_MNN)
+    add_executable(test_mnn tests/test_mnn.c)
+    target_link_libraries(test_mnn PRIVATE uairt)
+    if(NOT WIN32)
+      target_link_libraries(test_mnn PRIVATE m)
+    endif()
+    add_test(NAME mnn COMMAND test_mnn $<TARGET_FILE:uairt_backend_mnn>
+      ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/add_mul.mnn)
+    if(DEFINED ENV{UAIRT_MNN_TEST_MODEL} AND DEFINED ENV{UAIRT_MNN_PYTHON})
+      add_test(NAME mnn_vs_mnn_python COMMAND $ENV{UAIRT_MNN_PYTHON}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_mnn.py
+        $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_mnn> $ENV{UAIRT_MNN_TEST_MODEL})
+    endif()
+  endif()
+
+  if(UAIRT_BUILD_PADDLELITE)
+    add_executable(test_paddlelite tests/test_paddlelite.c)
+    target_link_libraries(test_paddlelite PRIVATE uairt)
+    if(NOT WIN32)
+      target_link_libraries(test_paddlelite PRIVATE m)
+    endif()
+    add_test(NAME paddlelite COMMAND test_paddlelite $<TARGET_FILE:uairt_backend_paddlelite>
+      ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/add_mul.nb)
+    if(DEFINED ENV{UAIRT_PADDLELITE_TEST_MODEL} AND DEFINED ENV{UAIRT_PADDLELITE_TEST_SHAPES})
+      find_package(Python3 REQUIRED COMPONENTS Interpreter)
+      add_executable(paddlelite_reference tests/paddlelite_reference.cpp)
+      target_include_directories(paddlelite_reference SYSTEM PRIVATE ${UAIRT_PADDLE_LITE_INCLUDE})
+      target_compile_features(paddlelite_reference PRIVATE cxx_std_17)
+      if(APPLE)
+        target_link_options(paddlelite_reference PRIVATE "LINKER:-force_load,${UAIRT_PADDLE_LITE_STATIC}")
+      else()
+        target_link_libraries(paddlelite_reference PRIVATE -Wl,--whole-archive ${UAIRT_PADDLE_LITE_STATIC} -Wl,--no-whole-archive)
+      endif()
+      add_test(NAME paddlelite_vs_paddlelite_api COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_with_paddlelite.py
+        $<TARGET_FILE:run_model> $<TARGET_FILE:uairt_backend_paddlelite> $<TARGET_FILE:paddlelite_reference>
+        $ENV{UAIRT_PADDLELITE_TEST_MODEL} $ENV{UAIRT_PADDLELITE_TEST_SHAPES})
     endif()
   endif()
 

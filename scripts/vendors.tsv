@@ -9,6 +9,8 @@ onnxruntime	ONNX Runtime	ONNXRUNTIME_ROOT	1.30.0	1.22.0	Linux x86_64, GTX 1650 (
 openvino	OpenVINO	OPENVINO_ROOT	2026.4.1	-	Ubuntu 24.04, Intel Core i9-9900K (CPU only)	https://docs.openvino.ai/
 tensorrt	TensorRT	TENSORRT_ROOT	10.9.0.34	8.5.0	Linux x86_64, GTX 1650 (CUDA 12.8)	https://developer.nvidia.com/tensorrt
 ncnn	NCNN (git submodule, BSD-3-Clause)	NCNN_ROOT	submodule	-	macOS Apple M5 (CPU, a hand-made net)	https://github.com/Tencent/ncnn
+mnn	MNN (git submodule, Apache-2.0)	MNN_ROOT	submodule	-	macOS Apple M5 (CPU and Metal, matches PyMNN)	https://github.com/alibaba/MNN
+paddlelite	Paddle Lite (you build it, Apache-2.0)	PADDLE_LITE_ROOT	v2.14-rc	-	macOS Apple M5 (CPU, byte-identical to Paddle Lite's own API)	https://github.com/PaddlePaddle/Paddle-Lite
 whispercpp	whisper.cpp (git submodule, MIT)	WHISPER_ROOT	submodule	-	macOS Apple M5 (CPU, Metal)	https://github.com/ggml-org/whisper.cpp
 executorch	ExecuTorch (built from source, BSD)	EXECUTORCH_ROOT	-	-	-	https://github.com/pytorch/executorch
 tflite	TensorFlow Lite C library	TFLITE_LIBRARY	-	-	-	https://developers.google.com/edge/litert

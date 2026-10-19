@@ -110,6 +110,8 @@ such order, so its inputs and outputs are sorted by name.
 | TFLite | `tflite` | `.tflite` (path or memory), static shapes; optional QNN delegate (HTP) | `num_threads`, `delegate` (`none`, `qnn`), and with `qnn`: `delegate_library`*, `backend_library`*, `skel_dir`, `htp_performance_mode` (`default`, `burst`, `high_performance`, `sustained`, `balanced`, `power_saver`), `htp_precision` (`quantized`, `fp16`), `adsp_library_path` | host |
 | OpenVINO | `openvino` | OpenVINO IR `.xml`, `.onnx`, or a directory with one `.xml` (path only), static shapes | `device` (`CPU`, `GPU`, `NPU`, `AUTO`, ...), `performance_hint`, `num_threads`, `cache_dir` | host |
 | NCNN | `ncnn` | `.param` + `.bin` or a directory with one (path only), float32, static shapes | `input_shapes` (required), `device` (`cpu`, `vulkan`), `vulkan_device`, `fp16`, `num_threads` | host |
+| MNN | `mnn` | `.mnn` from a path or memory, static shapes; tensors numbered by name | `device` (`cpu`, `metal`, `opencl`, `vulkan`, `cuda`), `num_threads`, `precision` (`normal`, `high`, `low`, `bf16`), `input_shapes` (only for dynamic or resized inputs) | host |
+| Paddle Lite | `paddlelite` | `.nb` from a path or memory, float32, static shapes; inputs and outputs in the model's order | `input_shapes` (required), `num_threads`, `power_mode`, `precision` | host |
 | whisper.cpp | `whispercpp` | ggml `.bin` Whisper model (path only); input float32 `[n_samples]` audio, outputs uint8 `[max_text_bytes]` text and int32 `[1]` length | `n_samples`, `max_text_bytes`, `language`, `translate`, `num_threads`, `use_gpu`, `gpu_device`, `flash_attn` | host |
 | ExecuTorch | `executorch` | `.pte` (path only), tensor I/O, static shapes, contiguous | `method` (default `forward`), `num_threads` | host |
 | TensorRT | `tensorrt` | serialized engine `.engine` / `.plan` (ultralytics exports load as is), static shapes | `device` (CUDA device index) | host, pinned |
@@ -151,7 +153,7 @@ rows for the reference backend list by platform.
 | llamacpp, CUDA, Vulkan and CPU | Ubuntu 24.04 x86_64, NVIDIA RTX 3060 Laptop 12 GB, driver 580.95, CUDA 12.8 | same pinned llama.cpp; Qwen3-0.6B Q8_0 and Qwen3-14B Q4_K_M; `ctest` 10 of 10 on each build; 0.6B about 251 (CUDA), 280 (Vulkan) and 31 (CPU) tokens/s; the Python `AutoModel` ran both |
 | llamacpp, OpenCL, Hexagon NPU (`HTP0`) and CPU | Windows 11 ARM64, Snapdragon X Elite (Adreno X1-85, Hexagon v73, test signing on) | same pinned llama.cpp; Qwen3-0.6B Q8_0 and Qwen3-4B Q4_K_M; `ctest` passes on the OpenCL and the Hexagon builds; 0.6B about 68 (OpenCL) and 48 (`HTP0`) tokens/s; `HTP0` output equals the CPU's on two of three prompts |
 
-Not tested: OpenVINO's GPU and NPU devices (no Intel GPU or NPU was available), NCNN on macOS or Android, iOS, other Snapdragon parts, the TFLite backend's QNN delegate path (see
+Not tested: Paddle Lite on Android and Linux and its GPU and NPU delegates, MNN on Android (cross-compiled, not run) and its OpenCL, Vulkan and CUDA backends, OpenVINO's GPU and NPU devices (no Intel GPU or NPU was available), NCNN on macOS or Android, iOS, other Snapdragon parts, the TFLite backend's QNN delegate path (see
 `docs/design.md`), the ONNX Runtime backend on Windows (it compiles; no matching runtime was available), the TFLite
 backend on Windows (ported, not compiled), and TensorRT with dynamic shapes or on GPUs other than the GTX 1650, the RTX 2060 (build and error paths only) and the Colab T4. The llamacpp backend was not run on Linux ARM, with Vulkan on the Adreno GPU,
 or with a CUDA GPU other than the RTX 3060.

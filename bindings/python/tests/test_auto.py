@@ -22,7 +22,7 @@ def plan(path, available=ALL, **kwargs):
 
 @pytest.mark.parametrize("path, backend", [
     ("m.dlc", "qnn"), ("m.bin", "qnn"), ("m.onnx", "onnxruntime"), ("M.ONNX", "onnxruntime"), ("m.xml", "openvino"),
-    ("m.param", "ncnn"), ("m.engine", "tensorrt"), ("m.plan", "tensorrt"), ("m.tflite", "tflite"),
+    ("m.param", "ncnn"), ("m.mnn", "mnn"), ("m.nb", "paddlelite"), ("m.engine", "tensorrt"), ("m.plan", "tensorrt"), ("m.tflite", "tflite"),
     ("m.mlmodelc", "coreml"), ("m.mlpackage", "coreml"), ("m.mlmodel", "coreml"), ("m.gguf", "llamacpp"),
 ])
 def test_backend_comes_from_the_file_suffix(path, backend):
