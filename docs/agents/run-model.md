@@ -38,7 +38,8 @@ a Hexagon architecture hint (it is a hint: check it against the chip before rely
   an older SDK will not load. A `.dlc` is portable but is compiled on the device at load (see the cache below).
 - Producing a `.dlc` needs `qairt-converter`, which runs on x86_64 Linux only. If the user has only an ONNX or
   PyTorch model and the target is the NPU, say what that conversion needs and who does it.
-- Choosing a format for a device, and converting and checking a model, is in [export-model.md](export-model.md).
+- Choosing a format for a device, and converting and checking a model, is in [export-model.md](export-model.md); measuring which backend is fastest for a model is
+  [benchmark-model.md](benchmark-model.md).
   Writing the program that feeds the model is in [write-app.md](write-app.md).
 
 ## 3. Get the SDK in place

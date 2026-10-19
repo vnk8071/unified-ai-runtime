@@ -101,6 +101,19 @@ def flat(outputs) -> list:
     return [outputs]
 
 
+def onnx_input_info(path: Path) -> Tuple[List[Tuple[int, ...]], List[str]]:
+    """Shapes and dtypes of the real inputs of an ONNX file (not its initializers); the shapes must be fixed."""
+    onnx = need("onnx", "reading the ONNX file")
+    graph = onnx.load(str(path)).graph
+    initializers = {i.name for i in graph.initializer}
+    real_inputs = [i for i in graph.input if i.name not in initializers]
+    shapes = [tuple(d.dim_value for d in i.type.tensor_type.shape.dim) for i in real_inputs]
+    if any(d <= 0 for s in shapes for d in s):
+        raise ExportError(f"the ONNX inputs {shapes} are not fixed: re-export with a static shape, or fix them (see docs/agents/export-model.md)")
+    elem = {1: "float32", 7: "int64", 6: "int32", 10: "float16", 2: "uint8"}
+    return shapes, [elem.get(i.type.tensor_type.elem_type, "float32") for i in real_inputs]
+
+
 # ---- the exporters: each writes the file UAIRT loads and returns its path ---------------------------------------------------------
 
 def export_onnx(model, inputs, out: Path, opset: int) -> Path:
@@ -212,20 +225,25 @@ def reference_outputs(source: str, model, onnx_path: Optional[Path], inputs: Seq
         return [x.detach().cpu().numpy() for x in flat(model(*[torch.from_numpy(i) for i in inputs]))]
 
 
+def align_inputs(model, inputs: Sequence[np.ndarray]) -> List[np.ndarray]:
+    """The reference inputs in the dtype and shape the converted model reports (NCNN has no batch dimension, so a model that differs only by
+    size-1 dimensions gets the same data reshaped)."""
+    if len(model.inputs) != len(inputs):
+        raise ExportError(f"the converted model has {len(model.inputs)} inputs, the reference {len(inputs)}")
+    cast = []
+    for info, value in zip(model.inputs, inputs):
+        if tuple(info.shape) != tuple(value.shape):
+            if tuple(d for d in info.shape if d != 1) != tuple(d for d in value.shape if d != 1):
+                raise ExportError(f"input '{info.name}': the converted model wants shape {tuple(info.shape)}, the reference ran with {tuple(value.shape)}")
+            value = value.reshape(info.shape)
+        cast.append(value.astype(info.dtype))
+    return cast
+
+
 def run_uairt(path: Path, backend: str, inputs: Sequence[np.ndarray], options: Dict[str, str]) -> List[np.ndarray]:
     uairt = need("uairt", "the check through UAIRT", "the uairt package, or set PYTHONPATH=bindings/python and UAIRT_LIBRARY (shared build)")
     with uairt.AutoModel.from_file(str(path), backend=backend, options=options) as model:
-        if len(model.inputs) != len(inputs):
-            raise ExportError(f"the converted model has {len(model.inputs)} inputs, the reference {len(inputs)}")
-        cast = []
-        for info, value in zip(model.inputs, inputs):
-            if tuple(info.shape) != tuple(value.shape):
-                # NCNN has no batch dimension: a model that differs only by size-1 dimensions gets the same data reshaped
-                if tuple(d for d in info.shape if d != 1) != tuple(d for d in value.shape if d != 1):
-                    raise ExportError(f"input '{info.name}': the converted model wants shape {tuple(info.shape)}, the reference ran with {tuple(value.shape)}")
-                value = value.reshape(info.shape)
-            cast.append(value.astype(info.dtype))
-        return [np.asarray(x) for x in model.run(*cast)]
+        return [np.asarray(x) for x in model.run(*align_inputs(model, inputs))]
 
 
 def match_outputs(reference: Sequence[np.ndarray], got: Sequence[np.ndarray]) -> List[Tuple[np.ndarray, np.ndarray]]:
@@ -316,15 +334,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             unsupported = [t for t in args.to if t not in ("onnx", "openvino", "ncnn", "mnn")]
             if unsupported:
                 raise ExportError(f"an ONNX file converts to openvino, ncnn and mnn here; {', '.join(unsupported)} needs the PyTorch model (CoreML and ExecuTorch do not read ONNX)")
-            onnx = need("onnx", "reading the ONNX file")
-            graph = onnx.load(str(onnx_path)).graph
-            initializers = {i.name for i in graph.initializer}
-            real_inputs = [i for i in graph.input if i.name not in initializers]
-            shapes = [tuple(d.dim_value for d in i.type.tensor_type.shape.dim) for i in real_inputs]
-            if any(d <= 0 for s in shapes for d in s):
-                raise ExportError(f"the ONNX inputs {shapes} are not fixed: re-export with a static shape, or fix them (see docs/agents/export-model.md)")
-            elem = {1: "float32", 7: "int64", 6: "int32", 10: "float16", 2: "uint8"}
-            dtypes = [elem.get(i.type.tensor_type.elem_type, "float32") for i in real_inputs]
+            shapes, dtypes = onnx_input_info(onnx_path)
         else:
             if not args.shape:
                 raise ExportError("a PyTorch source needs --shape (the shape you will really feed; it is not guessed)")

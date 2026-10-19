@@ -153,6 +153,11 @@ ARM64 wheel, vendor version checks in `doctor`, and the export, application and 
   provider. Verified with the MLX provider on an Apple M5: ResNet50 at batch 8 ran 3.1 to 3.2 times faster than
   the CPU EP with the same outputs; MobileNetV2 at batch 1 showed no gain.
 
+### Added (benchmark tool)
+- `scripts/bench_model.py`: exports a PyTorch module or ONNX file to every target of `export_model.py`, runs each backend and option variant in its own process through UAIRT,
+  checks the outputs against the original and ranks latency (the core's own timing), with a verdict that keeps exact and reduced-precision results apart; `--artifact` adds files
+  you already have (a QNN `.dlc`, a TensorRT engine). `docs/agents/benchmark-model.md` is the playbook. `export_model.py` gained `align_inputs` and `onnx_input_info` for it.
+
 ### Added (Paddle Lite backend)
 - `paddlelite` backend (`-DUAIRT_BUILD_PADDLELITE=ON`, `PADDLE_LITE_ROOT`): `.nb` models, float32, static shapes (`input_shapes` required), CPU; options `num_threads`, `power_mode`,
   `precision`. Byte-identical to Paddle Lite's own C++ API in `tests/compare_with_paddlelite.py`; `ctest -R paddlelite` runs `tests/test_paddlelite.c` on `tests/data/add_mul.nb`.

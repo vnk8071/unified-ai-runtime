@@ -329,6 +329,13 @@ build/run_model --repeat 100 --option input_shapes=3x640x640 --option device=vul
 On a GTX 1650 a yolov8n model runs in 21.9 ms through Vulkan against 79 ms on the CPU; `device=vulkan` fails instead of
 quietly using the CPU when no GPU is usable. See [docs/backends/ncnn.md](docs/backends/ncnn.md).
 
+### Which backend is fastest for my model?
+
+`scripts/bench_model.py model.onnx` (or `torchvision:resnet18 --shape 1,3,224,224`) exports the model to every target that can run it, runs each backend and
+option variant through UAIRT, checks the outputs against the original and ranks them by latency, keeping float32 results apart from reduced-precision ones.
+`--artifact qnn=model.dlc,device=npu` adds a file you already have. It measures one model on one machine with random input, so check the task result
+before choosing a reduced-precision winner. See [docs/agents/benchmark-model.md](docs/agents/benchmark-model.md).
+
 ### MNN (Alibaba)
 
 MNN is a pinned submodule (Apache-2.0): `git submodule update --init --depth 1 third_party/MNN`, then `-DUAIRT_BUILD_MNN=ON` (add

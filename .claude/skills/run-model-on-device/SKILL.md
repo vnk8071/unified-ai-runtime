@@ -17,7 +17,8 @@ description: >-
    `docs/agents/setup.md`, build, run with `run_model`, verify against the vendor tool, report.
 4. On any error, look it up in `docs/agents/troubleshooting.md` before trying anything else.
 5. If the model is not in a loadable format, follow `docs/agents/export-model.md` (`scripts/export_model.py` exports a PyTorch
-   module or an ONNX file to ONNX Runtime, CoreML, ExecuTorch, OpenVINO or NCNN and checks it through UAIRT); if the user wants a program, follow
+   module or an ONNX file to ONNX Runtime, CoreML, ExecuTorch, OpenVINO, NCNN or MNN and checks it through UAIRT); to find the fastest backend for a model
+   follow `docs/agents/benchmark-model.md`; if the user wants a program, follow
    `docs/agents/write-app.md`. To prepare inputs or decode outputs (images, audio, tokenizers, chat templates, boxes), start from
    `python examples/python/inspect_model.py <model>` and follow `docs/agents/pre-post-processing.md`. Installed versus tested vendor
    versions: `docs/vendors.md`.
