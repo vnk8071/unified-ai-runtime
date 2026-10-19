@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 #define UAIRT_VERSION_MAJOR 0
-#define UAIRT_VERSION_MINOR 1
+#define UAIRT_VERSION_MINOR 2
 #define UAIRT_VERSION_PATCH 0
 
 #define UAIRT_STRINGIFY_(x) #x

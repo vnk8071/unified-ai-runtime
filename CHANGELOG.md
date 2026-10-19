@@ -1,9 +1,12 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.2.0 (2026-10-19)
 
-First public version. Pre-1.0: the API and ABI may change.
+Pre-1.0: the API and ABI may change. 0.1.0 was published to PyPI on 2026-10-05; this section grew while it was still
+labelled unreleased, so entries from before that date were already in 0.1.0 and are not marked separately. Since 0.1.0: the
+llama.cpp, whisper.cpp, ExecuTorch and llmserver backends, the C++17 core behind the unchanged C API, the Windows
+ARM64 wheel, vendor version checks in `doctor`, and the export, application and pre/post-processing guides for agents and people.
 
 ### Added
 - C11 API (`uairt/uairt.h`): engines, models, tensors, zero-copy buffers, status codes.
