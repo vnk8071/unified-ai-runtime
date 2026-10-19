@@ -14,7 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # ubuntu-latest began moving to Ubuntu 26 on 2026-10-19 and its Test step failed; the same commit passes on 24.04.
+        # Pinned until the cause is known.
+        os: [ubuntu-24.04, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
