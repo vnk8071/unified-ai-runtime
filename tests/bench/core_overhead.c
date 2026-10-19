@@ -12,15 +12,27 @@
 #include <string.h>
 #include <time.h>
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include <uairt/uairt.h>
 
 #define MAX_TENSORS 16
 #define MAX_OPTIONS 16
 
 static double now_ns(void) {
+#if defined(_WIN32)
+  LARGE_INTEGER frequency, counter;
+  QueryPerformanceFrequency(&frequency);
+  QueryPerformanceCounter(&counter);
+  return (double)counter.QuadPart * 1e9 / (double)frequency.QuadPart;
+#else
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return (double)ts.tv_sec * 1e9 + (double)ts.tv_nsec;
+#endif
 }
 
 static int compare_double(const void* a, const void* b) {
