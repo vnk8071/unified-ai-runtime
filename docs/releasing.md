@@ -9,7 +9,7 @@ run of the workflow with `publish` set to `testpypi` or `pypi`.
 
 - **Wheels**, one per platform, named `uairt-<version>-py3-none-<platform>.whl`. The binding uses `ctypes`, so a wheel is not
   tied to a Python version: one wheel serves every Python 3.9 and later on its platform. Built: Linux x86_64 and aarch64
-  (manylinux 2.28), macOS arm64 (11 and later), Windows x64, and Windows ARM64 once an ARM64 runner is enabled (see below). Not
+  (manylinux 2.28), macOS arm64 (11 and later), Windows x64 and Windows ARM64 (GitHub's hosted `windows-11-arm` runner). Not
   built: musllinux, 32-bit, and macOS on Intel.
 - **A source distribution**, which `pip` builds on any other platform. It holds the core library and the reference backend; it
   has no ONNX Runtime plugin unless the ONNX Runtime headers are available (see "Building locally").
@@ -30,9 +30,7 @@ Package names are first-come: `uairt` was free when this was written, and it is 
    - TestPyPI: the same, with environment `testpypi`.
 3. In the GitHub repository's Settings, Environments, create `testpypi` and `pypi`. On `pypi`, add yourself as a **required
    reviewer**: the workflow then stops and waits for your approval before anything reaches PyPI.
-4. Optional: when an ARM64 Windows runner is available to the repository (`windows-11-arm`), create the repository variable
-   `ENABLE_WINDOWS_ARM64_CI` with the value `true`; the ARM64 wheel is then built, tested and published too.
-5. The package metadata links to the repository (`project.urls` in `pyproject.toml`). If the repository is private, make it public
+4. The package metadata links to the repository (`project.urls` in `pyproject.toml`). If the repository is private, make it public
    or change that link before the first release: PyPI pages are public.
 
 ## Release steps

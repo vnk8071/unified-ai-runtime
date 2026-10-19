@@ -28,7 +28,7 @@ First public version. Pre-1.0: the API and ABI may change.
 ### Added (Python wheels)
 - A root `pyproject.toml` (scikit-build-core) builds the `uairt` wheel: the Python package, `libuairt` and the ONNX Runtime plugin,
   tagged `py3-none-<platform>` so one wheel per platform serves every Python 3.x. `.github/workflows/wheels.yml` builds and tests
-  the wheels with cibuildwheel (Linux x86_64 and aarch64, macOS arm64, Windows x64, Windows ARM64 when a runner is enabled) and
+  the wheels with cibuildwheel (Linux x86_64 and aarch64, macOS arm64, Windows x64, Windows ARM64) and
   publishes to TestPyPI and then PyPI with trusted publishing, behind an approval. See `docs/releasing.md`.
 - The ONNX Runtime plugin loads ONNX Runtime at run time instead of linking it, so it works with any release from 1.22 on,
   including a pip-installed `onnxruntime`, which the Python package locates itself. `UAIRT_ONNXRUNTIME_LIBRARY` names a library
