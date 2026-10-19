@@ -1,6 +1,14 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Unified AI Runtime (UAIRT)
 
+[![CI](https://github.com/vnk8071/unified-ai-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/vnk8071/unified-ai-runtime/actions/workflows/ci.yml)
+[![Wheels](https://github.com/vnk8071/unified-ai-runtime/actions/workflows/wheels.yml/badge.svg)](https://github.com/vnk8071/unified-ai-runtime/actions/workflows/wheels.yml)
+[![PyPI](https://img.shields.io/pypi/v/uairt.svg)](https://pypi.org/project/uairt/)
+[![Python](https://img.shields.io/pypi/pyversions/uairt.svg)](https://pypi.org/project/uairt/)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![C11 / C++17](https://img.shields.io/badge/C11%20ABI-C%2B%2B17%20core-informational.svg)](docs/design.md)
+[![Status: pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange.svg)](CHANGELOG.md)
+
 One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML, llama.cpp (GGUF language models), TensorRT (NVIDIA GPUs), OpenVINO (Intel), NCNN (CPU and Vulkan GPUs), MNN (Alibaba), Paddle Lite (Baidu), ExecuTorch (`.pte`), whisper.cpp (speech to text), and language model servers (Ollama, LM Studio, SGLang).
 Write the application code once; choose the backend by name when you create an engine.
 
@@ -25,6 +33,8 @@ uairt_model_run(model, &in, 1, &out, 1);
 ```
 
 A complete runnable program is in [examples/quickstart.c](examples/quickstart.c); there are also C++, Python and Rust examples in [examples/](examples/README.md).
+
+**Contents:** [Use it with a coding agent](#use-it-with-a-coding-agent) · [Getting started](#getting-started) · [Architecture](#architecture) · [Status](#status) · [Install](#install-python) · [Build](#build) · [Testing and CI](#testing-and-ci) · [Documentation](#documentation) · [Contributing](#contributing) · [License](#license)
 
 ## Use it with a coding agent
 
@@ -156,6 +166,76 @@ This is a port of the model, not of the program. Be aware of what UAIRT does not
   ([docs/agents/pre-post-processing.md](docs/agents/pre-post-processing.md)).
 - **Verify the new backend** against the old one on the same inputs and compare the raw outputs, not just the top result.
 
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph apps["Your application"]
+        direction LR
+        C["C / C++<br/>uairt.h, uairt.hpp"]
+        PY["Python<br/>AutoModel"]
+        RS["Rust"]
+        EX["examples, run_model,<br/>Android and iOS apps"]
+    end
+
+    LLM["libuairt_llm (optional)<br/>sampling, streaming generation,<br/>end-of-generation stop"]
+
+    subgraph core["libuairt core: C++17, no C++ runtime, exports only the C API"]
+        direction TB
+        API["Public C11 API (ABI, append-only)<br/>engines, models, tensors, sessions, text"]
+        VAL["Validation and status codes"]
+        LDR["Plugin loader<br/>dlopen / LoadLibrary, UAIRT_PLUGIN_PATH"]
+        API --> VAL --> LDR
+    end
+
+    VT{{"uairt_backend_api vtable<br/>uairt_backend_get_api(), struct_size versioned<br/>tensor table + optional session and text tables"}}
+
+    subgraph plugins["Backend plugins: one shared library each, never link the core"]
+        direction LR
+        subgraph npu["NPU and GPU runtimes"]
+            QNN["qnn"]
+            TRT["tensorrt"]
+            CML["coreml"]
+            OV["openvino"]
+        end
+        subgraph cpu["Portable engines"]
+            ORT["onnxruntime"]
+            TFL["tflite"]
+            NCNN["ncnn"]
+            MNN["mnn"]
+            PDL["paddlelite"]
+            ET["executorch"]
+        end
+        subgraph lang["Language and speech models"]
+            LCP["llamacpp"]
+            WCP["whispercpp"]
+            SRV["llmserver<br/>Ollama, LM Studio, SGLang"]
+        end
+        REF["reference<br/>builtin template"]
+    end
+
+    HW[("Hardware: Hexagon NPU, NVIDIA GPU, Apple Neural Engine,<br/>Intel CPU/GPU/NPU, Arm CPU, Vulkan, Metal")]
+
+    apps --> API
+    apps -.-> LLM
+    LLM --> API
+    LDR --> VT --> plugins --> HW
+
+    subgraph tools["Around the runtime (optional, not part of the ABI)"]
+        direction LR
+        EXP["scripts/export_model.py<br/>PyTorch / ONNX to a backend format"]
+        BEN["scripts/bench_model.py<br/>which backend is fastest"]
+        DOC["scripts/doctor.sh<br/>SDK and device check"]
+    end
+    EXP -. artifacts .-> apps
+    BEN -. uses .-> API
+```
+
+The application sees one API; a backend is chosen by name when an engine is created. The core never includes a vendor header: each
+plugin does, and a plugin that is not installed simply is not loadable, so the core builds and tests with no SDK present.
+Details and the reasons for each boundary are in [docs/design.md](docs/design.md); the plugin ABI is in
+[docs/writing-a-backend.md](docs/writing-a-backend.md).
+
 ## What it is, and is not
 
 UAIRT loads artifacts that each vendor's toolchain already produced (an ONNX file, a QNN
@@ -168,7 +248,7 @@ API, with a plain C ABI that other languages can bind to. (Behind that ABI the c
 
 ## Status
 
-Version 0.1.0, pre-release: the API and ABI may change. See [CHANGELOG.md](CHANGELOG.md).
+Version 0.2.0, pre-1.0: the API and ABI may change. See [CHANGELOG.md](CHANGELOG.md).
 
 | Backend | Models | Verified on |
 |---|---|---|
@@ -480,6 +560,25 @@ under `ctest` (see [docs/agents/setup.md](docs/agents/setup.md)).
 
 Per-backend setup pages are in [docs/backends/](docs/backends/README.md).
 
+## Testing and CI
+
+`ctest` runs on the core, the loader, the bindings and the builtin reference backend, so it needs no vendor SDK or hardware:
+
+```bash
+cmake -S . -B build -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror"
+cmake --build build && ctest --test-dir build --output-on-failure
+PYTHONPATH=bindings/python UAIRT_LIBRARY=build/libuairt.so python3 -m pytest bindings/python/tests    # Python binding and tools
+```
+
+[CI](.github/workflows/ci.yml) builds with warnings as errors and runs `ctest` on Ubuntu 24.04 and macOS, builds the CoreML backend on macOS,
+and builds and tests on Windows x64 and ARM64. [The wheels workflow](.github/workflows/wheels.yml) builds the Python wheels and
+checks that the tag, `pyproject.toml` and the C header name the same version. Dependabot keeps the workflow actions current.
+
+What CI does **not** prove: a vendor backend (QNN, TensorRT, OpenVINO, ...) running a real model on its hardware. Those runs are done by
+hand and recorded per backend in the [Status](#status) table and in [docs/backends/](docs/backends/); a passing CI means the core is sound,
+not that every backend works on your device. The checks `ctest` also runs include `scripts/check_no_vendor_files.sh`, which fails if a
+vendor SDK file is committed.
+
 ## Language bindings
 
 Python (`bindings/python`), Rust (`bindings/rust`) and a header-only C++17 wrapper
@@ -504,6 +603,13 @@ ONNX Runtime plugin is on PyPI (`pip install "uairt[onnxruntime]"`; see [docs/re
   ([docs/agents/write-app.md](docs/agents/write-app.md)). People can follow the same pages
 - [docs/vendors.md](docs/vendors.md): which vendor SDK versions were tested, the minimum versions, and where to get them
 
+## Contributing
+
+Bug reports, backend fixes and new backends are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; the rules that matter are
+append-only public headers, no vendor files in the repository, and saying what you did not verify on real hardware. To add a backend see
+[docs/writing-a-backend.md](docs/writing-a-backend.md). Report security problems as described in [SECURITY.md](SECURITY.md), not in a public issue.
+Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Vendor SDKs
 
 QAIRT (Qualcomm), Xcode and CoreML (Apple) and TensorRT (NVIDIA) are proprietary and are
@@ -513,4 +619,8 @@ when you ask, and their notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTI
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE). Third-party components keep their own licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Citation
+
+If you use UAIRT in research, cite it with [CITATION.cff](CITATION.cff) (GitHub's "Cite this repository" button reads it).

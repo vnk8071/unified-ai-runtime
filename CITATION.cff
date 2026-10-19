@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use UAIRT in research, please cite it as below."
+title: "Unified AI Runtime (UAIRT)"
+type: software
+version: 0.2.0
+date-released: 2026-10-19
+license: Apache-2.0
+repository-code: "https://github.com/vnk8071/unified-ai-runtime"
+authors:
+  - alias: vnk8071
+keywords: [inference, npu, onnx, qnn, tensorrt, openvino, coreml, llama.cpp]
