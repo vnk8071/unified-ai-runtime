@@ -31,7 +31,7 @@ jobs:
   sdist:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: The tag, pyproject.toml and the C header name the same version
         run: python scripts/ci/check_release_version.py ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
       - name: Build the sdist
@@ -53,7 +53,7 @@ jobs:
           - { name: macos-arm64, os: macos-14 }
           - { name: windows-x64, os: windows-2022 }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Fetch the ONNX Runtime headers (the plugin loads the library at run time)
         shell: bash
         run: bash scripts/ci/fetch_onnxruntime_headers.sh
@@ -71,7 +71,7 @@ jobs:
     name: wheel (windows-arm64)
     runs-on: windows-11-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Fetch the ONNX Runtime headers (the plugin loads the library at run time)
         shell: bash
         run: bash scripts/ci/fetch_onnxruntime_headers.sh
