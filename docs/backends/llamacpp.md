@@ -159,6 +159,14 @@ Qwen3-4B Q4_K_M "The capital of France is" (32 tokens), but Qwen3-0.6B "The capi
 30 characters (the same text as the GPU gives). `signtool verify /v /pa libggml-htp.cat` (arm64 `signtool`) succeeds and
 lists all four skeleton libraries.
 
+Qwen3-4B Q4_0 (2.3 GB) through the PyPI 0.2.0 wheel and this plugin build, "Write one sentence about the ocean.", 48 tokens
+greedy, each result compared with the CPU's text. Pinned `device=HTP0` ran about 12 tokens/s, the default device list (no
+`device` option) about 13.4, the CPU about 13.2, so the NPU was not faster than the CPU for this model. Stress test, 10
+fresh processes with 3 timed generations each after a 4-token warm-up: `HTP0` 30 of 30 generations equal to the CPU text;
+default 28 of 30, and the two others were garbage from the first character (non-ASCII text), both the third timed generation of
+their process (none in the first two of 20). The sample is small and the cause is unknown; the CPU was not stress-tested.
+Pin `device=HTP0` when you use the NPU, and compare output with the CPU when you use the default device list.
+
 CUDA on Linux (Ubuntu 24.04 x86_64, RTX 3060 Laptop 12 GB, CUDA 12.8, gcc 13), built with
 `cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DUAIRT_BUILD_LLAMACPP=ON -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86`: `ctest` passes
 (9 of 9, with the comparison against `llama-completion` and the symbol check). Qwen3-0.6B Q8_0 through the plugin generated about
