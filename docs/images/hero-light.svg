@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-label="Unified AI Runtime: one API over every inference runtime, with measured latencies on an Apple M5">
+<rect width="1200" height="440" rx="14" fill="#ffffff"/>
+<text x="44" y="44" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" font-weight="400" fill="#59636e" text-anchor="start" xml:space="preserve">One API for every inference runtime. Choose the backend by name.</text>
+<g transform="translate(0,-80)">
+<rect x="44" y="150" width="456" height="178" rx="10" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="64" y="184" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" xml:space="preserve"><tspan fill="#1f2328">with uairt.Engine(</tspan><tspan fill="#0550ae">&quot;coreml&quot;</tspan><tspan fill="#1f2328">) as engine, \</tspan></text>
+<text x="64" y="208" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" xml:space="preserve"><tspan fill="#1f2328">     engine.load_model(path) as model:</tspan></text>
+<text x="64" y="232" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" xml:space="preserve"><tspan fill="#1f2328">    outputs = model.run(image)</tspan></text>
+<text x="64" y="268" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" xml:space="preserve"><tspan fill="#59636e"># the backend is a name:</tspan></text>
+<text x="64" y="290" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" xml:space="preserve"><tspan fill="#59636e">#   </tspan><tspan fill="#0550ae">&quot;qnn&quot;</tspan><tspan fill="#59636e">, </tspan><tspan fill="#0550ae">&quot;tensorrt&quot;</tspan><tspan fill="#59636e">, </tspan><tspan fill="#0550ae">&quot;onnxruntime&quot;</tspan><tspan fill="#59636e">,</tspan></text>
+<text x="64" y="312" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="14.5" xml:space="preserve"><tspan fill="#59636e">#   </tspan><tspan fill="#0550ae">&quot;openvino&quot;</tspan><tspan fill="#59636e">, </tspan><tspan fill="#0550ae">&quot;mnn&quot;</tspan><tspan fill="#59636e">, </tspan><tspan fill="#0550ae">&quot;llamacpp&quot;</tspan><tspan fill="#59636e"> ...</tspan></text>
+<text x="44" y="372" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#1f2328" text-anchor="start" xml:space="preserve">Write the application once. Run it on a Qualcomm NPU,</text>
+<text x="44" y="394" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#1f2328" text-anchor="start" xml:space="preserve">an NVIDIA GPU, an Apple Neural Engine or a CPU.</text>
+<text x="540" y="164" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1f2328" text-anchor="start" xml:space="preserve">Same model, six ways to run it on one Mac</text>
+<text x="540" y="186" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#59636e" text-anchor="start" xml:space="preserve">median ms per run, lower is faster; each result checked against PyTorch</text>
+<text x="540" y="230" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start" xml:space="preserve">ONNX Runtime + CoreML (Neural Engine)</text>
+<rect x="830" y="216" width="238" height="20" rx="4" fill="#eaeef2"/>
+<rect x="830" y="216" width="8" height="20" rx="4" fill="#bf8700"/>
+<text x="1078" y="231" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#1f2328" text-anchor="start" xml:space="preserve">0.58 ms</text>
+<text x="540" y="264" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start" xml:space="preserve">MNN (Metal GPU)</text>
+<rect x="830" y="250" width="238" height="20" rx="4" fill="#eaeef2"/>
+<rect x="830" y="250" width="20" height="20" rx="4" fill="#bf8700"/>
+<text x="1078" y="265" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#1f2328" text-anchor="start" xml:space="preserve">1.37 ms</text>
+<text x="540" y="298" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start" xml:space="preserve">CoreML (GPU)</text>
+<rect x="830" y="284" width="238" height="20" rx="4" fill="#eaeef2"/>
+<rect x="830" y="284" width="21" height="20" rx="4" fill="#1a7f37"/>
+<text x="1078" y="299" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#1f2328" text-anchor="start" xml:space="preserve">1.50 ms</text>
+<text x="540" y="332" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start" xml:space="preserve">ONNX Runtime (CPU)</text>
+<rect x="830" y="318" width="238" height="20" rx="4" fill="#eaeef2"/>
+<rect x="830" y="318" width="57" height="20" rx="4" fill="#1a7f37"/>
+<text x="1078" y="333" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#1f2328" text-anchor="start" xml:space="preserve">4.01 ms</text>
+<text x="540" y="366" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start" xml:space="preserve">OpenVINO (CPU)</text>
+<rect x="830" y="352" width="238" height="20" rx="4" fill="#eaeef2"/>
+<rect x="830" y="352" width="77" height="20" rx="4" fill="#1a7f37"/>
+<text x="1078" y="367" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#1f2328" text-anchor="start" xml:space="preserve">5.39 ms</text>
+<text x="540" y="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start" xml:space="preserve">NCNN (CPU)</text>
+<rect x="830" y="386" width="238" height="20" rx="4" fill="#eaeef2"/>
+<rect x="830" y="386" width="238" height="20" rx="4" fill="#1a7f37"/>
+<text x="1078" y="401" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13" font-weight="600" fill="#1f2328" text-anchor="start" xml:space="preserve">16.66 ms</text>
+<rect x="540" y="415" width="12" height="12" rx="3" fill="#1a7f37"/>
+<text x="558" y="426" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#59636e" text-anchor="start" xml:space="preserve">exact (float32)</text>
+<rect x="680" y="415" width="12" height="12" rx="3" fill="#bf8700"/>
+<text x="698" y="426" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#59636e" text-anchor="start" xml:space="preserve">reduced (half precision, GPU / Neural Engine)</text>
+</g>
+<line x1="44" y1="366" x2="1156" y2="366" stroke="#d0d7de"/>
+<text x="600.0" y="394" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="500" fill="#59636e" text-anchor="middle" xml:space="preserve">ONNX Runtime  ·  QNN  ·  TensorRT  ·  CoreML  ·  TFLite  ·  OpenVINO  ·  NCNN  ·  MNN  ·  Paddle Lite  ·  ExecuTorch  ·  llama.cpp  ·  whisper.cpp</text>
+<text x="600.0" y="418" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#59636e" text-anchor="middle" xml:space="preserve">C11 API  ·  C++17 core with no C++ runtime  ·  plugins  ·  Apache-2.0  ·  github.com/vnk8071/unified-ai-runtime</text>
+</svg>

@@ -9,6 +9,15 @@
 [![C11 / C++17](https://img.shields.io/badge/C11%20ABI-C%2B%2B17%20core-informational.svg)](docs/design.md)
 [![Status: pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange.svg)](CHANGELOG.md)
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.svg">
+    <img src="docs/images/hero-light.svg" width="900"
+         alt="One API for every inference runtime. A Python snippet where the backend is a name, and ResNet-18 on an Apple M5 through six backends: ONNX Runtime with CoreML 0.58 ms, MNN on Metal 1.37 ms, CoreML 1.50 ms, ONNX Runtime CPU 4.01 ms, OpenVINO 5.39 ms, NCNN 16.66 ms.">
+  </picture>
+</p>
+<p align="center"><sub>Measured with <code>scripts/bench_model.py</code> on one machine and one model, each result checked against PyTorch; green is float32, amber is half precision. Reproduce it with <a href="examples/notebooks/uairt_macos.ipynb">the macOS notebook</a>.</sub></p>
+
 One C API to run compiled AI models on QNN (Qualcomm NPUs), ONNX Runtime, TFLite, CoreML, llama.cpp (GGUF language models), TensorRT (NVIDIA GPUs), OpenVINO (Intel), NCNN (CPU and Vulkan GPUs), MNN (Alibaba), Paddle Lite (Baidu), ExecuTorch (`.pte`), whisper.cpp (speech to text), and language model servers (Ollama, LM Studio, SGLang).
 Write the application code once; choose the backend by name when you create an engine.
 
@@ -596,7 +605,7 @@ ONNX Runtime plugin is on PyPI (`pip install "uairt[onnxruntime]"`; see [docs/re
 - [docs/writing-a-backend.md](docs/writing-a-backend.md): the plugin ABI and how to add a backend
 - [docs/design.md](docs/design.md): design decisions, per-backend notes, measurements
 - [docs/LICENSING.md](docs/LICENSING.md): how vendor licenses shape this repository
-- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), [release notes for 0.2.0](docs/releases/v0.2.0.md)
 - [AGENTS.md](AGENTS.md) and [docs/agents/](docs/agents/run-model.md): instructions for coding agents, including a
   playbook for building UAIRT and running a model on a target device (`scripts/doctor.sh` reports the device), choosing
   and exporting a model format ([docs/agents/export-model.md](docs/agents/export-model.md)) and writing application code

@@ -1,23 +1,49 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Changelog
 
+## Unreleased
+
+On `main` after the `v0.2.0` tag; not in the 0.2.0 wheels.
+
+### Fixed
+- A shared build (`-DBUILD_SHARED_LIBS=ON`) on Linux failed to link `test_llm` (`undefined reference to symbol 'logf' ... DSO missing from command line`): the test now links `m`. Seen on Colab and reproduced on an Ubuntu 20.04 aarch64 board; the default static build and macOS were not affected.
+
+### Added (generic ONNX Runtime provider)
+- `onnxruntime` backend: `execution_provider=<name>` passes any provider in the loaded ONNX Runtime build (`CoreML`, `QNN`, `OpenVINO`,
+  `XNNPACK`, ...) to ONNX Runtime by name, with `ep_option.<key>` as its options. A provider the build lacks, or an unknown name, is
+  now `UAIRT_ERR_BACKEND_UNAVAILABLE` (it was `UAIRT_ERR_UNSUPPORTED`). Only CoreML was run (Apple M5). `cpu_fallback=0` (ONNX Runtime's `session.disable_cpu_ep_fallback`) makes a model that would run on ONNX Runtime's CPU provider fail to load.
+
+### Added (benchmark tool)
+- `scripts/bench_model.py`: exports a PyTorch module or ONNX file to every target of `export_model.py`, runs each backend and option variant in its own process through UAIRT,
+  checks the outputs against the original and ranks latency (the core's own timing), with a verdict that keeps exact and reduced-precision results apart; `--artifact` adds files
+  you already have (a QNN `.dlc`, a TensorRT engine). `docs/agents/benchmark-model.md` is the playbook. `export_model.py` gained `align_inputs` and `onnx_input_info` for it.
+
+### Added (Paddle Lite backend)
+- `paddlelite` backend (`-DUAIRT_BUILD_PADDLELITE=ON`, `PADDLE_LITE_ROOT`): `.nb` models, float32, static shapes (`input_shapes` required), CPU; options `num_threads`, `power_mode`,
+  `precision`. Byte-identical to Paddle Lite's own C++ API in `tests/compare_with_paddlelite.py`; `ctest -R paddlelite` runs `tests/test_paddlelite.c` on `tests/data/add_mul.nb`.
+  Paddle Lite is built by the user (the recipe and its workarounds are in `docs/backends/paddlelite.md`); not run on Android or Linux. `uairt.AutoModel` maps `.nb` to it.
+
+### Added (MNN backend)
+- `mnn` backend (`-DUAIRT_BUILD_MNN=ON`, MNN 3.6.1 as the pinned submodule `third_party/MNN`, or `MNN_ROOT`): `.mnn` models, CPU and Metal, options `device`, `num_threads`,
+  `precision` and `input_shapes`. A GPU device that MNN did not end up on is an error. Identical to MNN's Python API in `tests/compare_with_mnn.py`;
+  `ctest -R mnn` runs `tests/test_mnn.c` on `tests/data/add_mul.mnn`. The Android build compiled; it was not run on a device.
+- `scripts/export_model.py` can write `.mnn` (from ONNX); `uairt.AutoModel` maps `.mnn` to the backend; `doctor.sh` knows MNN.
+
+### Added (macOS notebook)
+- `examples/notebooks/uairt_macos.ipynb`: builds every Apple-relevant backend, runs `ctest`, runs ResNet-18 through all variants and proves the Metal runs; `scripts/bench_model.py` gained three variants for ONNX Runtime's CoreML provider (`cpu_fallback=0`).
+
+### Added (agent skills and the front page)
+- `.claude/skills/`: `export-model`, `benchmark-model`, `write-uairt-app`, `use-onnxruntime-providers`, `add-backend`, `test-on-remote-device`, `test-on-colab-gpu` and `release-uairt`, next to `run-model-on-device` and `check-references`.
+- The README became an open-source front page: badges, an architecture diagram, a testing and CI section, and contributing, citation and licence pointers. Added `CODE_OF_CONDUCT.md`, `CITATION.cff`, a pull request template and issue templates.
+- A README hero image generated from measured numbers (`docs/images/hero-data.json`, `scripts/make_hero.py`; light and dark SVGs, and a 1280x640 social preview card) and the release notes for 0.2.0 (`docs/releases/v0.2.0.md`).
+- `examples/notebooks/uairt_tensorrt_colab.ipynb` gained sections 9 and 10: the `onnxruntime` backend with its CUDA and TensorRT providers (the CUDA provider ran on a Colab T4; the TensorRT provider rows are not yet verified).
+
 ## 0.2.0 (2026-10-19)
 
 Pre-1.0: the API and ABI may change. 0.1.0 was published to PyPI on 2026-10-05; this section grew while it was still
 labelled unreleased, so entries from before that date were already in 0.1.0 and are not marked separately. Since 0.1.0: the
 llama.cpp, whisper.cpp, ExecuTorch and llmserver backends, the C++17 core behind the unchanged C API, the Windows
 ARM64 wheel, vendor version checks in `doctor`, and the export, application and pre/post-processing guides for agents and people.
-
-### Fixed
-- A shared build (`-DBUILD_SHARED_LIBS=ON`) on Linux failed to link `test_llm` (`undefined reference to symbol 'logf' ... DSO missing from command line`): the test now links `m`. Seen on Colab and reproduced on an Ubuntu 20.04 aarch64 board; the default static build and macOS were not affected.
-
-### Added (macOS notebook)
-- `examples/notebooks/uairt_macos.ipynb`: builds every Apple-relevant backend, runs `ctest`, runs ResNet-18 through all variants and proves the Metal runs; `scripts/bench_model.py` gained three variants for ONNX Runtime's CoreML provider (`cpu_fallback=0`).
-
-### Added (generic ONNX Runtime provider)
-- `onnxruntime` backend: `execution_provider=<name>` passes any provider in the loaded ONNX Runtime build (`CoreML`, `QNN`, `OpenVINO`,
-  `XNNPACK`, ...) to ONNX Runtime by name, with `ep_option.<key>` as its options. A provider the build lacks, or an unknown name, is
-  now `UAIRT_ERR_BACKEND_UNAVAILABLE` (it was `UAIRT_ERR_UNSUPPORTED`). Only CoreML was run (Apple M5). `cpu_fallback=0` (ONNX Runtime's `session.disable_cpu_ep_fallback`) makes a model that would run on ONNX Runtime's CPU provider fail to load.
 
 ### Added
 - C11 API (`uairt/uairt.h`): engines, models, tensors, zero-copy buffers, status codes.
@@ -164,22 +190,6 @@ ARM64 wheel, vendor version checks in `doctor`, and the export, application and 
   provider. Verified with the MLX provider on an Apple M5: ResNet50 at batch 8 ran 3.1 to 3.2 times faster than
   the CPU EP with the same outputs; MobileNetV2 at batch 1 showed no gain.
 
-### Added (benchmark tool)
-- `scripts/bench_model.py`: exports a PyTorch module or ONNX file to every target of `export_model.py`, runs each backend and option variant in its own process through UAIRT,
-  checks the outputs against the original and ranks latency (the core's own timing), with a verdict that keeps exact and reduced-precision results apart; `--artifact` adds files
-  you already have (a QNN `.dlc`, a TensorRT engine). `docs/agents/benchmark-model.md` is the playbook. `export_model.py` gained `align_inputs` and `onnx_input_info` for it.
-
-### Added (Paddle Lite backend)
-- `paddlelite` backend (`-DUAIRT_BUILD_PADDLELITE=ON`, `PADDLE_LITE_ROOT`): `.nb` models, float32, static shapes (`input_shapes` required), CPU; options `num_threads`, `power_mode`,
-  `precision`. Byte-identical to Paddle Lite's own C++ API in `tests/compare_with_paddlelite.py`; `ctest -R paddlelite` runs `tests/test_paddlelite.c` on `tests/data/add_mul.nb`.
-  Paddle Lite is built by the user (the recipe and its workarounds are in `docs/backends/paddlelite.md`); not run on Android or Linux. `uairt.AutoModel` maps `.nb` to it.
-
-### Added (MNN backend)
-- `mnn` backend (`-DUAIRT_BUILD_MNN=ON`, MNN 3.6.1 as the pinned submodule `third_party/MNN`, or `MNN_ROOT`): `.mnn` models, CPU and Metal, options `device`, `num_threads`,
-  `precision` and `input_shapes`. A GPU device that MNN did not end up on is an error. Identical to MNN's Python API in `tests/compare_with_mnn.py`;
-  `ctest -R mnn` runs `tests/test_mnn.c` on `tests/data/add_mul.mnn`. The Android build compiled; it was not run on a device.
-- `scripts/export_model.py` can write `.mnn` (from ONNX); `uairt.AutoModel` maps `.mnn` to the backend; `doctor.sh` knows MNN.
-
 ### Added (exporting models)
 - `scripts/export_model.py`: exports a PyTorch module or an ONNX file to ONNX Runtime, CoreML, ExecuTorch, OpenVINO or NCNN and checks each result through UAIRT against the
   original (one process per target). `docs/agents/export-model.md` is rewritten around it: a source-by-target table, what was run here, and the traps found (half-precision defaults in
@@ -251,8 +261,7 @@ ARM64 wheel, vendor version checks in `doctor`, and the export, application and 
 - `QnnSystemDlc_composeGraphs` allocates about 1.3 KB per DLC load that the QNN headers
   do not say how to release; LeakSanitizer reports it.
 - Static shapes only, one graph per QNN model, no asynchronous execution, no dynamic
-  shapes, no Windows plugin loading.
-- TensorRT is not implemented.
+  shapes.
 - The TFLite backend's QNN delegate crashes on Hexagon v68 like the DLC path (also with the
   reference `tflite_bench`); it works on Hexagon v73.
 - Plugin execution providers depend on ONNX Runtime's device discovery: the MLX provider works on macOS,

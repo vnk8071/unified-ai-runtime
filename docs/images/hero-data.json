@@ -1,0 +1,12 @@
+{
+  "title": "ResNet-18, 1x3x224x224, on an Apple M5: median milliseconds per run (lower is faster)",
+  "source": "examples/notebooks/uairt_macos.ipynb, run on 2026-10-20 with scripts/bench_model.py (50 runs); every row was compared with PyTorch",
+  "rows": [
+    {"label": "ONNX Runtime + CoreML (Neural Engine)", "ms": 0.58, "precision": "reduced"},
+    {"label": "MNN (Metal GPU)", "ms": 1.37, "precision": "reduced"},
+    {"label": "CoreML (GPU)", "ms": 1.50, "precision": "exact"},
+    {"label": "ONNX Runtime (CPU)", "ms": 4.01, "precision": "exact"},
+    {"label": "OpenVINO (CPU)", "ms": 5.39, "precision": "exact"},
+    {"label": "NCNN (CPU)", "ms": 16.66, "precision": "exact"}
+  ]
+}
