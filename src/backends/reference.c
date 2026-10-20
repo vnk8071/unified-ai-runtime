@@ -4,9 +4,15 @@
  * output. Compiled twice: built in, and as a loadable plugin that proves the
  * ABI works without linking against the core library.
  */
+#define _POSIX_C_SOURCE 200809L /* clock_gettime under -std=c11 */
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 #include "../internal.h"
 
@@ -84,6 +90,22 @@ static uairt_status describe(const void* model, size_t index, uairt_tensor* out)
   return UAIRT_OK;
 }
 
+/* The core times runs with a monotonic clock, so wait on one too: the wall clock (timespec_get) is coarse on Windows and ended the
+ * wait up to a millisecond early in the core's terms, which made the "at least delay_ms" check in tests/test_core.c fail now and then. */
+static unsigned long long monotonic_ns(void) {
+#if defined(_WIN32)
+  LARGE_INTEGER freq, now;
+  QueryPerformanceFrequency(&freq);
+  QueryPerformanceCounter(&now);
+  return (unsigned long long)(now.QuadPart / freq.QuadPart) * 1000000000ull +
+         (unsigned long long)(now.QuadPart % freq.QuadPart) * 1000000000ull / (unsigned long long)freq.QuadPart;
+#else
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (unsigned long long)ts.tv_sec * 1000000000ull + (unsigned long long)ts.tv_nsec;
+#endif
+}
+
 static uairt_status run(
     void* model,
     const uairt_tensor* inputs,
@@ -94,11 +116,9 @@ static uairt_status run(
   (void)num_outputs;
   long delay_ms = *(const long*)model;
   if (delay_ms > 0) {
-    struct timespec start, now;
-    timespec_get(&start, TIME_UTC);
-    do {
-      timespec_get(&now, TIME_UTC);
-    } while ((now.tv_sec - start.tv_sec) * 1000 + (now.tv_nsec - start.tv_nsec) / 1000000 < delay_ms);
+    unsigned long long deadline = monotonic_ns() + (unsigned long long)delay_ms * 1000000ull;
+    while (monotonic_ns() < deadline) {
+    }
   }
   memcpy(outputs[0].data, inputs[0].data, REFERENCE_ELEMENTS * sizeof(float));
   return UAIRT_OK;
