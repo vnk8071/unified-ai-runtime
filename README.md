@@ -348,7 +348,7 @@ cmake -S . -B build -DUAIRT_BUILD_ONNXRUNTIME=ON && cmake --build build
 The plugin needs only the ONNX Runtime header to build and loads the library at run time, so the lighter route is `pip install onnxruntime` plus
 `scripts/ci/fetch_onnxruntime_headers.sh` (headers into the git-ignored `.ort/`, used when `ONNXRUNTIME_ROOT` is unset).
 
-Engine options: `intra_op_threads`, `execution_provider` (`cpu`, `cuda` or `tensorrt` with a GPU release), `log_level`, and for a plugin execution provider
+Engine options: `intra_op_threads`, `execution_provider` (`cpu`, `cuda` or `tensorrt` with a GPU release, or the name of any provider in your ONNX Runtime build, such as `CoreML`), `log_level`, and for a plugin execution provider
 `ep_library`, `ep_name` and `ep_option.<key>` (for example Apple's MLX with ONNX Runtime 1.29;
 see [docs/design.md](docs/design.md)).
 

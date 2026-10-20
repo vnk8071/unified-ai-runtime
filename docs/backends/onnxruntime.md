@@ -32,8 +32,8 @@ for `run_model` or your own C program, `export UAIRT_ONNXRUNTIME_LIBRARY=<site-p
 
 ## Engine options
 
-`intra_op_threads`, `execution_provider` (`cpu`, `cuda` or `tensorrt`), `log_level` (`verbose`, `info`, `warning`,
-`error`, `fatal`), and `ep_option.<key>`, which is passed to the provider (CUDA, TensorRT or a plugin). For a plugin
+`intra_op_threads`, `execution_provider` (`cpu`, `cuda`, `tensorrt`, or the name of any provider your ONNX Runtime build contains, see below), `log_level` (`verbose`, `info`, `warning`,
+`error`, `fatal`), `cpu_fallback` (`1` default, or `0`, see below), and `ep_option.<key>`, which is passed to the provider (CUDA, TensorRT, a named provider or a plugin). For a plugin
 execution provider also `ep_library` and `ep_name`.
 
 ## GPU providers (CUDA and TensorRT)
@@ -53,7 +53,7 @@ build/run_model --option execution_provider=tensorrt --option ep_option.trt_engi
 ```
 
 Check that the GPU really ran: `--option log_level=verbose` prints the node placement, for example
-`All nodes placed on [CUDAExecutionProvider]. Number of nodes: 175`. Set `UAIRT_TEST_ORT_PROVIDER=cuda` (or `tensorrt`)
+`All nodes placed on [CUDAExecutionProvider]. Number of nodes: 175`. Set `UAIRT_TEST_ORT_PROVIDER=cuda` (or `tensorrt`, or a name such as `CoreML`)
 before `ctest` to run the backend test on that provider.
 
 Verified on a GTX 1650 (CUDA 12.8, cuDNN 9) with ONNX Runtime 1.30.0: a yolov8n model (`.onnx`, 640x640, FP32) takes
@@ -64,6 +64,58 @@ The `tensorrt` provider on the same model: the first run compiles an engine (116
 takes 3.5 s, and a run takes 8.1 ms with identical detections (outputs differ from the CPU's by at most 1.4e-3). Both
 providers copy through ordinary host memory; the standalone `tensorrt` backend with pinned buffers is faster still
 (6.4 ms for the same network, see `docs/backends/tensorrt.md`).
+
+## Any other built-in provider (CoreML, QNN, OpenVINO, XNNPACK, ...)
+
+Any other `execution_provider` value goes to ONNX Runtime's generic call by name, with the `ep_option.<key>` settings as that
+provider's string options. The name is ONNX Runtime's and case-sensitive (`CoreML`, `QNN`, `OpenVINO`, `XNNPACK`, `WebGPU`, `DML`);
+the provider has to be in the ONNX Runtime build you load. One that is not, an unknown name, or an option the provider rejects fails
+at engine creation with `UAIRT_ERR_BACKEND_UNAVAILABLE` and ONNX Runtime's message.
+
+**A provider that is in the build but cannot start is not an error by default.** Nodes the provider does not take run on ONNX Runtime's
+CPU provider, and so does the whole model when the provider fails after it was created: on a Qualcomm QCS6490 board the QNN provider could
+not create its HTP device (`QNN_DEVICE_ERROR_INVALID_CONFIG`, FastRPC libraries missing), ONNX Runtime logged it as an error, and the
+model ran on the CPU at 58 ms, the same as `execution_provider=cpu`. Set `--option cpu_fallback=0` to turn that into a failed load
+(`fallback to CPU EP has been explicitly disabled`); it is ONNX Runtime's `session.disable_cpu_ep_fallback`. It also refuses a model with
+a single node the provider cannot take, so use it to prove a model runs on the device, not for every model. Without it, check the placement
+with `--option log_level=verbose` (`All nodes placed on [CoreMLExecutionProvider]`).
+
+```bash
+build/run_model --repeat 50 --option execution_provider=CoreML --option ep_option.MLComputeUnits=CPUAndNeuralEngine \
+  build/libuairt_backend_onnxruntime.so onnxruntime model.onnx out in0.bin
+```
+
+Run here on an Apple M5, ONNX Runtime 1.31.0 from pip (its CoreML provider; there is no Metal provider), ResNet-18 1x3x224x224, 50 runs, against the
+CPU provider (4.0 ms):
+
+| `ep_option.MLComputeUnits` | median | max abs difference from the CPU output (logits up to 5.9) |
+|---|---|---|
+| `CPUOnly` | 4.15 ms | 4e-6 |
+| `CPUAndGPU` | 1.67 ms | 2.4e-2 |
+| `CPUAndNeuralEngine` | 0.58 ms | 1.4e-2 |
+| `ALL` | 0.58 ms | 1.4e-2 |
+
+All 49 nodes were placed on CoreML. The GPU and Neural Engine compute in float16, so those rows are reduced precision, not float32.
+The same options work from Python (`AutoModel.from_file(..., backend="onnxruntime", options={"execution_provider": "CoreML"})`) with a plugin built
+from this change; the 0.2.0 wheel's plugin refuses the name. Only CoreML was run: QNN, OpenVINO, XNNPACK, WebGPU, DirectML and NNAPI are
+**untested**, and the test is `UAIRT_TEST_ORT_PROVIDER=<name> ctest`.
+
+### QNN through ONNX Runtime: tried on a QCS6490 board, not working
+
+Use the `qnn` backend for Qualcomm NPUs; this is what happened when ONNX Runtime's QNN provider was tried instead (Ubuntu 20.04 board,
+Hexagon v68, glibc 2.31, the QNN libraries from QAIRT 2.46 and 2.48):
+
+- The QNN provider wheels and the 2.4.0 plugin (`github.com/onnxruntime/onnxruntime-qnn`) need glibc 2.34 or 2.38, so they ran in an Ubuntu
+  22.04/24.04 Docker container with `/dev/adsprpc-smd` and the board's `libcdsprpc.so` mounted. Without that library the provider could not
+  create its HTP device and the model silently ran on the CPU (see `cpu_fallback` above).
+- `execution_provider=QNN` with the bundled provider of the `onnxruntime-qnn` 1.23.0 wheel reached the NPU, but the HTP backend refused every Conv
+  of a statically quantized ResNet-18 (`backendValidateOpConfig() failed ... error code 3110`) and the load failed. The same happened with the
+  QAIRT 2.48 libraries. The cause is not known; the `qnn` backend ran other quantized models on this board.
+- The plugin build (`ep_library=.../libonnxruntime_providers_qnn.so`, `ep_name=QNNExecutionProvider`, 2.4.0 with ONNX Runtime 1.26.0) registered,
+  but ONNX Runtime found no Qualcomm NPU or GPU device to give it (the provider supports only those two device types), so it exposed no device.
+  UAIRT reports `no execution provider device named 'QNNExecutionProvider' (available: CPUExecutionProvider)`.
+
+No QNN run through ONNX Runtime was verified on the NPU.
 
 ## Plugin execution providers (for example MLX)
 

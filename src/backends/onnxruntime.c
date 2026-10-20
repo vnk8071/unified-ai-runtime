@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /*
  * ONNX Runtime backend, built as a loadable plugin (libuairt_backend_onnxruntime).
- * v1 limits: host memory, static shapes. Execution providers: CPU, or a plugin execution provider
- * library (ep_library, ep_name, ep_option.<key>) with CPU as the fallback.
+ * v1 limits: host memory, static shapes. Execution providers: CPU, any provider compiled into the ONNX Runtime build by
+ * name (execution_provider=CoreML, QNN, OpenVINO, XNNPACK, ...), or a plugin execution provider library (ep_library,
+ * ep_name, ep_option.<key>), with CPU as the fallback.
  */
 #define _POSIX_C_SOURCE 200809L
 #include <stdarg.h>
@@ -29,6 +30,7 @@
 #define OPTION_EP_NAME "ep_name"
 #define OPTION_EP_PREFIX "ep_option."
 #define OPTION_LOG_LEVEL "log_level"
+#define OPTION_CPU_FALLBACK "cpu_fallback"
 #define MAX_EP_OPTIONS 32
 
 typedef struct {
@@ -216,11 +218,12 @@ cleanup:
 }
 
 /*
- * Appends a built-in GPU execution provider ("cuda" or "tensorrt") with the ep_option.<key> settings. The provider
- * libraries ship with an ONNX Runtime GPU build; a CPU-only build fails here. Nodes the provider cannot take run on
- * the CPU provider, which ONNX Runtime adds last.
+ * Appends a built-in execution provider with the ep_option.<key> settings: "cuda" and "tensorrt" through their typed
+ * option structs, any other name (CoreML, QNN, OpenVINO, XNNPACK, ...) through ONNX Runtime's generic call, which
+ * refuses a provider this build does not contain. The CUDA and TensorRT libraries ship with an ONNX Runtime GPU build;
+ * a CPU-only build fails here. Nodes the provider cannot take run on the CPU provider, which ONNX Runtime adds last.
  */
-static uairt_status append_gpu_ep(
+static uairt_status append_builtin_ep(
     engine_t* engine,
     const char* provider,
     const char* const* keys,
@@ -233,6 +236,9 @@ static uairt_status append_gpu_ep(
     TRY(g_ort->CreateCUDAProviderOptions(&cuda));
     TRY(g_ort->UpdateCUDAProviderOptions(cuda, keys, values, num_ep_options));
     status = check(g_ort->SessionOptionsAppendExecutionProvider_CUDA_V2(engine->options, cuda));
+  } else if (strcmp(provider, "tensorrt") != 0) {
+    status = check(g_ort->SessionOptionsAppendExecutionProvider(engine->options, provider, keys, values,
+                                                                 num_ep_options));
   } else {
     TRY(g_ort->CreateTensorRTProviderOptions(&tensorrt));
     TRY(g_ort->UpdateTensorRTProviderOptions(tensorrt, keys, values, num_ep_options));
@@ -245,8 +251,11 @@ cleanup:
   if (tensorrt) {
     g_ort->ReleaseTensorRTProviderOptions(tensorrt);
   }
-  if (status == UAIRT_ERR_RUNTIME) {
-    status = UAIRT_ERR_BACKEND_UNAVAILABLE;  // a CPU-only build, or the provider's libraries cannot be loaded
+  bool generic = strcmp(provider, "cuda") != 0 && strcmp(provider, "tensorrt") != 0;
+  if (status == UAIRT_ERR_RUNTIME || (generic && status == UAIRT_ERR_INVALID_ARGUMENT)) {
+    // not in this build (names are case-sensitive; a bad ep_option key lands here too, the message says which), or its
+    // libraries cannot be loaded
+    status = UAIRT_ERR_BACKEND_UNAVAILABLE;
   }
   return status;
 }
@@ -277,7 +286,7 @@ static uairt_status create_engine(
   const char* ep_values[MAX_EP_OPTIONS];
   size_t num_ep_options = 0;
   bool cpu_requested = false;
-  const char* gpu_ep = NULL;
+  const char* builtin_ep = NULL;
   TRY(g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "uairt", &engine->env));
   TRY(g_ort->CreateSessionOptions(&engine->options));
   for (size_t i = 0; i < num_options; ++i) {
@@ -293,16 +302,19 @@ static uairt_status create_engine(
         goto cleanup;
       }
       TRY(g_ort->SetSessionLogSeverityLevel(engine->options, level));
+    } else if (strcmp(key, OPTION_CPU_FALLBACK) == 0) {
+      if (strcmp(value, "0") != 0 && strcmp(value, "1") != 0) {
+        fail("%s must be 0 or 1", OPTION_CPU_FALLBACK);
+        status = UAIRT_ERR_INVALID_ARGUMENT;
+        goto cleanup;
+      }
+      // 0: a model that has any node ONNX Runtime would run on its CPU provider fails to load
+      TRY(g_ort->AddSessionConfigEntry(engine->options, "session.disable_cpu_ep_fallback", value[0] == '0' ? "1" : "0"));
     } else if (strcmp(key, OPTION_EP) == 0) {
-      if (strcmp(value, "cuda") == 0 || strcmp(value, "tensorrt") == 0) {
-        gpu_ep = value;
-      } else if (strcmp(value, "cpu") == 0) {
+      if (strcmp(value, "cpu") == 0) {
         cpu_requested = true;
       } else {
-        fail("execution provider '%s' is not supported (cpu, cuda, tensorrt); use ep_library and ep_name for a "
-             "plugin", value);
-        status = UAIRT_ERR_UNSUPPORTED;
-        goto cleanup;
+        builtin_ep = value;
       }
     } else if (strcmp(key, OPTION_EP_LIBRARY) == 0) {
       ep_library = value;
@@ -322,13 +334,13 @@ static uairt_status create_engine(
       goto cleanup;
     }
   }
-  if (gpu_ep) {
+  if (builtin_ep) {
     if (ep_library || ep_name) {
-      fail("execution_provider=%s cannot be combined with '%s' or '%s'", gpu_ep, OPTION_EP_LIBRARY, OPTION_EP_NAME);
+      fail("execution_provider=%s cannot be combined with '%s' or '%s'", builtin_ep, OPTION_EP_LIBRARY, OPTION_EP_NAME);
       status = UAIRT_ERR_INVALID_ARGUMENT;
       goto cleanup;
     }
-    status = append_gpu_ep(engine, gpu_ep, ep_keys, ep_values, num_ep_options);
+    status = append_builtin_ep(engine, builtin_ep, ep_keys, ep_values, num_ep_options);
     if (status != UAIRT_OK) {
       goto cleanup;
     }
@@ -343,7 +355,7 @@ static uairt_status create_engine(
       goto cleanup;
     }
   } else if (ep_name || num_ep_options) {
-    fail("'%s' and '%s*' need '%s' or execution_provider=cuda|tensorrt", OPTION_EP_NAME, OPTION_EP_PREFIX,
+    fail("'%s' and '%s*' need '%s' or execution_provider=<provider>", OPTION_EP_NAME, OPTION_EP_PREFIX,
          OPTION_EP_LIBRARY);
     status = UAIRT_ERR_INVALID_ARGUMENT;
     goto cleanup;

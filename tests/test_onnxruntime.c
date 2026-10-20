@@ -86,7 +86,10 @@ int main(int argc, char** argv) {
         UAIRT_ERR_INVALID_ARGUMENT);
   uairt_option unknown_provider = {"execution_provider", "no_such_provider"};
   CHECK(uairt_engine_create("onnxruntime", &unknown_provider, 1, &engine) ==
-        UAIRT_ERR_UNSUPPORTED);
+        UAIRT_ERR_BACKEND_UNAVAILABLE);
+
+  uairt_option bad_fallback = {"cpu_fallback", "2"};
+  CHECK(uairt_engine_create("onnxruntime", &bad_fallback, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
 
   uairt_option threads = {"intra_op_threads", "1"};
   CHECK(uairt_engine_create("onnxruntime", &threads, 1, &engine) == UAIRT_OK);
@@ -115,6 +118,17 @@ int main(int argc, char** argv) {
       uairt_model_destroy(model);
     }
     free(bytes);
+  }
+
+  /* cpu_fallback=0 makes a model that ends up on ONNX Runtime's CPU provider (here: no other provider) fail to load */
+  uairt_engine* strict = NULL;
+  uairt_option no_fallback = {"cpu_fallback", "0"};
+  CHECK(uairt_engine_create("onnxruntime", &no_fallback, 1, &strict) == UAIRT_OK);
+  if (strict) {
+    uairt_model* refused = NULL;
+    CHECK(uairt_model_load(strict, &from_path, &refused) != UAIRT_OK);
+    CHECK(strstr(uairt_last_error(), "fallback to CPU EP has been explicitly disabled") != NULL);
+    uairt_engine_destroy(strict);
   }
 
   uairt_model_source dynamic = {.struct_size = sizeof(dynamic), .path = dynamic_path};
@@ -155,7 +169,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  /* Optional: a built-in GPU provider ("cuda" or "tensorrt") from UAIRT_TEST_ORT_PROVIDER; needs a GPU build. */
+  /* Optional: a built-in provider ("cuda", "tensorrt", or any name such as "CoreML") from UAIRT_TEST_ORT_PROVIDER; needs a GPU build. */
   const char* provider = getenv("UAIRT_TEST_ORT_PROVIDER");
   if (provider && provider[0]) {
     uairt_option gpu[] = {{"execution_provider", provider}};

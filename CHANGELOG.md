@@ -8,6 +8,11 @@ labelled unreleased, so entries from before that date were already in 0.1.0 and 
 llama.cpp, whisper.cpp, ExecuTorch and llmserver backends, the C++17 core behind the unchanged C API, the Windows
 ARM64 wheel, vendor version checks in `doctor`, and the export, application and pre/post-processing guides for agents and people.
 
+### Added (generic ONNX Runtime provider)
+- `onnxruntime` backend: `execution_provider=<name>` passes any provider in the loaded ONNX Runtime build (`CoreML`, `QNN`, `OpenVINO`,
+  `XNNPACK`, ...) to ONNX Runtime by name, with `ep_option.<key>` as its options. A provider the build lacks, or an unknown name, is
+  now `UAIRT_ERR_BACKEND_UNAVAILABLE` (it was `UAIRT_ERR_UNSUPPORTED`). Only CoreML was run (Apple M5). `cpu_fallback=0` (ONNX Runtime's `session.disable_cpu_ep_fallback`) makes a model that would run on ONNX Runtime's CPU provider fail to load.
+
 ### Added
 - C11 API (`uairt/uairt.h`): engines, models, tensors, zero-copy buffers, status codes.
 - Backend plugin ABI (`uairt/uairt_backend.h`): backends are shared libraries that fill in
