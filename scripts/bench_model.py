@@ -38,7 +38,9 @@ import export_model as em  # noqa: E402
 
 # target -> [(backend, engine options)]: the variants worth comparing. Half-precision and GPU variants sit next to the exact ones.
 VARIANTS: Dict[str, List[Tuple[str, Dict[str, str]]]] = {
-    "onnx": [("onnxruntime", {})],
+    "onnx": [("onnxruntime", {})] + [
+        ("onnxruntime", {"execution_provider": "CoreML", "ep_option.MLComputeUnits": u, "cpu_fallback": "0"})
+        for u in ("CPUAndGPU", "CPUAndNeuralEngine", "ALL")],     # ONNX Runtime's CoreML provider; refused, not skipped, where it is not built in
     "coreml": [("coreml", {"compute_units": u}) for u in ("cpu_only", "cpu_and_gpu", "cpu_and_ne", "all")],
     "executorch": [("executorch", {})],
     "openvino": [("openvino", {"inference_precision": "f32"}), ("openvino", {"inference_precision": "f16"})],

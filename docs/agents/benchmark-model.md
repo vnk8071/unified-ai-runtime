@@ -20,7 +20,7 @@ backend plugins on `UAIRT_PLUGIN_PATH`, `UAIRT_LIBRARY`), because it exports to 
 checks of [export-model.md](export-model.md). Run `--list` first: a variant whose plugin is not built is skipped, so build the backends you want
 compared before you run it.
 
-What it does: exports to each target (onnx, coreml, executorch, openvino, ncnn, mnn), then runs every variant (CoreML's four compute-unit settings,
+What it does: exports to each target (onnx, coreml, executorch, openvino, ncnn, mnn), then runs every variant (ONNX Runtime's CoreML provider with three compute-unit settings and `cpu_fallback=0`, CoreML's four compute-unit settings,
 OpenVINO and NCNN and MNN at full and at half precision, MNN on Metal, and so on) **in its own process**, because the native libraries of
 different runtimes can deadlock in one process and a crash then costs one row. Each run loads the file through UAIRT, runs once and compares the raw
 outputs with the reference (PyTorch, or ONNX Runtime for an ONNX source) on the same random input, warms up, and times the runs.

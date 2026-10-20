@@ -8,6 +8,12 @@ labelled unreleased, so entries from before that date were already in 0.1.0 and 
 llama.cpp, whisper.cpp, ExecuTorch and llmserver backends, the C++17 core behind the unchanged C API, the Windows
 ARM64 wheel, vendor version checks in `doctor`, and the export, application and pre/post-processing guides for agents and people.
 
+### Fixed
+- A shared build (`-DBUILD_SHARED_LIBS=ON`) on Linux failed to link `test_llm` (`undefined reference to symbol 'logf' ... DSO missing from command line`): the test now links `m`. Seen on Colab and reproduced on an Ubuntu 20.04 aarch64 board; the default static build and macOS were not affected.
+
+### Added (macOS notebook)
+- `examples/notebooks/uairt_macos.ipynb`: builds every Apple-relevant backend, runs `ctest`, runs ResNet-18 through all variants and proves the Metal runs; `scripts/bench_model.py` gained three variants for ONNX Runtime's CoreML provider (`cpu_fallback=0`).
+
 ### Added (generic ONNX Runtime provider)
 - `onnxruntime` backend: `execution_provider=<name>` passes any provider in the loaded ONNX Runtime build (`CoreML`, `QNN`, `OpenVINO`,
   `XNNPACK`, ...) to ONNX Runtime by name, with `ep_option.<key>` as its options. A provider the build lacks, or an unknown name, is

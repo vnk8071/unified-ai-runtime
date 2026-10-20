@@ -641,6 +641,9 @@ if(UAIRT_BUILD_TESTS)
 
   add_executable(test_llm tests/test_llm.c)
   target_link_libraries(test_llm PRIVATE uairt_llm)
+  if(NOT WIN32)
+    target_link_libraries(test_llm PRIVATE m)    # the test calls logf; a shared build does not pass uairt_llm's own libm on
+  endif()
   add_test(NAME llm COMMAND test_llm $<TARGET_FILE:uairt_session_test_1> $<TARGET_FILE:uairt_session_test_4>)
   add_executable(test_llm_utf8 tests/test_llm_utf8.cpp)
   target_include_directories(test_llm_utf8 PRIVATE include src)

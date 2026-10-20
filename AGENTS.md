@@ -16,6 +16,9 @@ ExecuTorch, OpenVINO, NCNN or MNN and checks the result through UAIRT against th
 follow `docs/agents/benchmark-model.md` (`scripts/bench_model.py`). If the user wants a program that uses UAIRT, follow `docs/agents/write-app.md`. When the model runs but its input has to be prepared or its
 output interpreted (images, audio, text and tokenizers, boxes, chat templates, sampling), start from the inputs and outputs the backend
 reports and follow `docs/agents/pre-post-processing.md`; `examples/python/inspect_model.py` prints them with a first guess.
+Project skills in `.claude/skills/` wrap these playbooks and the lessons learned running them: `run-model-on-device`, `export-model`,
+`benchmark-model`, `write-uairt-app`, `use-onnxruntime-providers`, `add-backend`, `test-on-remote-device`, `test-on-colab-gpu`,
+`release-uairt` and `check-references`.
 Vendor versions (tested, minimum, download pages) are in `docs/vendors.md`; `scripts/doctor.sh` compares what is installed
 with them.
 

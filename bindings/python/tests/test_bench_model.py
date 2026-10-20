@@ -99,5 +99,5 @@ def test_end_to_end_benchmark_of_an_onnx_file_writes_json(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Fastest accurate: onnxruntime" in result.stdout
     data = json.loads((tmp_path / "r.json").read_text())
-    (entry,) = data["results"]
+    entry = next(r for r in data["results"] if not r["options"])     # the plain CPU variant; the CoreML provider ones are refused off Apple hardware
     assert entry["status"] == "ok" and entry["accuracy"] == "ok" and entry["runs"] == 10 and entry["median_ms"] > 0
