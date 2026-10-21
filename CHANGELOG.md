@@ -6,6 +6,7 @@
 On `main` after the `v0.2.0` tag; not in the 0.2.0 wheels.
 
 ### Fixed
+- `whispercpp`: `language=auto` returned an empty transcript, because the backend set whisper.cpp's `detect_language`, which detects the language and stops without transcribing. Found through a comment on a Reddit post; `tests/compare_with_whisper_cli.py` now compares `auto` as well as `en` with `whisper-cli`, and fails on the old code. Checked only on the English-only `tiny.en`.
 - A shared build (`-DBUILD_SHARED_LIBS=ON`) on Linux failed to link `test_llm` (`undefined reference to symbol 'logf' ... DSO missing from command line`): the test now links `m`. Seen on Colab and reproduced on an Ubuntu 20.04 aarch64 board; the default static build and macOS were not affected.
 
 ### Added (generic ONNX Runtime provider)

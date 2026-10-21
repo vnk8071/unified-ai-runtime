@@ -234,7 +234,8 @@ static uairt_status run(void* handle, const uairt_tensor* inputs, size_t n_in, u
   params.print_special = false;
   params.translate = model->options.translate;
   params.language = model->options.language;
-  params.detect_language = strcmp(model->options.language, "auto") == 0;
+  // language "auto" makes whisper_full detect the language and go on; detect_language would stop after the detection, with no text
+  params.detect_language = false;
   if (model->options.num_threads > 0) {
     params.n_threads = model->options.num_threads;
   }

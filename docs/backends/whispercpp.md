@@ -57,7 +57,7 @@ build/run_model --option n_samples=176000 build/libuairt_backend_whispercpp.so w
 Engine options:
 
 - `n_samples` (default 480000, at least 1600), `max_text_bytes` (default 4096).
-- `language`: a code such as `en` (default) or `auto` to detect it. An English-only model with another language fails at load.
+- `language`: a code such as `en` (default) or `auto` to detect it and then transcribe (before 2026-10-21 `auto` returned an empty transcript: the backend asked whisper.cpp to detect the language and stop). An English-only model with another language fails at load.
 - `translate`: `true` translates to English.
 - `num_threads`, `use_gpu` (default `true`: whichever GPU backend your whisper.cpp was built with, Metal on a Mac), `gpu_device`,
   `flash_attn` (default `true`, as in whisper.cpp; `false` is slower and, on the CPU, uses about 50 MB more).
@@ -85,12 +85,13 @@ Apple M5, macOS 26.6.2, whisper.cpp 1.9.5-dev (commit 0c7be69; first built share
 | CPU, `use_gpu=false` | transcript equal to `whisper-cli` after ignoring whitespace, case and its segment timestamps; 116 ms per run |
 | Metal GPU (default) | the same transcript; 54 ms per run |
 | 11 s of silence | ` [BLANK_AUDIO]` |
+| `language=auto` (tiny.en) | transcript equal to `whisper-cli -l auto` (`tests/compare_with_whisper_cli.py` runs both `en` and `auto`) |
 | `max_text_bytes=20` | fails with "the transcript needs 106 bytes but option 'max_text_bytes' is 20" |
 
 The comparison and the error-path tests also pass under AddressSanitizer and UBSan (LeakSanitizer is not available on macOS
 arm64). Loading this plugin and the llama.cpp plugin in one process and running the whisper model worked.
 
-Not verified: any model other than `tiny.en`, multilingual or `translate` use, `language=auto`, CUDA, Vulkan or the Hexagon
+Not verified: any model other than `tiny.en`, multilingual or `translate` use, language detection on a multilingual model (`auto` was checked only on `tiny.en`, which is English-only), CUDA, Vulkan or the Hexagon
 NPU (whisper.cpp has backends for them; none was built), Linux and Windows, long audio, and a comparison against the GPU
 output of `whisper-cli` (the GPU run was compared only with the CPU transcript).
 
