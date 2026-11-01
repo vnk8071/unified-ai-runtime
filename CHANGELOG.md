@@ -14,6 +14,12 @@ On `main` after the `v0.2.0` tag; not in the 0.2.0 wheels.
   `XNNPACK`, ...) to ONNX Runtime by name, with `ep_option.<key>` as its options. A provider the build lacks, or an unknown name, is
   now `UAIRT_ERR_BACKEND_UNAVAILABLE` (it was `UAIRT_ERR_UNSUPPORTED`). Only CoreML was run (Apple M5). `cpu_fallback=0` (ONNX Runtime's `session.disable_cpu_ep_fallback`) makes a model that would run on ONNX Runtime's CPU provider fail to load.
 
+### Added (Transformers.js backend)
+- `transformersjs` backend (POSIX): runs a Transformers.js model directory in a Node worker (`-DUAIRT_BUILD_TRANSFORMERSJS=ON`; you install Node and `@huggingface/transformers`). Options `package_dir`, `node`, `worker`, `device` (`cpu`, `webgpu`), `dtype`, `input_shapes`. `device=webgpu` is refused unless ONNX Runtime logged nodes on `WebGpuExecutionProvider`. Verified on an Apple M5 with all-MiniLM-L6-v2: identical to Transformers.js called from Node on `cpu` and `webgpu`. Not run on Linux or other models; see `docs/backends/transformersjs.md`.
+
+### Added (WebGPU through ONNX Runtime)
+- `onnxruntime` backend: `execution_provider=webgpu` is an alias for ONNX Runtime's `WebGPU` provider. An ONNX Runtime build without it fails at engine creation with `UAIRT_ERR_BACKEND_UNAVAILABLE`. Run on an Apple M5 with the ONNX Runtime 1.24.4 macOS release (has WebGPU): all nodes on `WebGpuExecutionProvider`, outputs equal the CPU provider's (add_mul exactly, a small conv net within 1.1e-8), and slower than the CPU on that tiny net. A fixed-shape `all-MiniLM-L6-v2` (Transformers.js's ONNX export, 1x16 tokens) also ran: 328 of 331 nodes on WebGPU, output within 2.3e-6 of ONNX Runtime's CPU run, slower than the CPU. The pip ONNX Runtime 1.31.0 has no WebGPU provider (the error path). WebCL has no runtime anywhere (Khronos dropped it); use `device=opencl` in `mnn` or `device=GPUOpenCL` in `llamacpp`, neither run on OpenCL here.
+
 ### Added (benchmark tool)
 - `scripts/bench_model.py`: exports a PyTorch module or ONNX file to every target of `export_model.py`, runs each backend and option variant in its own process through UAIRT,
   checks the outputs against the original and ranks latency (the core's own timing), with a verdict that keeps exact and reduced-precision results apart; `--artifact` adds files

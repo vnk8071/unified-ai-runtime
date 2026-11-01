@@ -19,6 +19,7 @@ and how to check the result. Vendor SDKs are never part of this repository
 | whisper.cpp | [whispercpp.md](whispercpp.md) | speech to text; ggml `.bin` Whisper models. Verified on macOS (CPU, Metal) |
 | ExecuTorch | [executorch.md](executorch.md) | macOS (CPU, XNNPACK); `.pte` files. Verified on macOS only |
 | llama.cpp | [llamacpp.md](llamacpp.md) | GGUF language models on the CPU, Metal, CUDA, Vulkan, OpenCL (Adreno) and the Hexagon NPU (`HTP0`). Verified on macOS (Metal, CPU), Linux x86_64 with an RTX 3060 (CUDA, Vulkan) and Windows 11 ARM64 on a Snapdragon X Elite (CPU, OpenCL, `HTP0`) |
+| Transformers.js | [transformersjs.md](transformersjs.md) | A Transformers.js model directory through a Node worker (POSIX), on the CPU or WebGPU. Verified on macOS (Apple M5) with all-MiniLM-L6-v2 |
 | LLM server | [llmserver.md](llmserver.md) | Ollama, LM Studio, SGLang: attaches to a running server over HTTP, text completion only. Verified with Ollama on macOS |
 | reference | [reference.md](reference.md) | any, test only |
 

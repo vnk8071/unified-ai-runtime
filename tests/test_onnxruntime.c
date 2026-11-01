@@ -187,6 +187,16 @@ int main(int argc, char** argv) {
     CHECK(uairt_engine_create("onnxruntime", bad_combo, 2, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
   }
 
+  /* "webgpu" is an alias for ONNX Runtime's "WebGPU" provider: it either loads, or fails as unavailable, never a silent CPU run. */
+  {
+    uairt_option webgpu[] = {{"execution_provider", "webgpu"}, {"cpu_fallback", "0"}};
+    uairt_status webgpu_status = uairt_engine_create("onnxruntime", webgpu, 2, &engine);
+    CHECK(webgpu_status == UAIRT_OK || webgpu_status == UAIRT_ERR_BACKEND_UNAVAILABLE);
+    if (webgpu_status == UAIRT_OK) {
+      uairt_engine_destroy(engine);
+    }
+  }
+
   if (g_failures) {
     fprintf(stderr, "%d check(s) failed\n", g_failures);
     return 1;

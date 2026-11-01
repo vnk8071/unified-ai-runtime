@@ -597,6 +597,20 @@ if(UAIRT_BUILD_LLMSERVER)
   endif()
 endif()
 
+option(UAIRT_BUILD_TRANSFORMERSJS "Build the Transformers.js backend plugin (POSIX; runs a Node worker, you install Node and @huggingface/transformers)" OFF)
+if(UAIRT_BUILD_TRANSFORMERSJS)
+  if(WIN32)
+    message(FATAL_ERROR "UAIRT_BUILD_TRANSFORMERSJS is POSIX only")
+  endif()
+  add_library(uairt_backend_transformersjs MODULE src/backends/transformersjs.c)
+  target_include_directories(uairt_backend_transformersjs PRIVATE include)
+  target_compile_definitions(uairt_backend_transformersjs PRIVATE UAIRT_BUILDING_SHARED
+    UAIRT_TRANSFORMERSJS_WORKER="${CMAKE_CURRENT_SOURCE_DIR}/src/backends/transformersjs_worker.mjs")
+  set_target_properties(uairt_backend_transformersjs PROPERTIES PREFIX "lib" C_VISIBILITY_PRESET hidden)
+  install(TARGETS uairt_backend_transformersjs LIBRARY DESTINATION lib/uairt)
+  install(FILES src/backends/transformersjs_worker.mjs DESTINATION lib/uairt)
+endif()
+
 if(UAIRT_BUILD_TESTS)
   enable_testing()
 
@@ -890,6 +904,17 @@ if(UAIRT_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/add_mul.onnx)
     else()
       add_test(NAME cpp_binding COMMAND test_cpp)
+    endif()
+  endif()
+
+  if(UAIRT_BUILD_TRANSFORMERSJS)
+    find_program(UAIRT_NODE node)
+    if(UAIRT_NODE)
+      add_executable(test_transformersjs tests/test_transformersjs.c)
+      target_link_libraries(test_transformersjs PRIVATE uairt)
+      add_test(NAME transformersjs COMMAND test_transformersjs $<TARGET_FILE:uairt_backend_transformersjs>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/tjs_add_mul
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/fake_transformersjs_worker.mjs)
     endif()
   endif()
 

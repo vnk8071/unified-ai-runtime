@@ -381,6 +381,20 @@ else
   report skip "llmserver: libcurl development files not found (libcurl4-openssl-dev on Debian and Ubuntu)"
 fi
 
+tjs_dir="${UAIRT_TRANSFORMERSJS_DIR:-}"
+if [[ "$(uname -s)" != MINGW* && "$(uname -s)" != MSYS* ]]; then
+  if ! have node; then
+    report skip "transformersjs: node not found (install Node.js)"
+  elif [[ -z "$tjs_dir" ]]; then
+    report skip "transformersjs: node $(node --version); set UAIRT_TRANSFORMERSJS_DIR to a directory with @huggingface/transformers installed (npm install --prefix <dir> @huggingface/transformers)"
+  elif [[ -f "$tjs_dir/node_modules/@huggingface/transformers/package.json" ]]; then
+    report ok "transformersjs: node $(node --version), $tjs_dir"
+    vendor_check transformersjs "$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$tjs_dir/node_modules/@huggingface/transformers/package.json" | head -1)"
+  else
+    report missing "transformersjs: @huggingface/transformers not found under $tjs_dir/node_modules"
+  fi
+fi
+
 if [[ "$(uname -s)" == "Darwin" ]]; then
   if have xcrun; then
     sdk="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"

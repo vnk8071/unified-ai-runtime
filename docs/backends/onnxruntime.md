@@ -100,6 +100,28 @@ The same options work from Python (`AutoModel.from_file(..., backend="onnxruntim
 from this change; the 0.2.0 wheel's plugin refuses the name. Only CoreML was run: QNN, OpenVINO, XNNPACK, WebGPU, DirectML and NNAPI are
 **untested**, and the test is `UAIRT_TEST_ORT_PROVIDER=<name> ctest`.
 
+### WebGPU (`execution_provider=webgpu`)
+
+`webgpu` is an alias for ONNX Runtime's case-sensitive `WebGPU` provider (a native build that includes it, which runs on Dawn). The pip wheel
+does not contain it: ONNX Runtime 1.31.0 from pip lists `CoreML`, `Azure` and `CPU` providers, and `webgpu` fails with
+`UAIRT_ERR_BACKEND_UNAVAILABLE` ("WebGPU execution provider is not supported in this build"). Use `cpu_fallback=0` to prove the model ran on it.
+
+Run on an Apple M5 (Metal) with the ONNX Runtime 1.24.4 `onnxruntime-osx-arm64` release (it contains Dawn; the plugin was built with
+`ONNXRUNTIME_ROOT` pointing at it): `--option log_level=verbose` printed `All nodes placed on [WebGpuExecutionProvider]` for `tests/data/add_mul.onnx`
+and for a small exported conv net (3 convolutions, pooling, linear; 1x3x64x64). Outputs equal the CPU provider's (add_mul exactly; the conv net within
+1.1e-8, outputs of std 0.07, so not constant). On that tiny net WebGPU was **slower** than the CPU (0.61 ms against 0.16 ms per run, plus 244 ms against 23 ms to
+load): a model this small does not pay for a GPU dispatch, so no speed-up is claimed. Not verified: a large model, other platforms or GPUs, fp16, the 1.30 and 1.31
+versions with WebGPU. A Transformers.js-style model, `Xenova/all-MiniLM-L6-v2` `onnx/model.onnx` (Apache-2.0, fp32, 90 MB, BERT-based sentence embedding), also ran through UAIRT. Its
+inputs have dynamic dimensions, which the backend refuses, so a copy was fixed to 1x16 tokens with `onnx.tools.update_model_dims` (inputs `input_ids`,
+`attention_mask`, `token_type_ids` as int64, output `last_hidden_state` 1x16x384; tokenized with the `tokenizers` package). On the M5 with ONNX Runtime 1.24.4:
+328 nodes were placed on `WebGpuExecutionProvider` and 3 on the CPU provider (not identified), the output differs from ONNX Runtime's own Python CPU run by at most 2.3e-6
+(UAIRT's CPU run: exactly 0; output std 0.44) and the mean-pooled embedding has cosine 0.99999994 with it. WebGPU was slower: 3.2 ms per run against 0.93 ms on the CPU, at 16 tokens.
+Not run: the fp16, q4 or q4f16 files, a dynamic sequence length, a language model with a key-value cache, a larger input. Cross-check in a browser (not a UAIRT run: UAIRT is native and does not run in Chrome): the same conv net through onnxruntime-web 1.24.3 on
+headless Google Chrome 156 (Apple M5, adapter `apple` / `metal-3`) gave the same output to 1.1e-8, 1.08 ms per run. It shows the model and the WebGPU
+numerics agree in a browser; a UAIRT build for WebAssembly was not attempted. With this 1.24.4 build `tests/test_onnxruntime.c` aborts in its existing `cpu_fallback=0` check
+(`Attempt to use DefaultLogger but none has been registered`), before any WebGPU code; it passes with pip 1.31.0. There is no WebCL
+backend: the standard is abandoned and no runtime ships it. For OpenCL use `mnn` (`device=opencl`) or `llamacpp` (`GPUOpenCL`).
+
 ### QNN through ONNX Runtime: tried on a QCS6490 board, not working
 
 Use the `qnn` backend for Qualcomm NPUs; this is what happened when ONNX Runtime's QNN provider was tried instead (Ubuntu 20.04 board,

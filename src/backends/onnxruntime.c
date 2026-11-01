@@ -232,6 +232,9 @@ static uairt_status append_builtin_ep(
   uairt_status status = UAIRT_OK;
   OrtCUDAProviderOptionsV2* cuda = NULL;
   OrtTensorRTProviderOptionsV2* tensorrt = NULL;
+  if (strcmp(provider, "webgpu") == 0) {
+    provider = "WebGPU";  // ONNX Runtime's own name is case-sensitive
+  }
   if (strcmp(provider, "cuda") == 0) {
     TRY(g_ort->CreateCUDAProviderOptions(&cuda));
     TRY(g_ort->UpdateCUDAProviderOptions(cuda, keys, values, num_ep_options));
