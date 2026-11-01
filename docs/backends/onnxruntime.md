@@ -119,8 +119,18 @@ inputs have dynamic dimensions, which the backend refuses, so a copy was fixed t
 Not run: the fp16, q4 or q4f16 files, a dynamic sequence length, a language model with a key-value cache, a larger input. Cross-check in a browser (not a UAIRT run: UAIRT is native and does not run in Chrome): the same conv net through onnxruntime-web 1.24.3 on
 headless Google Chrome 156 (Apple M5, adapter `apple` / `metal-3`) gave the same output to 1.1e-8, 1.08 ms per run. It shows the model and the WebGPU
 numerics agree in a browser; a UAIRT build for WebAssembly was not attempted. With this 1.24.4 build `tests/test_onnxruntime.c` aborts in its existing `cpu_fallback=0` check
-(`Attempt to use DefaultLogger but none has been registered`), before any WebGPU code; it passes with pip 1.31.0. There is no WebCL
-backend: the standard is abandoned and no runtime ships it. For OpenCL use `mnn` (`device=opencl`) or `llamacpp` (`GPUOpenCL`).
+(`Attempt to use DefaultLogger but none has been registered`), before any WebGPU code; it passes with pip 1.31.0. 
+
+**The plugin route (not run).** ONNX Runtime also publishes the native WebGPU provider as a separate plugin execution provider, the
+`onnxruntime-ep-webgpu` package on PyPI, which needs ONNX Runtime 1.24.4 or newer and, on Linux, a system Vulkan loader. UAIRT's
+`ep_library` and `ep_name` options load plugin providers (see above), so it should work with an ONNX Runtime that was built without WebGPU. The library
+path and the `ep_name` come from the package's own documentation, which was not checked; none of this was tried here. Sources: the
+[WebGPU provider page](https://onnxruntime.ai/docs/execution-providers/WebGPU-ExecutionProvider.html) and the
+[package page](https://pypi.org/project/onnxruntime-ep-webgpu/0.4.0/).
+
+**WebCL.** There is no WebCL backend. WebCL 1.0 was ratified in 2014 but stalled: no shipping browser or native runtime provides it, and Khronos's
+[WebGL 2.0 Compute](https://registry.khronos.org/webgl/specs/latest/2.0-compute/) specification names WebGPU as the direction for compute on the web.
+Khronos did not publish a retirement notice that was found, so "stalled", not "withdrawn". For OpenCL use `mnn` (`device=opencl`) or `llamacpp` (`GPUOpenCL`); neither was run on OpenCL here.
 
 ### QNN through ONNX Runtime: tried on a QCS6490 board, not working
 
