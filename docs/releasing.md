@@ -2,7 +2,7 @@
 # Releasing the Python package
 
 The `uairt` package on PyPI is a set of platform wheels plus a source distribution, built and published by
-`.github/workflows/wheels.yml`. Version 0.1.0 is on https://pypi.org/project/uairt/. A release needs the one-time setup below and either a pushed `v*` tag or a manual
+`.github/workflows/wheels.yml`. Version 0.2.1 is on https://pypi.org/project/uairt/. A release needs the one-time setup below and either a pushed `v*` tag or a manual
 run of the workflow with `publish` set to `testpypi` or `pypi`.
 
 ## What is published
@@ -36,9 +36,9 @@ Package names are first-come: `uairt` was free when this was written, and it is 
 ## Release steps
 
 1. Pick the version. Change it in **both** `pyproject.toml` (`version`) and `include/uairt/uairt.h` (`UAIRT_VERSION_*`); a test
-   and the workflow fail if they disagree. A pre-release such as `0.1.0rc1` goes in `pyproject.toml` only, with the numbers
+   and the workflow fail if they disagree. A pre-release such as `0.2.1rc1` goes in `pyproject.toml` only, with the numbers
    matching the header. Update `CHANGELOG.md`.
-2. Commit, then tag and push the tag: `git tag v0.1.0 && git push origin v0.1.0`.
+2. Commit, then tag and push the tag: `git tag v0.2.1 && git push origin v0.2.1`.
 3. The workflow checks the versions, builds the source distribution and the wheels, installs each wheel in a clean environment
    and runs the Python tests against it, and uploads everything to **TestPyPI**.
 4. Look at the TestPyPI page and try it:
