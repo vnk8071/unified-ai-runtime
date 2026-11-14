@@ -69,12 +69,20 @@ async function load(h) {
   tf = await import(pathToFileURL(entry).href);
   const version = JSON.parse(readFileSync(new URL('../package.json', pathToFileURL(entry)), 'utf8')).version;
   tf.env.allowRemoteModels = false;
-  model = await tf.AutoModel.from_pretrained(h.path, {
-    device: h.device,
-    dtype: h.dtype || 'fp32',
-    // verbose, so the plugin can read the node placement from stderr and refuse a device the model did not land on
-    session_options: { logSeverityLevel: 0 },
-  });
+  try {
+    model = await tf.AutoModel.from_pretrained(h.path, {
+      device: h.device,
+      dtype: h.dtype || 'fp32',
+      // verbose, so the plugin can read the node placement from stderr and refuse a device the model did not land on
+      session_options: { logSeverityLevel: 0 },
+    });
+  } catch (error) {
+    // onnxruntime-node without WebGPU (Linux without Vulkan) throws "no available backend found. ERR: [webgpu] backend not found."
+    if (h.device !== 'cpu' && /backend not found|no available backend/i.test(String(error && error.message))) {
+      throw problem(`device=${h.device} is not available: ${error.message}`, 'unavailable');
+    }
+    throw error;
+  }
   const names = Object.keys(model.sessions || {});
   if (names.length !== 1) throw problem(`the model has ${names.length} ONNX sessions (${names.join(', ')}); one is supported`, 'unsupported');
   const session = model.sessions[names[0]];

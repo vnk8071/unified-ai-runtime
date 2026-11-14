@@ -232,12 +232,23 @@ plugin's QNN factory offers no device (only `CPUExecutionProvider` is listed), a
 call is disabled in that build. Every Linux aarch64 `onnxruntime-qnn` wheel (2.1.0 to 2.6.0) is
 such a plugin. Only the built-in EP, which does not depend on device discovery, works.
 
+On Windows 11 ARM64 the same plugin does find the Hexagon NPU through DXCore. The `edge-ai`
+project runs RTMDet and HRNet pose on a Snapdragon X Elite laptop with it, ONNX Runtime used
+directly. That exposed a selection bug on UAIRT's side: the QNN plugin lists an NPU, a GPU and a
+CPU device under one `QNNExecutionProvider` name, and the old code took the first match, so a
+model could land on QNN's CPU backend without saying so. `ep_device` (`auto`, `cpu`, `gpu`,
+`npu`) now selects by hardware type and `auto` prefers NPU, then GPU, then CPU. `AutoModel`
+maps `device="npu"` to the `onnxruntime-qnn` package's plugin path and `ep_device=npu`; this
+route was not run on the Snapdragon here.
+
 ## ONNX Runtime plugin execution providers: MLX
 
 The ONNX Runtime backend can load a plugin execution provider with `ep_library` (path to the
 library), `ep_name` (the name to register it under, normally the provider's own, for example
-`MLXExecutionProvider`) and `ep_option.<key>=<value>` options. It registers the library, picks the
-device whose provider name matches, and appends it; ONNX Runtime keeps the CPU EP as the fallback.
+`MLXExecutionProvider`) and `ep_option.<key>=<value>` options, plus `ep_device` (`auto`, `cpu`,
+`gpu`, `npu`) to choose among the plugin's devices. It registers the library, picks the devices whose
+provider name matches (and whose type matches `ep_device`, or the fastest type: NPU, then GPU, then CPU)
+and appends them; ONNX Runtime keeps the CPU EP as the fallback.
 The plugin must match the ONNX Runtime core: `onnxruntime-ep-mlx` 0.29.x needs ONNX Runtime 1.29.x,
 and the UAIRT plugin must be built against headers no newer than that core (it asks for the header's
 API level, so a build against 1.29.1 headers works with 1.29.1).
@@ -258,6 +269,13 @@ Outputs agreed with the CPU EP to a relative max abs difference of 8e-7 (MobileN
 (ResNet50), and the top-1 classes were equal. The first MLX run in a fresh process took 1.6 s to
 initialize for MobileNetV2 and about 68 ms for the later runs of the other model; I did not find out
 why, so treat initialization time as unexplained.
+
+Later, with ONNX Runtime 1.31.1 and `onnxruntime-ep-mlx` 0.31.1 on the same M5, the new `ep_device`
+option was checked with `tests/data/add_mul.onnx`: `ep_device=gpu` and `auto` placed all nodes on
+`MLXExecutionProvider` and gave byte-identical outputs to the CPU provider, while `cpu` and `npu`
+failed with `available for MLXExecutionProvider: gpu`. The same test with `onnxruntime-ep-webgpu`
+0.5.0 and ONNX Runtime 1.24.4 placed all nodes on `WebGpuExecutionProvider` with output-identical
+results.
 
 Not tested: LLMs or other transformers (the provider's own benchmarks target those, and its README
 reports larger gains there), quantized models, models with dynamic shapes, and a comparison with the

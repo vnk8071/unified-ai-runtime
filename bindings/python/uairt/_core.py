@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import codecs
 import ctypes
+import sys
 import weakref
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -208,6 +209,8 @@ class Session:
         self.close()
 
     def __del__(self):
+        if sys.is_finalizing():
+            return  # the runtime may already be tearing down; the process is about to free everything anyway
         try:
             self.close()
         except Exception:
@@ -256,6 +259,8 @@ class Buffer:
         self.close()
 
     def __del__(self):
+        if sys.is_finalizing():
+            return  # the runtime may already be tearing down; the process is about to free everything anyway
         try:
             self.close()
         except Exception:
@@ -462,6 +467,8 @@ class Model:
         self.close()
 
     def __del__(self):
+        if sys.is_finalizing():
+            return  # the runtime may already be tearing down; the process is about to free everything anyway
         try:
             self.close()
         except Exception:
@@ -520,6 +527,8 @@ class Engine:
         self.close()
 
     def __del__(self):
+        if sys.is_finalizing():
+            return  # the runtime may already be tearing down; the process is about to free everything anyway
         try:
             self.close()
         except Exception:

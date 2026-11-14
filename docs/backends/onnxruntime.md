@@ -34,7 +34,8 @@ for `run_model` or your own C program, `export UAIRT_ONNXRUNTIME_LIBRARY=<site-p
 
 `intra_op_threads`, `execution_provider` (`cpu`, `cuda`, `tensorrt`, or the name of any provider your ONNX Runtime build contains, see below), `log_level` (`verbose`, `info`, `warning`,
 `error`, `fatal`), `cpu_fallback` (`1` default, or `0`, see below), and `ep_option.<key>`, which is passed to the provider (CUDA, TensorRT, a named provider or a plugin). For a plugin
-execution provider also `ep_library` and `ep_name`.
+execution provider also `ep_library` and `ep_name`, and `ep_device` (`auto`, the default, or `cpu`, `gpu`, `npu`) to choose which device the plugin uses when it offers more than one.
+`auto` prefers an NPU, then a GPU, then a CPU; without it a plugin that lists its CPU device first would silently run there.
 
 ## GPU providers (CUDA and TensorRT)
 
@@ -121,21 +122,73 @@ headless Google Chrome 156 (Apple M5, adapter `apple` / `metal-3`) gave the same
 numerics agree in a browser; a UAIRT build for WebAssembly was not attempted. With this 1.24.4 build `tests/test_onnxruntime.c` aborts in its existing `cpu_fallback=0` check
 (`Attempt to use DefaultLogger but none has been registered`), before any WebGPU code; it passes with pip 1.31.0. 
 
-**The plugin route (not run).** ONNX Runtime also publishes the native WebGPU provider as a separate plugin execution provider, the
-`onnxruntime-ep-webgpu` package on PyPI, which needs ONNX Runtime 1.24.4 or newer and, on Linux, a system Vulkan loader. UAIRT's
-`ep_library` and `ep_name` options load plugin providers (see above), so it should work with an ONNX Runtime that was built without WebGPU. The library
-path and the `ep_name` come from the package's own documentation, which was not checked; none of this was tried here. Sources: the
-[WebGPU provider page](https://onnxruntime.ai/docs/execution-providers/WebGPU-ExecutionProvider.html) and the
-[package page](https://pypi.org/project/onnxruntime-ep-webgpu/0.4.0/).
+**The plugin route (run on an Apple M5).** ONNX Runtime also publishes the native WebGPU provider as a separate plugin
+execution provider, the `onnxruntime-ep-webgpu` package on PyPI, which needs ONNX Runtime 1.24.4 or newer and, on Linux, a
+system Vulkan loader. UAIRT's `ep_library`, `ep_name` and `ep_device` options load it. With `onnxruntime-ep-webgpu` 0.5.0
+and ONNX Runtime 1.24.4 on an Apple M5 (`tests/data/add_mul.onnx`, two 1x4 inputs):
+`ep_device=gpu` and `ep_device=auto` both placed all nodes on `WebGpuExecutionProvider`, and the outputs were byte-identical
+to the CPU provider's. The WebGPU plugin exposes one GPU device; ONNX Runtime lists its CPU device separately under
+`CPUExecutionProvider`, so `ep_device=cpu` is rejected for `WebGpuExecutionProvider` with
+`no 'cpu' device (available for WebGpuExecutionProvider: gpu)`, and `ep_device=npu` says the same; `auto` picked the GPU.
+The model is tiny, so its 0.66 ms per run is not a speed-up claim (the CPU run was below the timer's 0.01 ms resolution).
 
 **WebCL.** There is no WebCL backend. WebCL 1.0 was ratified in 2014 but stalled: no shipping browser or native runtime provides it, and Khronos's
 [WebGL 2.0 Compute](https://registry.khronos.org/webgl/specs/latest/2.0-compute/) specification names WebGPU as the direction for compute on the web.
 Khronos did not publish a retirement notice that was found, so "stalled", not "withdrawn". For OpenCL use `mnn` (`device=opencl`) or `llamacpp` (`GPUOpenCL`); neither was run on OpenCL here.
 
-### QNN through ONNX Runtime: tried on a QCS6490 board, not working
+### QNN through ONNX Runtime on Windows ARM64 (`onnxruntime-qnn`)
 
-Use the `qnn` backend for Qualcomm NPUs; this is what happened when ONNX Runtime's QNN provider was tried instead (Ubuntu 20.04 board,
-Hexagon v68, glibc 2.31, the QNN libraries from QAIRT 2.46 and 2.48):
+On Windows 11 ARM64 the `onnxruntime-qnn` wheel (QNN EP plugin, 2.x) exposes the Hexagon NPU, and UAIRT can use it
+through the plugin route. The `edge-ai` project runs RTMDet and HRNet pose on a Snapdragon X Elite NPU with this plugin
+(ONNX Runtime used directly); this path has not yet been run through UAIRT on that laptop.
+
+```bash
+pip install "uairt[onnxruntime]" onnxruntime-qnn
+```
+
+`AutoModel` finds the plugin when an NPU is requested, so no paths are needed:
+
+```python
+import uairt
+model = uairt.AutoModel.from_file("rtmdet_qnn_ctx.onnx", device="npu")
+print(model.options)  # ep_library=..., ep_name=QNNExecutionProvider, ep_device=npu
+```
+
+The explicit form, for C or when `onnxruntime-qnn` is not installed as a Python package:
+
+```bash
+build/run_model --option ep_library="C:/.../onnxruntime_qnn/onnxruntime_providers_qnn.dll" \
+  --option ep_name=QNNExecutionProvider --option ep_device=npu \
+  --option ep_option.htp_performance_mode=burst \
+  --option cpu_fallback=0 \
+  build/libuairt_backend_onnxruntime.dll onnxruntime rtmdet_qnn_ctx.onnx out in.bin
+```
+
+Keep the QNN context binary (`*_qnn.bin`) next to the EPContext `.onnx`, as ONNX Runtime requires. `ep_device=npu` is
+the important part: the QNN plugin lists an NPU, a GPU and a CPU device under the same `QNNExecutionProvider` name, so
+`auto` now prefers the NPU, and `ep_device` makes that explicit. `cpu_fallback=0` fails the load if any node would land
+on ONNX Runtime's CPU provider; without it, a QNN device that cannot start runs the model on the CPU silently (see
+above). `ep_option.<key>` uses the provider's own option names, for example `htp_performance_mode`, `backend_path` or
+`soc_model`.
+
+In an application such as `edge-ai`, an ONNX Runtime QNN model entry only needs:
+
+```yaml
+runtime: uairt
+runtime_options:
+  backend: onnxruntime
+  device: npu
+  options:
+    ep_option.htp_performance_mode: burst
+```
+
+UAIRT finds the `onnxruntime-qnn` plugin; `ep_name` is optional, and `ep_library` is only needed when the plugin is not
+installed as a Python package.
+
+### QNN through ONNX Runtime on Linux: the plugin cannot see the NPU
+
+Use the `qnn` backend for Qualcomm NPUs on Linux; this is what happened when ONNX Runtime's QNN provider was tried
+instead (Ubuntu 20.04 board, Hexagon v68, glibc 2.31, the QNN libraries from QAIRT 2.46 and 2.48):
 
 - The QNN provider wheels and the 2.4.0 plugin (`github.com/onnxruntime/onnxruntime-qnn`) need glibc 2.34 or 2.38, so they ran in an Ubuntu
   22.04/24.04 Docker container with `/dev/adsprpc-smd` and the board's `libcdsprpc.so` mounted. Without that library the provider could not
@@ -145,16 +198,31 @@ Hexagon v68, glibc 2.31, the QNN libraries from QAIRT 2.46 and 2.48):
   QAIRT 2.48 libraries. The cause is not known; the `qnn` backend ran other quantized models on this board.
 - The plugin build (`ep_library=.../libonnxruntime_providers_qnn.so`, `ep_name=QNNExecutionProvider`, 2.4.0 with ONNX Runtime 1.26.0) registered,
   but ONNX Runtime found no Qualcomm NPU or GPU device to give it (the provider supports only those two device types), so it exposed no device.
-  UAIRT reports `no execution provider device named 'QNNExecutionProvider' (available: CPUExecutionProvider)`.
+  UAIRT reports `no execution provider device named 'QNNExecutionProvider' (available: CPUExecutionProvider(cpu))`.
 
-No QNN run through ONNX Runtime was verified on the NPU.
+No QNN run through ONNX Runtime was verified on a Linux NPU. On Windows ARM64 the same plugin works because ONNX Runtime's
+DXCore device discovery finds the Hexagon NPU.
 
 ## Plugin execution providers (for example MLX)
 
 A plugin EP needs an ONNX Runtime core of the version it targets (`onnxruntime-ep-mlx` 0.29.x needs
-ONNX Runtime 1.29.x). Build UAIRT against that release's headers and keep the provider library
+ONNX Runtime 1.29.x; 0.31.x needs 1.31.x). Build UAIRT against that release's headers and keep the provider library
 (the `onnxruntime-ep-mlx` wheel bundles `libonnxruntime_mlx_ep.dylib` and the MLX runtime) together.
-To run the plugin test under `ctest`, set `UAIRT_TEST_ORT_EP_LIBRARY` and `UAIRT_TEST_ORT_EP_NAME`.
+
+The Python binding fills `ep_library` from `ep_name` when the provider's PyPI package is installed:
+`QNNExecutionProvider` (`onnxruntime-qnn`), `MLXExecutionProvider` (`onnxruntime-ep-mlx`) and
+`WebGpuExecutionProvider` (`onnxruntime-ep-webgpu`). So `AutoModel.from_file("model.onnx", backend="onnxruntime",
+device="gpu", options={"ep_name": "MLXExecutionProvider"})` is enough; a C caller passes the library path itself.
+`ep_device` chooses the provider's device (`auto` by default, or `cpu`, `gpu`, `npu`), which matters when one provider
+lists several. Run on an Apple M5 with ONNX Runtime 1.31.1 and `onnxruntime-ep-mlx` 0.31.1: `ep_device=gpu` and `auto`
+placed all nodes of `tests/data/add_mul.onnx` on `MLXExecutionProvider`, its outputs were byte-identical to the CPU
+provider's, and `ep_device=cpu`/`npu` failed with `available for MLXExecutionProvider: gpu`. The `edge-ai` pipeline
+(`yolox_s.onnx`, `runtime: uairt`, `backend: onnxruntime`, `device: gpu`, `options: {ep_name: MLXExecutionProvider}`)
+ran 20 frames, wrote its event and exited 0; its raw output was byte-identical to a direct ONNX Runtime MLX run (same three
+boxes and classes).
+
+To run the plugin test under `ctest`, set `UAIRT_TEST_ORT_EP_LIBRARY` and `UAIRT_TEST_ORT_EP_NAME`, and optionally
+`UAIRT_TEST_ORT_EP_DEVICE` (`auto`, `npu`, `gpu` or `cpu`).
 
 ## Check
 

@@ -44,6 +44,7 @@ with uairt.AutoModel.from_file("yolov8n.onnx", device="gpu") as model:
     (y,) = model.run(x)
 
 uairt.AutoModel.from_file("face_det.dlc", device="npu")                  # qnn
+uairt.AutoModel.from_file("rtmdet.onnx", device="npu")                   # onnxruntime + onnxruntime-qnn
 uairt.AutoModel.from_file("yolov8n_ncnn_model", device="gpu", input_shapes="3x640x640")   # ncnn on Vulkan
 uairt.AutoModel.resolve("m.onnx", device="gpu")                           # the plan only, nothing loaded
 ```
@@ -53,7 +54,10 @@ uairt.AutoModel.resolve("m.onnx", device="gpu")                           # the 
   directory is judged by what it holds (an ultralytics `_openvino_model` or `_ncnn_model` export). Pass `backend=` to choose.
 - **Device:** `cpu`, `gpu`, `npu`, `cuda`, `tensorrt` or `vulkan`, with an optional index (`gpu:1`), or `None` for the backend's
   default. It is mapped to that backend's own options (`device=npu` for QNN, `execution_provider=cuda` for ONNX Runtime,
-  `device=GPU` for OpenVINO, `device=vulkan` for NCNN, and so on). QNN's default is `npu`.
+  `device=GPU` for OpenVINO, `device=vulkan` for NCNN, and so on). QNN's default is `npu`. For an `.onnx` file, `device="npu"`
+  uses the `onnxruntime-qnn` package's QNN plugin and selects its NPU device automatically; install that package first.
+  `options={"ep_name": "MLXExecutionProvider"}` (or `QNNExecutionProvider`, `WebGpuExecutionProvider`) finds the plugin
+  library from its installed package and selects the matching device type.
 - **Strict:** the first candidate that is available (registered, or with a plugin that can be found) and supports the device
   is used. If it fails to load, that error is raised: there is no fallback to another runtime or to the CPU. A device a
   backend cannot serve raises `Unsupported`; no usable plugin raises `NotFound`. Both say why each candidate was passed over.

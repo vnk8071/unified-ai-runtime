@@ -1,11 +1,34 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Changelog
 
-## Unreleased
+## 0.2.1 (2026-11-14)
 
-On `main` after the `v0.2.0` tag; not in the 0.2.0 wheels.
+### Added (ONNX Runtime plugin devices and QNN on Windows ARM64)
+- `onnxruntime` backend: `ep_device` selects which device a plugin execution provider uses: `auto` (default), `cpu`, `gpu` or `npu`.
+  It matters for `onnxruntime-qnn`, which lists an NPU, a GPU and a CPU device under one `QNNExecutionProvider` name; the old
+  code took the first match, so a model could run on QNN's CPU backend without saying so. `auto` prefers an NPU, then a GPU,
+  then a CPU, and all devices of the chosen type are passed to ONNX Runtime. The error now names each device's type.
+- Python `AutoModel`: `device="npu"` with `backend="onnxruntime"` finds the `onnxruntime-qnn` package's QNN plugin and passes
+  `ep_library`, `ep_name` and `ep_device=npu`, so `AutoModel.from_file("model.onnx", device="npu")` needs no paths. On Windows the
+  plugin's directory is added to the DLL search path, where its bundled QNN libraries live. `ep_name` alone is also enough for
+  `QNNExecutionProvider`, `MLXExecutionProvider` and `WebGpuExecutionProvider` when their PyPI package is installed; the binding
+  finds the library. An explicit `ep_library` still works without the package.
+- Verified the plugin route and `ep_device` on an Apple M5 with ONNX Runtime 1.31.1 and `onnxruntime-ep-mlx` 0.31.1: `ep_device=gpu`
+  and `auto` placed all nodes of `add_mul.onnx` on `MLXExecutionProvider` and gave byte-identical outputs to the CPU provider, and
+  `cpu`/`npu` were rejected with `available for MLXExecutionProvider: gpu`. The same test with `onnxruntime-ep-webgpu` 0.5.0
+  (ONNX Runtime 1.24.4) put all nodes on `WebGpuExecutionProvider`, output-identical to the CPU, with `auto` selecting the GPU
+  when no device type was named. The `edge-ai` pipeline (`yolox_s.onnx`, `device: gpu`, `ep_name: MLXExecutionProvider`, only the
+  provider name in its config) ran 20 frames through `main.py`, produced its event and exited 0; its raw output was byte-identical
+  to a direct ONNX Runtime MLX run (same 3 boxes and classes).
+- Windows ARM64 evidence: the `edge-ai` project runs RTMDet and HRNet pose on a Snapdragon X Elite NPU with the same
+  `onnxruntime-qnn` plugin, used directly. The UAIRT route through `ep_device=npu` was not run on that laptop, and the Linux plugin
+  still cannot see the NPU (see `docs/backends/onnxruntime.md`).
 
 ### Fixed
+- Python binding: an engine that was left to `__del__` segfaulted at interpreter shutdown when a plugin execution provider
+  was registered (found with the `edge-ai` pipeline and the MLX plugin, after it had processed every frame and logged `APP END`).
+  `__del__` now skips the native teardown while `sys.is_finalizing()` is true; close the model or engine explicitly to release
+  it before exit. A subprocess test covers the shutdown path.
 - `whispercpp`: `language=auto` returned an empty transcript, because the backend set whisper.cpp's `detect_language`, which detects the language and stops without transcribing. Found through a comment on a Reddit post; `tests/compare_with_whisper_cli.py` now compares `auto` as well as `en` with `whisper-cli`, and fails on the old code. Checked only on the English-only `tiny.en`.
 - A shared build (`-DBUILD_SHARED_LIBS=ON`) on Linux failed to link `test_llm` (`undefined reference to symbol 'logf' ... DSO missing from command line`): the test now links `m`. Seen on Colab and reproduced on an Ubuntu 20.04 aarch64 board; the default static build and macOS were not affected.
 
@@ -15,10 +38,10 @@ On `main` after the `v0.2.0` tag; not in the 0.2.0 wheels.
   now `UAIRT_ERR_BACKEND_UNAVAILABLE` (it was `UAIRT_ERR_UNSUPPORTED`). Only CoreML was run (Apple M5). `cpu_fallback=0` (ONNX Runtime's `session.disable_cpu_ep_fallback`) makes a model that would run on ONNX Runtime's CPU provider fail to load.
 
 ### Added (Transformers.js backend)
-- `transformersjs` backend (POSIX): runs a Transformers.js model directory in a Node worker (`-DUAIRT_BUILD_TRANSFORMERSJS=ON`; you install Node and `@huggingface/transformers`). Options `package_dir`, `node`, `worker`, `device` (`cpu`, `webgpu`), `dtype`, `input_shapes`. `device=webgpu` is refused unless ONNX Runtime logged nodes on `WebGpuExecutionProvider`. Verified on an Apple M5 with all-MiniLM-L6-v2: identical to Transformers.js called from Node on `cpu` and `webgpu`. Not run on Linux or other models; see `docs/backends/transformersjs.md`.
+- `transformersjs` backend (POSIX): runs a Transformers.js model directory in a Node worker (`-DUAIRT_BUILD_TRANSFORMERSJS=ON`; you install Node and `@huggingface/transformers`). Options `package_dir`, `node`, `worker`, `device` (`cpu`, `webgpu`), `dtype`, `input_shapes`. `device=webgpu` is refused unless ONNX Runtime logged nodes on `WebGpuExecutionProvider`. Verified on an Apple M5 with all-MiniLM-L6-v2: identical to Transformers.js called from Node on `cpu` and `webgpu`; and in a Debian 12 aarch64 Docker container (CPU only, `webgpu` correctly unavailable). Not run on Linux hardware or other models; see `docs/backends/transformersjs.md`.
 
 ### Added (WebGPU through ONNX Runtime)
-- `onnxruntime` backend: `execution_provider=webgpu` is an alias for ONNX Runtime's `WebGPU` provider. An ONNX Runtime build without it fails at engine creation with `UAIRT_ERR_BACKEND_UNAVAILABLE`. Run on an Apple M5 with the ONNX Runtime 1.24.4 macOS release (has WebGPU): all nodes on `WebGpuExecutionProvider`, outputs equal the CPU provider's (add_mul exactly, a small conv net within 1.1e-8), and slower than the CPU on that tiny net. A fixed-shape `all-MiniLM-L6-v2` (Transformers.js's ONNX export, 1x16 tokens) also ran: 328 of 331 nodes on WebGPU, output within 2.3e-6 of ONNX Runtime's CPU run, slower than the CPU. The pip ONNX Runtime 1.31.0 has no WebGPU provider (the error path). The native WebGPU provider is also published as the `onnxruntime-ep-webgpu` plugin (needs ONNX Runtime 1.24.4 or newer); it should load through `ep_library` and `ep_name`, which was not tried. There is no WebCL backend: WebCL stalled after 1.0 (2014) and no runtime ships it; use `device=opencl` in `mnn` or `device=GPUOpenCL` in `llamacpp`, neither run on OpenCL here.
+- `onnxruntime` backend: `execution_provider=webgpu` is an alias for ONNX Runtime's `WebGPU` provider. An ONNX Runtime build without it fails at engine creation with `UAIRT_ERR_BACKEND_UNAVAILABLE`. Run on an Apple M5 with the ONNX Runtime 1.24.4 macOS release (has WebGPU): all nodes on `WebGpuExecutionProvider`, outputs equal the CPU provider's (add_mul exactly, a small conv net within 1.1e-8), and slower than the CPU on that tiny net. A fixed-shape `all-MiniLM-L6-v2` (Transformers.js's ONNX export, 1x16 tokens) also ran: 328 of 331 nodes on WebGPU, output within 2.3e-6 of ONNX Runtime's CPU run, slower than the CPU. The pip ONNX Runtime 1.31.0 has no WebGPU provider (the error path). The native WebGPU provider is also published as the `onnxruntime-ep-webgpu` plugin (needs ONNX Runtime 1.24.4 or newer); its 0.5.0 wheel loaded through `ep_library`, `ep_name` and `ep_device` on the same M5, placed all nodes of `add_mul.onnx` on `WebGpuExecutionProvider`, gave byte-identical outputs to the CPU provider, and made `ep_device=auto` pick the GPU over the plugin's CPU device. There is no WebCL backend: WebCL stalled after 1.0 (2014) and no runtime ships it; use `device=opencl` in `mnn` or `device=GPUOpenCL` in `llamacpp`, neither run on OpenCL here.
 
 ### Added (benchmark tool)
 - `scripts/bench_model.py`: exports a PyTorch module or ONNX file to every target of `export_model.py`, runs each backend and option variant in its own process through UAIRT,

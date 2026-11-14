@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -78,11 +80,51 @@ def test_device_maps_to_backend_options(path, device, options):
     assert plan(path, device=device).options == options
 
 
+def test_onnxruntime_npu_uses_the_qnn_plugin(monkeypatch, tmp_path):
+    library = tmp_path / "onnxruntime_providers_qnn.dll"
+    library.write_bytes(b"")
+    monkeypatch.setattr(uairt._plugins, "onnxruntime_qnn_plugin",
+                        lambda: ("QNNExecutionProvider", library))
+    chosen = plan("m.onnx", device="npu")
+    assert chosen.backend == "onnxruntime"
+    assert chosen.options == {"ep_library": str(library), "ep_name": "QNNExecutionProvider", "ep_device": "npu"}
+
+
+def test_onnxruntime_npu_without_the_qnn_package_says_what_to_install(monkeypatch):
+    monkeypatch.setattr(uairt._plugins, "onnxruntime_qnn_plugin", lambda: None)
+    with pytest.raises(uairt.Unsupported, match="onnxruntime-qnn"):
+        plan("m.onnx", device="npu", backend="onnxruntime")
+
+
+def test_an_explicit_plugin_ep_selects_its_device_without_the_qnn_package(monkeypatch):
+    monkeypatch.setattr(uairt._plugins, "onnxruntime_qnn_plugin", lambda: None)
+    chosen = plan("m.onnx", device="npu", backend="onnxruntime",
+                  options={"ep_library": "/opt/qnn/libQnnHtp.so", "ep_name": "QNNExecutionProvider"})
+    assert chosen.options == {"ep_library": "/opt/qnn/libQnnHtp.so", "ep_name": "QNNExecutionProvider",
+                              "ep_device": "npu"}
+    with pytest.raises(uairt.Unsupported, match="index"):
+        plan("m.onnx", device="npu:1", backend="onnxruntime",
+             options={"ep_library": "x", "ep_name": "y"})
+
+
+def test_ep_name_alone_finds_the_plugin_library(monkeypatch, tmp_path):
+    library = tmp_path / "libonnxruntime_mlx_ep.dylib"
+    library.write_bytes(b"")
+    monkeypatch.setattr(uairt._plugins, "plugin_library_for_ep", lambda name: library)
+    chosen = plan("m.onnx", device="gpu", backend="onnxruntime", options={"ep_name": "MLXExecutionProvider"})
+    assert chosen.options == {"ep_name": "MLXExecutionProvider", "ep_library": str(library), "ep_device": "gpu"}
+
+
+def test_ep_name_without_a_known_package_needs_the_library(monkeypatch):
+    monkeypatch.setattr(uairt._plugins, "plugin_library_for_ep", lambda name: None)
+    with pytest.raises(uairt.Unsupported, match="needs ep_library"):
+        plan("m.onnx", device="gpu", backend="onnxruntime", options={"ep_name": "VitisAIExecutionProvider"})
+
+
 @pytest.mark.parametrize("path, device, backend, why", [
     ("m.engine", "cpu", None, "NVIDIA gpu"),
     ("m.dlc", "cuda", None, "cpu, gpu or npu"),
     ("m.tflite", "npu", None, "delegate"),
-    ("m.onnx", "npu", "onnxruntime", "execution provider"),
     ("m.param", "npu", None, "Vulkan"),
     ("m.xml", "cuda", None, "no cuda"),
     ("m.mlmodelc", "gpu:1", None, "index"),
@@ -92,7 +134,8 @@ def test_a_device_the_backend_cannot_serve_is_an_error_not_a_fallback(path, devi
         plan(path, device=device, backend=backend)
 
 
-def test_candidates_are_tried_in_order_and_the_reasons_are_kept():
+def test_candidates_are_tried_in_order_and_the_reasons_are_kept(monkeypatch):
+    monkeypatch.setattr(uairt._plugins, "onnxruntime_qnn_plugin", lambda: None)
     both = plan("m.onnx", device="gpu")
     assert both.backend == "onnxruntime" and both.skipped == {}
     only_openvino = plan("m.onnx", device="gpu", available=lambda name: name == "openvino")
@@ -165,6 +208,14 @@ def test_a_missing_plugin_is_a_clear_error():
     assert "no plugin was found" in str(caught.value)
     with pytest.raises(uairt.NotFound, match="no plugin found"):
         uairt.AutoModel.from_file("model.onnx", backend="no_such_backend")
+
+
+def test_an_engine_left_to_the_interpreter_shutdown_does_not_crash():
+    script = ("import numpy as np, uairt\n"
+              "m = uairt.AutoModel.from_file('unused', backend='reference')\n"
+              "m.run(np.zeros((1, 4), np.float32))\n")
+    completed = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_available_backends_lists_the_registered_one():

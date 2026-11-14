@@ -257,11 +257,11 @@ API, with a plain C ABI that other languages can bind to. (Behind that ABI the c
 
 ## Status
 
-Version 0.2.0, pre-1.0: the API and ABI may change. See [CHANGELOG.md](CHANGELOG.md).
+Version 0.2.1, pre-1.0: the API and ABI may change. See [CHANGELOG.md](CHANGELOG.md).
 
 | Backend | Models | Verified on |
 |---|---|---|
-| ONNX Runtime | `.onnx`, static shapes; CPU, and the CUDA and TensorRT providers on NVIDIA GPUs | macOS arm64 (CPU) and a GTX 1650 (CUDA provider); matches Python ONNX Runtime. Compiles on Windows ARM64, not run there |
+| ONNX Runtime | `.onnx`, static shapes; CPU, the CUDA and TensorRT providers on NVIDIA GPUs, CoreML/WebGPU, and plugin execution providers (QNN, MLX, WebGPU) with `ep_device` | macOS arm64 (CPU, CoreML, WebGPU and its plugin); a GTX 1650 (CUDA provider); matches Python ONNX Runtime. The QNN plugin route is set up for Windows ARM64 but was not run through UAIRT there |
 | QNN | `.dlc`, context binaries; CPU and HTP; DMABUF zero-copy; compiled-context cache | Qualcomm QCS6490 and QCS8550, Windows 11 ARM64 on a Snapdragon X Elite NPU, and Android on an SM8850 board (HTP v81, a float context binary and a w8a8 `.dlc`); byte-identical to `qnn-net-run` |
 | TFLite | `.tflite`; CPU kernels, optional QNN delegate | Qualcomm QCS6490 (CPU path only); identical to `tflite_bench`. On an Android SM8850 board a w8a8 YOLOX ran on the CPU and through the QNN delegate, but there was no TFLite reference tool there to compare with, and the delegate was slower than the CPU for that model |
 | CoreML | `.mlmodelc`, `.mlpackage`, `.mlmodel`; multi-array I/O, image inputs | Apple M5; identical to CoreML itself. On an iPhone 12 (iOS 18.1.1), linked statically into an app: a small model equals the Mac's result, and a YOLOv9t detector gives the Mac's detections (3.3 ms with the Neural Engine) |
@@ -605,7 +605,7 @@ ONNX Runtime plugin is on PyPI (`pip install "uairt[onnxruntime]"`; see [docs/re
 - [docs/writing-a-backend.md](docs/writing-a-backend.md): the plugin ABI and how to add a backend
 - [docs/design.md](docs/design.md): design decisions, per-backend notes, measurements
 - [docs/LICENSING.md](docs/LICENSING.md): how vendor licenses shape this repository
-- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), [release notes for 0.2.0](docs/releases/v0.2.0.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), [release notes for 0.2.1](docs/releases/v0.2.1.md)
 - [AGENTS.md](AGENTS.md) and [docs/agents/](docs/agents/run-model.md): instructions for coding agents, including a
   playbook for building UAIRT and running a model on a target device (`scripts/doctor.sh` reports the device), choosing
   and exporting a model format ([docs/agents/export-model.md](docs/agents/export-model.md)) and writing application code

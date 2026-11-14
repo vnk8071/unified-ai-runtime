@@ -36,6 +36,8 @@ def main():
     parser.add_argument("--model", default="resnet50", choices=["resnet50", "mobilenet_v2"])
     parser.add_argument("--batch", type=int, default=8)
     parser.add_argument("--runs", type=int, default=10)
+    parser.add_argument("--ep-device", choices=["auto", "cpu", "gpu", "npu"], default=None,
+                        help="ep_device for the plugin EP (default: the backend's auto selection)")
     args = parser.parse_args()
 
     torch.manual_seed(0)
@@ -49,6 +51,8 @@ def main():
 
         cpu_ms, cpu_init = run(args.run_model, args.plugin, model, tmp / "in.bin", tmp / "cpu_", args.runs, [])
         ep_options = ["--option", f"ep_library={args.ep_library}", "--option", f"ep_name={args.ep_name}"]
+        if args.ep_device:
+            ep_options += ["--option", f"ep_device={args.ep_device}"]
         ep_ms, ep_init = run(args.run_model, args.plugin, model, tmp / "in.bin", tmp / "ep_", args.runs, ep_options)
 
         expected = np.fromfile(tmp / "cpu_0.bin", np.float32).reshape(args.batch, -1)

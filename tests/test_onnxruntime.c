@@ -148,6 +148,13 @@ int main(int argc, char** argv) {
   CHECK(uairt_engine_create("onnxruntime", &name_only, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
   uairt_option ep_only = {"ep_option.x", "1"};
   CHECK(uairt_engine_create("onnxruntime", &ep_only, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
+  uairt_option device_only = {"ep_device", "npu"};
+  CHECK(uairt_engine_create("onnxruntime", &device_only, 1, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
+  uairt_option bad_device[] = {{"ep_library", "/no/such/ep.dylib"}, {"ep_name", "SomeExecutionProvider"},
+                               {"ep_device", "tpu"}};
+  CHECK(uairt_engine_create("onnxruntime", bad_device, 3, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
+  uairt_option builtin_and_device[] = {{"execution_provider", "cpu"}, {"ep_device", "npu"}};
+  CHECK(uairt_engine_create("onnxruntime", builtin_and_device, 2, &engine) == UAIRT_ERR_INVALID_ARGUMENT);
   uairt_option missing_library[] = {{"ep_library", "/no/such/ep.dylib"}, {"ep_name", "SomeExecutionProvider"}};
   CHECK(uairt_engine_create("onnxruntime", missing_library, 2, &engine) != UAIRT_OK);
   CHECK(uairt_last_error()[0] != '\0');
@@ -155,9 +162,11 @@ int main(int argc, char** argv) {
   /* Optional: a real plugin execution provider, from UAIRT_TEST_ORT_EP_LIBRARY and UAIRT_TEST_ORT_EP_NAME. */
   const char* ep_library = getenv("UAIRT_TEST_ORT_EP_LIBRARY");
   const char* ep_name = getenv("UAIRT_TEST_ORT_EP_NAME");
+  const char* ep_device = getenv("UAIRT_TEST_ORT_EP_DEVICE");
   if (ep_library && ep_name) {
-    uairt_option provider_options[] = {{"ep_library", ep_library}, {"ep_name", ep_name}};
-    CHECK(uairt_engine_create("onnxruntime", provider_options, 2, &engine) == UAIRT_OK);
+    uairt_option provider_options[] = {{"ep_library", ep_library}, {"ep_name", ep_name},
+                                       {"ep_device", ep_device ? ep_device : "auto"}};
+    CHECK(uairt_engine_create("onnxruntime", provider_options, 3, &engine) == UAIRT_OK);
     if (engine) {
       uairt_model* plugin_model = NULL;
       CHECK(uairt_model_load(engine, &from_path, &plugin_model) == UAIRT_OK);

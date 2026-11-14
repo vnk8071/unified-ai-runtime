@@ -18,7 +18,7 @@ a Hexagon architecture hint (it is a hint: check it against the chip before rely
 | Model file | Backend | Devices | The user provides |
 |---|---|---|---|
 | `.dlc`, `.bin` (QNN context binary) | `qnn` | NPU (HTP), CPU, GPU | QAIRT SDK, new enough for `.dlc` |
-| `.onnx` | `onnxruntime` | CPU; NVIDIA GPU with the `cuda` or `tensorrt` provider; NPU through a plugin execution provider | an ONNX Runtime release matching the headers (1.22+), a GPU release for the GPU providers |
+| `.onnx` | `onnxruntime` | CPU; NVIDIA GPU with the `cuda` or `tensorrt` provider; NPU on Windows ARM64 through the `onnxruntime-qnn` plugin (or Qualcomm's `qnn` backend); GPU/NPU on a Mac through CoreML or the MLX plugin | an ONNX Runtime release matching the headers (1.22+), a GPU release for the GPU providers; `pip install onnxruntime-qnn` or `onnxruntime-ep-mlx` for the plugins |
 | `.tflite` | `tflite` | CPU; NPU through the QNN delegate (`libQnnTFLiteDelegate.so`, so Linux or Android) | a TFLite C library built for the target |
 | OpenVINO IR (`.xml` + `.bin`), also `.onnx` | `openvino` | Intel CPU, GPU, NPU | OpenVINO (pip or release), Intel GPU/NPU drivers for those devices |
 | Paddle Lite `.nb` | `paddlelite` | CPU | build Paddle Lite yourself (`docs/backends/paddlelite.md`), set `PADDLE_LITE_ROOT`, `-DUAIRT_BUILD_PADDLELITE=ON`; `input_shapes` option required |

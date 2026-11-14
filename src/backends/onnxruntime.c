@@ -28,6 +28,7 @@
 #define OPTION_EP "execution_provider"
 #define OPTION_EP_LIBRARY "ep_library"
 #define OPTION_EP_NAME "ep_name"
+#define OPTION_EP_DEVICE "ep_device"
 #define OPTION_EP_PREFIX "ep_option."
 #define OPTION_LOG_LEVEL "log_level"
 #define OPTION_CPU_FALLBACK "cpu_fallback"
@@ -167,15 +168,71 @@ static void release_engine(engine_t* engine) {
   free(engine);
 }
 
-/* Registers a plugin execution provider library and appends its device (CPU stays as the fallback). */
+/* Device type names used in option validation and error messages. */
+static const char* hardware_type_name(OrtHardwareDeviceType type) {
+  switch (type) {
+    case OrtHardwareDeviceType_NPU:
+      return "npu";
+    case OrtHardwareDeviceType_GPU:
+      return "gpu";
+    case OrtHardwareDeviceType_CPU:
+      return "cpu";
+    default:
+      return "unknown";
+  }
+}
+
+/* auto prefers an accelerator: NPU, then GPU, then CPU, then anything else. */
+static int hardware_type_rank(OrtHardwareDeviceType type) {
+  switch (type) {
+    case OrtHardwareDeviceType_NPU:
+      return 0;
+    case OrtHardwareDeviceType_GPU:
+      return 1;
+    case OrtHardwareDeviceType_CPU:
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+static bool parse_ep_device(const char* value, int* rank) {
+  if (strcmp(value, "auto") == 0) {
+    *rank = -1;
+    return true;
+  }
+  if (strcmp(value, "npu") == 0) {
+    *rank = 0;
+    return true;
+  }
+  if (strcmp(value, "gpu") == 0) {
+    *rank = 1;
+    return true;
+  }
+  if (strcmp(value, "cpu") == 0) {
+    *rank = 2;
+    return true;
+  }
+  return false;
+}
+
+/* Registers a plugin execution provider library and appends its devices of the requested type (CPU stays as the fallback). */
 static uairt_status append_plugin_ep(
     engine_t* engine,
     const char* library,
     const char* name,
+    const char* ep_device,
     const char* const* keys,
     const char* const* values,
     size_t num_ep_options) {
   uairt_status status = UAIRT_OK;
+  const OrtEpDevice** selected = NULL;
+  size_t num_selected = 0;
+  int wanted_rank = -1;
+  if (ep_device && !parse_ep_device(ep_device, &wanted_rank)) {
+    fail("%s must be auto, npu, gpu or cpu", OPTION_EP_DEVICE);
+    return UAIRT_ERR_INVALID_ARGUMENT;
+  }
 #if defined(_WIN32)
   wchar_t* wide_library = utf8_to_wide(library);
   if (!wide_library) {
@@ -193,27 +250,80 @@ static uairt_status append_plugin_ep(
   const OrtEpDevice* const* devices = NULL;
   size_t num_devices = 0;
   TRY(g_ort->GetEpDevices(engine->env, &devices, &num_devices));
-  const OrtEpDevice* chosen = NULL;
-  char available[256] = "";
-  size_t used = 0;
+  int best_rank = 4;
+  bool name_found = false;
+  char matching_types[128] = "";
+  char available[512] = "";
+  size_t used_types = 0;
+  size_t used_all = 0;
   for (size_t i = 0; i < num_devices; ++i) {
     const char* device_name = g_ort->EpDevice_EpName(devices[i]);
-    if (!chosen && strcmp(device_name, name) == 0) {
-      chosen = devices[i];
+    const OrtHardwareDevice* hardware = g_ort->EpDevice_Device(devices[i]);
+    OrtHardwareDeviceType type =
+        hardware ? g_ort->HardwareDevice_Type(hardware) : (OrtHardwareDeviceType)-1;
+    if (used_all < sizeof(available)) {
+      used_all += (size_t)snprintf(available + used_all, sizeof(available) - used_all, "%s%s(%s)",
+                                   used_all ? ", " : "", device_name, hardware_type_name(type));
     }
-    if (used < sizeof(available)) {
-      used += (size_t)snprintf(available + used, sizeof(available) - used, "%s%s", used ? ", " : "", device_name);
+    if (strcmp(device_name, name) != 0) {
+      continue;
+    }
+    name_found = true;
+    if (used_types < sizeof(matching_types)) {
+      used_types += (size_t)snprintf(matching_types + used_types, sizeof(matching_types) - used_types, "%s%s",
+                                     used_types ? ", " : "", hardware_type_name(type));
+    }
+    int rank = hardware_type_rank(type);
+    if (wanted_rank < 0) {
+      if (rank < best_rank) {
+        best_rank = rank;
+      }
     }
   }
-  if (!chosen) {
+  if (!name_found) {
     fail("no execution provider device named '%s' (available: %s); the library may not match this "
          "ONNX Runtime version, or ONNX Runtime found no hardware the provider supports",
          name, available);
     return UAIRT_ERR_UNSUPPORTED;
   }
-  TRY(g_ort->SessionOptionsAppendExecutionProvider_V2(engine->options, engine->env, &chosen, 1, keys,
-                                                      values, num_ep_options));
+  int target_rank = wanted_rank < 0 ? best_rank : wanted_rank;
+  for (size_t i = 0; i < num_devices; ++i) {
+    if (strcmp(g_ort->EpDevice_EpName(devices[i]), name) != 0) {
+      continue;
+    }
+    const OrtHardwareDevice* hardware = g_ort->EpDevice_Device(devices[i]);
+    OrtHardwareDeviceType type =
+        hardware ? g_ort->HardwareDevice_Type(hardware) : (OrtHardwareDeviceType)-1;
+    if (hardware_type_rank(type) == target_rank) {
+      ++num_selected;
+    }
+  }
+  if (num_selected == 0) {
+    fail("'%s' has no '%s' device (available for %s: %s)", name, ep_device, name, matching_types);
+    return UAIRT_ERR_UNSUPPORTED;
+  }
+  selected = calloc(num_selected, sizeof(*selected));
+  if (!selected) {
+    return UAIRT_ERR_OUT_OF_MEMORY;
+  }
+  size_t at = 0;
+  for (size_t i = 0; i < num_devices; ++i) {
+    if (strcmp(g_ort->EpDevice_EpName(devices[i]), name) != 0) {
+      continue;
+    }
+    const OrtHardwareDevice* hardware = g_ort->EpDevice_Device(devices[i]);
+    OrtHardwareDeviceType type =
+        hardware ? g_ort->HardwareDevice_Type(hardware) : (OrtHardwareDeviceType)-1;
+    if (hardware_type_rank(type) == target_rank) {
+      selected[at++] = devices[i];
+    }
+  }
+  status = check(g_ort->SessionOptionsAppendExecutionProvider_V2(engine->options, engine->env, selected,
+                                                                 num_selected, keys, values, num_ep_options));
+  free(selected);
+  return status;
 cleanup:
+  free(selected);
   return status;
 }
 
@@ -285,6 +395,7 @@ static uairt_status create_engine(
   uairt_status status = UAIRT_OK;
   const char* ep_library = NULL;
   const char* ep_name = NULL;
+  const char* ep_device = NULL;
   const char* ep_keys[MAX_EP_OPTIONS];
   const char* ep_values[MAX_EP_OPTIONS];
   size_t num_ep_options = 0;
@@ -323,6 +434,14 @@ static uairt_status create_engine(
       ep_library = value;
     } else if (strcmp(key, OPTION_EP_NAME) == 0) {
       ep_name = value;
+    } else if (strcmp(key, OPTION_EP_DEVICE) == 0) {
+      int rank = 0;
+      if (!parse_ep_device(value, &rank)) {
+        fail("%s must be auto, npu, gpu or cpu", OPTION_EP_DEVICE);
+        status = UAIRT_ERR_INVALID_ARGUMENT;
+        goto cleanup;
+      }
+      ep_device = value;
     } else if (strncmp(key, OPTION_EP_PREFIX, strlen(OPTION_EP_PREFIX)) == 0) {
       if (num_ep_options == MAX_EP_OPTIONS) {
         fail("at most %d '%s*' options are supported", MAX_EP_OPTIONS, OPTION_EP_PREFIX);
@@ -338,8 +457,9 @@ static uairt_status create_engine(
     }
   }
   if (builtin_ep) {
-    if (ep_library || ep_name) {
-      fail("execution_provider=%s cannot be combined with '%s' or '%s'", builtin_ep, OPTION_EP_LIBRARY, OPTION_EP_NAME);
+    if (ep_library || ep_name || ep_device) {
+      fail("execution_provider=%s cannot be combined with '%s', '%s' or '%s'", builtin_ep, OPTION_EP_LIBRARY,
+           OPTION_EP_NAME, OPTION_EP_DEVICE);
       status = UAIRT_ERR_INVALID_ARGUMENT;
       goto cleanup;
     }
@@ -353,13 +473,13 @@ static uairt_status create_engine(
       status = UAIRT_ERR_INVALID_ARGUMENT;
       goto cleanup;
     }
-    status = append_plugin_ep(engine, ep_library, ep_name, ep_keys, ep_values, num_ep_options);
+    status = append_plugin_ep(engine, ep_library, ep_name, ep_device, ep_keys, ep_values, num_ep_options);
     if (status != UAIRT_OK) {
       goto cleanup;
     }
-  } else if (ep_name || num_ep_options) {
-    fail("'%s' and '%s*' need '%s' or execution_provider=<provider>", OPTION_EP_NAME, OPTION_EP_PREFIX,
-         OPTION_EP_LIBRARY);
+  } else if (ep_name || num_ep_options || ep_device) {
+    fail("'%s', '%s*' and '%s' need '%s' or execution_provider=<provider>", OPTION_EP_NAME, OPTION_EP_PREFIX,
+         OPTION_EP_DEVICE, OPTION_EP_LIBRARY);
     status = UAIRT_ERR_INVALID_ARGUMENT;
     goto cleanup;
   }

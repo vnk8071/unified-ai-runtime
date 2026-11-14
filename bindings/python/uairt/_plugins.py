@@ -3,7 +3,7 @@
 import importlib.util
 import os
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from . import _lib
 from ._core import NotFound, backends, load_backend_library
@@ -66,6 +66,62 @@ def _onnxruntime_library() -> Optional[Path]:
 # Vendor runtimes that ship as Python packages: where a plugin can find them, set before the plugin loads.
 _RUNTIME_LOCATORS: Dict[str, Callable[[], Optional[Path]]] = {"onnxruntime": _onnxruntime_library}
 _RUNTIME_VARIABLES = {"onnxruntime": "UAIRT_ONNXRUNTIME_LIBRARY"}
+
+# os.add_dll_directory() handles must stay alive for the process, or Windows drops the directory again.
+_DLL_DIRECTORIES: List[object] = []
+
+
+def _add_dll_directory(library: Path) -> None:
+    """Makes a plugin's bundled dependencies findable on Windows."""
+    if os.name != "nt":
+        return
+    try:
+        _DLL_DIRECTORIES.append(os.add_dll_directory(str(library.parent)))
+    except (AttributeError, OSError):
+        os.environ["PATH"] = str(library.parent) + os.pathsep + os.environ.get("PATH", "")
+
+
+def onnxruntime_qnn_plugin() -> Optional[Tuple[str, Path]]:
+    """The QNN execution-provider plugin from the `onnxruntime-qnn` package, as (ep_name, library), or None.
+
+    The wheel bundles the QNN libraries next to the plugin. On Windows that directory is added to the DLL search path,
+    so QnnHtp.dll and its dependencies are found when ONNX Runtime registers the provider.
+    """
+    if importlib.util.find_spec("onnxruntime_qnn") is None:
+        return None
+    try:
+        import onnxruntime_qnn
+    except ImportError:
+        return None
+    library = Path(onnxruntime_qnn.get_library_path())
+    if not library.is_file():
+        return None
+    _add_dll_directory(library)
+    return onnxruntime_qnn.get_ep_name(), library
+
+
+# Plugin execution providers with a Python package that ships their library. The key is the name passed to ONNX Runtime.
+_EP_PACKAGES = {
+    "QNNExecutionProvider": "onnxruntime_qnn",
+    "MLXExecutionProvider": "onnxruntime_ep_mlx",
+    "WebGpuExecutionProvider": "onnxruntime_ep_webgpu",
+}
+
+
+def plugin_library_for_ep(ep_name: str) -> Optional[Path]:
+    """The library that provides a named plugin execution provider, when a known package ships it; else None."""
+    package = _EP_PACKAGES.get(ep_name)
+    if package is None or importlib.util.find_spec(package) is None:
+        return None
+    module = importlib.import_module(package)
+    getter = getattr(module, "get_library_path", None) or getattr(module, "library_path", None)
+    if getter is None:
+        return None
+    library = Path(getter() if callable(getter) else getter)
+    if not library.is_file():
+        return None
+    _add_dll_directory(library)
+    return library
 
 
 def ensure_backend(backend: str) -> Optional[Path]:

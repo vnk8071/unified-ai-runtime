@@ -14,6 +14,7 @@ the platform column says where each applies.
 | `fatal error: System/QnnSystemDlc.h` | QAIRT too old (2.31 has no DLC API) | use a newer QAIRT, for example 2.45, via `QNN_SDK_ROOT` |
 | `CLOCK_MONOTONIC` or `dlfcn.h` not found | built an older source tree on Windows | use the current tree; it has the Windows port |
 | `the installed ONNX Runtime (x) is older than the headers` | the ONNX Runtime library does not match the headers | use a release that matches `ONNXRUNTIME_ROOT`'s headers (1.22+) |
+| `onnxruntime` + `QNNExecutionProvider` runs as slowly as the CPU, or says it has no `npu` device | the QNN plugin lists CPU, GPU and NPU devices under one provider name, and the first was chosen; on Linux the plugin never discovers the NPU | pass `ep_device=npu` (the Python `device="npu"` does it) and `cpu_fallback=0`; on Linux use the `qnn` backend |
 | Python: `not a valid Win32 application` or the library will not load | x64 Python loading an ARM64 `uairt.dll` | use an ARM64 Python, or build for x64 |
 | `pip install torch` finds nothing on ARM64 | no Windows ARM64 `torch` wheel | export the model to ONNX from an x64 Python |
 | NPU run: `DspTransport.openSession ... 0x80000406` then exit code `0xC0000374` (Python, Rust) | the NPU libraries need `ADSP_LIBRARY_PATH` in the environment when the process starts; setting it later does not work from these hosts | set it to `<QAIRT root>\lib\hexagon-v73\unsigned` before starting the process. C and C++ hosts do not need this |

@@ -58,5 +58,10 @@ WebGPU output differs from the CPU's by about 3e-6. `ctest` runs `tests/test_tra
 (`tests/data/fake_transformersjs_worker.mjs`, needs only Node) including the refusal of `webgpu` when no WebGPU placement is logged, and, when
 `UAIRT_TRANSFORMERSJS_DIR` is set, a run of a two-output model directory on `cpu` and `webgpu`. Run under AddressSanitizer and UBSan: passed (leak detection is not available on macOS arm64).
 
-**Not verified:** Linux, any GPU but the M5's, other models or tasks, dtype variants (fp16, q4, q4f16), a language model with a key-value cache,
-dynamic shapes at run time, concurrent runs on one model (not supported; runs are serialized by the caller), Node versions other than 26.10.
+Linux, in a container: Debian 12 (glibc 2.36) aarch64 under Docker Desktop on the same Mac, Node 22.23.4, `@huggingface/transformers` installed with npm inside it. The plugin
+built with no warnings and links no `uairt_` symbol, `ctest` `transformersjs` passes (error paths, the stand-in worker, the two-output model on `cpu`), and `compare_with_transformersjs.py` on
+all-MiniLM-L6-v2 gave a difference of 0 on `cpu`. `device=webgpu` fails there with `UAIRT_ERR_BACKEND_UNAVAILABLE` (`no available backend found. ERR: [webgpu] backend not found.`), because the container has no GPU and no Vulkan.
+That run found a bug, now fixed: the worker's error was reported as `UAIRT_ERR_INCOMPATIBLE_MODEL`; a device ONNX Runtime does not have is now `UAIRT_ERR_BACKEND_UNAVAILABLE`.
+
+**Not verified:** Linux on real hardware or x86_64 (the container is a virtual machine on the Mac), WebGPU on Linux (Vulkan), any GPU but the M5's, other models or tasks, dtype variants (fp16, q4, q4f16), a language model with a key-value cache,
+dynamic shapes at run time, concurrent runs on one model (not supported; runs are serialized by the caller), Node versions other than 26.10 (macOS) and 22.23 (Linux container).

@@ -81,6 +81,14 @@ def _onnxruntime(kind, index):
         if index is not None:
             options["ep_option.device_id"] = str(index)
         return options
+    if kind == "npu":
+        _no_index("onnxruntime on the npu", index)
+        plugin = _plugins.onnxruntime_qnn_plugin()
+        if plugin is None:
+            raise _Skip("onnxruntime has no built-in npu execution provider; install onnxruntime-qnn (its QNN "
+                        "plugin is found automatically), or pass ep_library and ep_name with ep_device='npu'")
+        ep_name, library = plugin
+        return {"ep_library": str(library), "ep_name": ep_name, "ep_device": "npu"}
     raise _Skip(f"onnxruntime has no built-in {kind} provider; for an NPU use a plugin execution provider "
                 "(backend='onnxruntime' with options ep_library and ep_name)")
 
@@ -209,10 +217,24 @@ def resolve(path, device: Optional[str] = None, backend: Optional[str] = None,
     for name in names:
         mapper = _MAPPERS.get(name)
         try:
-            if mapper is None:
+            mapped: Dict[str, str]
+            ep_name = user.get("ep_name")
+            if name == "onnxruntime" and ep_name:
+                # A plugin EP named explicitly: find its library, so `ep_name` alone is enough for known packages.
+                library = user.get("ep_library") or _plugins.plugin_library_for_ep(ep_name)
+                if library is None:
+                    raise _Skip(f"execution provider '{ep_name}' needs ep_library, and no installed package ships it")
+                ep_kind = {"cuda": "gpu", "tensorrt": "gpu", "vulkan": "gpu"}.get(kind, kind)
+                if ep_kind not in (None, "cpu", "gpu", "npu"):
+                    raise _Skip(f"onnxruntime plugin execution providers run on cpu, gpu or npu, not {kind}")
+                _no_index(f"onnxruntime plugin '{ep_name}'", index)
+                mapped = {"ep_library": str(library)}
+                if ep_kind:
+                    mapped["ep_device"] = ep_kind
+            elif mapper is None:
                 if kind is not None:
                     raise _Skip(f"no device mapping is known for backend '{name}'; pass options instead")
-                mapped: Dict[str, str] = {}
+                mapped = {}
             else:
                 mapped = mapper(kind, index)
         except _Skip as why:
